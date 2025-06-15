@@ -1,5 +1,11 @@
 use bevy::prelude::*;
-use bevy_ecs_tilemap::prelude::*;
+
+mod plugins {
+    pub mod diagnostics_overlay_plg;
+    pub mod map_control_plg;
+}
+use plugins::diagnostics_overlay_plg::DiagnosticsOverlayPlugin;
+use plugins::map_control_plg::MapControlPlugin;
 
 fn main() {
     App::new()
@@ -17,48 +23,44 @@ fn main() {
                 })
                 .set(ImagePlugin::default_nearest()),
         )
-        .add_plugins(TilemapPlugin)
-        .add_systems(Startup, generate_tilemap)
+        .add_plugins(DiagnosticsOverlayPlugin)
+        .add_plugins(MapControlPlugin)
+        .add_systems(Startup, (spawn_camera, spawn_example_scene))
         .run();
 }
 
-fn generate_tilemap(
+fn spawn_camera(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
 ) {
-    commands.spawn(Camera2d);
+    commands.spawn((
+        Camera3d::default(),
+        Transform::from_xyz(-2.5, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y),
+    ));
+}
 
-    let texture_handle = asset_server.load("tiles.png");
-    let map_size = TilemapSize { x: 32, y: 32 };
-    let tilemap_entity = commands.spawn_empty().id();
-    let mut tile_storage = TileStorage::empty(map_size);
-
-    for x in 0..map_size.x {
-        for y in 0..map_size.y {
-            let tile_pos = TilePos { x, y };
-            let tile_entity = commands
-                .spawn(TileBundle {
-                    position: tile_pos,
-                    tilemap_id: TilemapId(tilemap_entity),
-                    ..Default::default()
-                })
-                .id();
-            tile_storage.set(&tile_pos, tile_entity);
-        }
-    }
-    
-    let tile_size = TilemapTileSize { x: 16.0, y: 16.0 };
-    let grid_size = tile_size.into();
-    let map_type = TilemapType::default();
-    
-    commands.entity(tilemap_entity).insert(TilemapBundle {
-        grid_size,
-        map_type,
-        size: map_size,
-        storage: tile_storage,
-        texture: TilemapTexture::Single(texture_handle),
-        tile_size,
-        anchor: TilemapAnchor::Center,
-        ..Default::default()
-    });
+fn spawn_example_scene(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    // circular base
+    commands.spawn((
+        Mesh3d(meshes.add(Circle::new(4.0))),
+        MeshMaterial3d(materials.add(Color::WHITE)),
+        Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
+    ));
+    // cube
+    commands.spawn((
+        Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+        Transform::from_xyz(0.0, 0.5, 0.0),
+    ));
+    // light
+    commands.spawn((
+        PointLight {
+            shadows_enabled: true,
+            ..default()
+        },
+        Transform::from_xyz(4.0, 8.0, 4.0),
+    ));
 }
