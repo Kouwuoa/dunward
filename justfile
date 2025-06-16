@@ -5,3 +5,6 @@ deb:
 
 rel:
     cargo run --release
+    
+web:
+    trunk serve

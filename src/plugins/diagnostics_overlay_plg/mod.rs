@@ -27,7 +27,6 @@ fn setup_fps_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
         .spawn((
             Text::new("FPS: "),
             TextFont {
-                font: asset_server.load("fonts/FiraSans-Bold.ttf"),
                 font_size,
                 ..default()
             },
@@ -44,7 +43,6 @@ fn setup_fps_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
             TextSpan::new("..."),
             (
                 TextFont {
-                    font: asset_server.load("fonts/FiraMono-Medium.ttf"),
                     font_size,
                     ..default()
                 },

@@ -1,0 +1,12 @@
+[build]
+target = "web/index.html"
+dist = "target/trunk"
+public_url = "./"
+cargo_profile = "wasm-release"
+
+[watch]
+watch = ["src", "Cargo.toml"]
+ignore = ["target"]
+
+[serve]
+port = 8080

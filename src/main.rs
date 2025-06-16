@@ -1,3 +1,5 @@
+use bevy::asset::AssetMetaCheck;
+use bevy::audio::{AudioPlugin, Volume};
 use bevy::prelude::*;
 
 mod plugins {
@@ -14,6 +16,7 @@ fn main() {
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         title: "Dunward".to_string(),
+                        canvas: Some("#bevy".to_string()),
                         present_mode: bevy::window::PresentMode::AutoVsync,
                         resolution: (800.0, 600.0).into(),
                         resizable: true,
@@ -21,7 +24,18 @@ fn main() {
                     }),
                     ..default()
                 })
-                .set(ImagePlugin::default_nearest()),
+                .set(ImagePlugin::default_nearest())
+                .set(AssetPlugin {
+                    // WASM builds will check for meta files that don't exist if this isn't set.
+                    meta_check: AssetMetaCheck::Never,
+                    ..default()
+                })
+                .set(AudioPlugin {
+                    global_volume: GlobalVolume {
+                        volume: Volume::Linear(0.3),
+                    },
+                   ..default()
+                }),
         )
         .add_plugins(DiagnosticsOverlayPlugin)
         .add_plugins(MapControlPlugin)

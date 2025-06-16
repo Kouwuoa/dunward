@@ -1,0 +1,13 @@
+body {
+    background-color: #1f1f28;
+}
+
+canvas {
+    background-color: #363646;
+}
+
+#bevy {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
