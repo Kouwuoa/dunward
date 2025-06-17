@@ -1,6 +1,7 @@
 use bevy::{image::{ImageLoaderSettings, ImageSampler}, prelude::*};
 use crate::game::GameUpdateSet;
-use super::{Containers, SceneState};
+use crate::ui::UiCommandsExt;
+use super::SceneState;
 
 pub(super) fn plugin(app: &mut App) {
     // Spawn splash screen on entering the SplashScreen state
@@ -70,7 +71,7 @@ fn spawn_splash_screen(
     asset_server: Res<AssetServer>,
 ) {
     commands
-        .ui_root()
+        .spawn_ui_root()
         .insert((
             Name::new("Splash Screen"),
             BackgroundColor(SPLASH_BACKGROUND_COLOR),

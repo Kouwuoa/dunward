@@ -3,6 +3,8 @@ use bevy::audio::{AudioPlugin, Volume};
 use bevy::prelude::*;
 
 mod game;
+mod ui;
+
 mod diagnostics_overlay;
 mod map_control;
 mod scene_transition;
