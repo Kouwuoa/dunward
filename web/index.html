@@ -11,8 +11,30 @@
     <link data-trunk rel="rust" data-cargo-no-default-features data-wasm-opt="s" href="../" />
 </head>
 <body>
-    <canvas id="bevy">
-        JavaScript is not enabled in your browser. Please enable it to run this application.
-    </canvas>
+    <div id="game" class="center">
+        <div id="loading-screen" class="center">
+            <span class="spinner"></span>
+        </div>
+
+        <canvas id="bevy">
+            JavaScript is not enabled in your browser. Please enable it to run this application.
+        </canvas>
+    </div>
+    
+    <script type="module">
+        // Hide loading screen when the game starts
+        const loading_screen = document.getElementById('loading-screen');
+        const bevy = document.getElementById('bevy');
+        const observer = new MutationObserver(() => {
+            if (bevy.height > 1) {
+                loading_screen.style.display = 'none';
+                observer.disconnect();
+            }
+        });
+        observer.observe(bevy, {
+            attributeFilter: ['height']
+        });
+    </script>
+
 </body>
 </html>

@@ -4,7 +4,7 @@ use bevy::{
     prelude::*,
 };
 
-pub struct DiagnosticsOverlayPlugin;
+pub(super) struct DiagnosticsOverlayPlugin;
 impl Plugin for DiagnosticsOverlayPlugin {
     fn build(&self, app: &mut App) {
         info!("DiagnosticsOverlayPlugin: Initializing diagnostics overlay plugin...");
