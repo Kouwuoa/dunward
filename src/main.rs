@@ -1,9 +1,10 @@
 use bevy::asset::AssetMetaCheck;
-use bevy::audio::{AudioPlugin, Volume};
 use bevy::prelude::*;
+use bevy_kira_audio::AudioPlugin;
 
 mod game;
 mod ui;
+mod assets;
 
 mod diagnostics_overlay;
 mod map_control;
@@ -20,6 +21,7 @@ fn main() {
                         present_mode: bevy::window::PresentMode::AutoVsync,
                         resolution: (800.0, 600.0).into(),
                         resizable: true,
+                        fit_canvas_to_parent: true,
                         ..default()
                     }),
                     ..default()
@@ -30,13 +32,8 @@ fn main() {
                     meta_check: AssetMetaCheck::Never,
                     ..default()
                 })
-                .set(AudioPlugin {
-                    global_volume: GlobalVolume {
-                        volume: Volume::Linear(0.3),
-                    },
-                    ..default()
-                }),
         )
+        .add_plugins(AudioPlugin)
         .add_plugins(game::GamePlugin)
         .run();
 }

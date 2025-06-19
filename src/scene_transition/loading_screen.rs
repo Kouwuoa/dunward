@@ -1,15 +1,15 @@
 use bevy::prelude::*;
-use crate::ui::UiCommandsExt;
+use bevy_asset_loader::prelude::*;
+use crate::{assets::{AudioAssets, ImageAssets}, ui::UiCommandsExt};
 use super::SceneState;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(OnEnter(SceneState::LoadingScreen), enter_loading_screen);
-    app.add_systems(
-        Update,
-        continue_to_title_screen
-            .run_if(in_state(SceneState::LoadingScreen)
-                .and(all_assets_loaded)
-            )
+    app.add_loading_state(
+        LoadingState::new(SceneState::LoadingScreen)
+            .continue_to_state(SceneState::TitleScreen)
+            .load_collection::<AudioAssets>()
+            .load_collection::<ImageAssets>(),
     );
 }
 
@@ -20,16 +20,4 @@ fn enter_loading_screen(mut commands: Commands) {
         .with_children(|children| {
             children.spawn_ui_label("Loading ...");
         });
-}
-
-fn all_assets_loaded(
-    asset_server: Res<AssetServer>,
-) -> bool {
-    false // Placeholder for actual asset loading check
-}
-
-fn continue_to_title_screen(
-    mut next_scene: ResMut<NextState<SceneState>>,
-) {
-    next_scene.set(SceneState::TitleScreen);
 }
