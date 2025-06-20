@@ -42,18 +42,23 @@ fn enter_title_screen(mut commands: Commands) {
 }
 
 fn handle_title_screen_button_actions(
+    query: Query<(&Interaction, &TitleScreenButtonAction)>,
     mut next_scene: ResMut<NextState<SceneState>>,
-    mut query: Query<(&Interaction, &TitleScreenButtonAction)>,
     mut app_exit: EventWriter<AppExit>,
 ) {
-    for (interaction, action) in query.iter_mut() {
+    for (interaction, action) in query {
         if matches!(interaction, Interaction::Pressed) {
             match action {
                 TitleScreenButtonAction::StartGame => {
                     next_scene.set(SceneState::GameScene);
                 },
                 TitleScreenButtonAction::ExitGame => {
-                    app_exit.write(AppExit::Success);
+                    // Exiting the game is only supported on non-WASM targets
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        info!("Exiting game...");
+                        app_exit.write(AppExit::Success);
+                    }
                 },
                 TitleScreenButtonAction::Credits => {
                     next_scene.set(SceneState::CreditsScreen);
