@@ -16,7 +16,7 @@ impl Plugin for SceneTransitionPlugin {
         app.add_plugins((
             splash_screen::plugin,
             loading_screen::plugin,
-            //title_screen::plugin,
+            title_screen::plugin,
             //credits_screen::plugin,
             //game_scene::plugin,
         ));

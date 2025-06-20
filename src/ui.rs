@@ -37,7 +37,7 @@ impl<T: Spawn> UiCommandsExt for T {
         self.spawn((
             Name::new("Button"),
             Node {
-                width: Val::Px(200.0),
+                width: Val::Percent(100.0),
                 height: Val::Px(65.0),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
