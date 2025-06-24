@@ -1,7 +1,8 @@
 use bevy::prelude::*;
 
-use crate::scene_transition::SceneState;
 use crate::ui::UiCommandsExt;
+
+use super::SceneState;
 
 pub(super) fn plugin(app: &mut App) {
     app.register_type::<CreditsScreenButtonAction>();

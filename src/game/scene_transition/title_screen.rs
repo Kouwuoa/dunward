@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use crate::ui::UiCommandsExt;
 
-use crate::scene_transition::SceneState;
+use super::SceneState;
 
 pub(super) fn plugin(app: &mut App) {
     app.register_type::<TitleScreenButtonAction>();

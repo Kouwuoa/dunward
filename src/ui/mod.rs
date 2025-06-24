@@ -1,5 +1,14 @@
 use bevy::prelude::*;
 
+mod diagnostics_overlay;
+
+pub(super) struct DunwardUiPlugin;
+impl Plugin for DunwardUiPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(diagnostics_overlay::DiagnosticsOverlayPlugin);
+    }
+}
+
 /// Extension trait for spawning UI widgets
 pub(super) trait UiCommandsExt {
     /// Spawn a UI root node that covers the full window,

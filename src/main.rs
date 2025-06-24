@@ -6,10 +6,6 @@ mod game;
 mod ui;
 mod assets;
 
-mod diagnostics_overlay;
-mod map_control;
-mod scene_transition;
-
 fn main() {
     App::new()
         .add_plugins(
@@ -34,6 +30,7 @@ fn main() {
                 })
         )
         .add_plugins(AudioPlugin)
-        .add_plugins(game::GamePlugin)
+        .add_plugins(game::DunwardGamePlugin)
+        .add_plugins(ui::DunwardUiPlugin)
         .run();
 }

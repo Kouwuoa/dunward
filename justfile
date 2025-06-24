@@ -8,3 +8,6 @@ rel:
     
 web:
     trunk serve
+
+build:
+    cargo build

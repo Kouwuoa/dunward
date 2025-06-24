@@ -1,10 +1,10 @@
 use bevy::prelude::*;
 
-mod splash_screen;
-mod loading_screen;
-mod title_screen;
 mod credits_screen;
 mod game_scene;
+mod loading_screen;
+mod splash_screen;
+mod title_screen;
 
 pub(super) struct SceneTransitionPlugin;
 impl Plugin for SceneTransitionPlugin {
@@ -18,7 +18,7 @@ impl Plugin for SceneTransitionPlugin {
             loading_screen::plugin,
             title_screen::plugin,
             credits_screen::plugin,
-            //game_scene::plugin,
+            game_scene::plugin,
         ));
     }
 }
