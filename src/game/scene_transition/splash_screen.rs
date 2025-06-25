@@ -7,7 +7,7 @@ pub(super) fn plugin(app: &mut App) {
     // Spawn splash screen on entering the SplashScreen state
     app.insert_resource(ClearColor(SPLASH_BACKGROUND_COLOR));
     app.add_systems(OnEnter(SceneState::SplashScreen), spawn_splash_screen);
-    
+
     // Fade out the splash screen image when exiting splash screen
     app.add_systems(
         Update,
@@ -17,7 +17,7 @@ pub(super) fn plugin(app: &mut App) {
         )
             .run_if(in_state(SceneState::SplashScreen))
     );
-    
+
     // Use a timer determine when to transition from the splash screen
     app.register_type::<SplashTimer>();
     app.add_systems(OnEnter(SceneState::SplashScreen), insert_splash_timer);
@@ -50,7 +50,7 @@ impl UiImageFadeInOut {
         // Normalize t by duration
         let t = (self.t / self.total_duration).clamp(0.0, 1.0);
         let fade = self.fade_duration / self.total_duration;
-        
+
         // Regular trapezoid-shaped graph, flat at the top with alpha = 1.0
         ((1.0 - (2.0 * t - 1.0).abs()) / fade).min(1.0)
     }

@@ -4,6 +4,8 @@ use bevy_kira_audio::AudioSource;
 
 #[derive(AssetCollection, Resource)]
 pub(super) struct AudioAssets {
+    #[asset(path = "audio/sfx/button_hover.ogg")]
+    pub button_hover: Handle<AudioSource>,
     #[asset(path = "audio/sfx/button_press.ogg")]
     pub button_press: Handle<AudioSource>,
 }
@@ -13,3 +15,4 @@ pub(super) struct ImageAssets {
     #[asset(path = "images/ducky.png")]
     pub ducky: Handle<Image>,
 }
+
