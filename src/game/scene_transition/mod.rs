@@ -9,7 +9,7 @@ mod title_screen;
 pub(super) struct SceneTransitionPlugin;
 impl Plugin for SceneTransitionPlugin {
     fn build(&self, app: &mut App) {
-        info!("SceneTransitionPlugin: Initializing scene transition plugin...");
+        info!("SceneTransitionPlugin: Initializing scene transition plugin ...");
         
         app.insert_state(SceneState::SplashScreen);
         app.enable_state_scoped_entities::<SceneState>();

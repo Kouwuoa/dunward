@@ -1,8 +1,9 @@
 use bevy::prelude::*;
 
+mod hex_tilemap;
+mod init_game;
 mod map_control;
 mod scene_transition;
-mod spawn;
 
 pub(super) struct DunwardGamePlugin;
 impl Plugin for DunwardGamePlugin {
@@ -17,15 +18,15 @@ impl Plugin for DunwardGamePlugin {
             )
                 .chain(),
         );
-        
+
         // Plugins
-        app.add_plugins(map_control::MapControlPlugin)
-            .add_plugins(scene_transition::SceneTransitionPlugin)
-            .add_plugins(spawn::SpawnPlugin);
-        
+        app.add_plugins(hex_tilemap::HexTilemapPlugin)
+            .add_plugins(init_game::InitGamePlugin)
+            .add_plugins(map_control::MapControlPlugin)
+            .add_plugins(scene_transition::SceneTransitionPlugin);
+
         // Events
-        app.add_event::<OnGameStarted>()
-            .add_event::<OnGameEnded>();
+        app.add_event::<OnGameStarted>().add_event::<OnGameEnded>();
     }
 }
 

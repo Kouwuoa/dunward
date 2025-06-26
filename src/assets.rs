@@ -14,5 +14,11 @@ pub(super) struct AudioAssets {
 pub(super) struct ImageAssets {
     #[asset(path = "images/ducky.png")]
     pub ducky: Handle<Image>,
+    #[asset(path = "images/bw-tile-hex-col.png")]
+    pub bw_tile_hex_col: Handle<Image>,
+    #[asset(path = "images/bw-tile-hex-row.png")]
+    pub bw_tile_hex_row: Handle<Image>,
 }
 
+#[derive(Event, Debug)]
+pub(super) struct OnAllAssetsLoaded;

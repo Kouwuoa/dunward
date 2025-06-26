@@ -63,5 +63,4 @@ features = [
 
 [dependencies]
 bevy_asset_loader = "0.23.0"
-bevy_ecs_tilemap = "0.16.0"
 bevy_kira_audio = "0.23.0"
