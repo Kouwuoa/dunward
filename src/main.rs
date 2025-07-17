@@ -1,13 +1,13 @@
-use bevy::asset::AssetMetaCheck;
 use bevy::prelude::*;
-use bevy_kira_audio::AudioPlugin;
 
-mod game;
-mod ui;
+//mod game;
+//mod ui;
 mod assets;
+mod render;
 
 fn main() {
     App::new()
+        .insert_resource(Assets::<Image>::default())
         .add_plugins(
             DefaultPlugins
                 .set(WindowPlugin {
@@ -22,15 +22,15 @@ fn main() {
                     }),
                     ..default()
                 })
-                .set(ImagePlugin::default_nearest())
                 .set(AssetPlugin {
                     // WASM builds will check for meta files that don't exist if this isn't set.
-                    meta_check: AssetMetaCheck::Never,
+                    meta_check: bevy::asset::AssetMetaCheck::Never,
                     ..default()
                 })
         )
-        .add_plugins(AudioPlugin)
-        .add_plugins(game::DunwardGamePlugin)
-        .add_plugins(ui::DunwardUiPlugin)
+        .add_plugins(bevy_kira_audio::AudioPlugin)
+        .add_plugins(render::DunwardRenderPlugin)
+        //.add_plugins(game::DunwardGamePlugin)
+        //.add_plugins(ui::DunwardUiPlugin)
         .run();
 }

@@ -25,42 +25,24 @@ strip = "debuginfo"
 version = "0.16.1"
 default-features = false
 features = [
-    "dynamic_linking",
     "animation",
     "bevy_asset",
     "bevy_color",
-    "bevy_core_pipeline",
     "bevy_gilrs",
-    "bevy_gizmos",
-    "bevy_gltf",
-    "bevy_input_focus",
+    "bevy_image",
     "bevy_log",
-    "bevy_mesh_picking_backend",
-    "bevy_pbr",
-    "bevy_picking",
-    "bevy_render",
-    "bevy_scene",
-    "bevy_sprite",
-    "bevy_sprite_picking_backend",
     "bevy_state",
-    "bevy_text",
-    "bevy_ui",
-    "bevy_ui_picking_backend",
     "bevy_window",
     "bevy_winit",
     "custom_cursor",
-    "default_font",
-    "hdr",
+    "dynamic_linking",
     "multi_threaded",
-    "png",
-    "smaa_luts",
     "std",
     "sysinfo_plugin",
-    "tonemapping_luts",
-    "webgl2",
     "x11",
 ]
 
 [dependencies]
+ash = "0.38.0"
 bevy_asset_loader = "0.23.0"
 bevy_kira_audio = "0.23.0"
