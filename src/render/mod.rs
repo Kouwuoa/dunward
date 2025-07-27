@@ -1,23 +1,36 @@
 use bevy::{
-    app::MainScheduleOrder, ecs::schedule::{ExecutorKind, ScheduleLabel}, prelude::*
+    ecs::system::SystemState,
+    prelude::*,
+    window::{self, PrimaryWindow},
+    winit::WinitWindows,
 };
+
+mod camera;
+mod renderer;
+mod schedules;
+mod viewport;
 
 pub(super) struct DunwardRenderPlugin;
 impl Plugin for DunwardRenderPlugin {
     fn build(&self, app: &mut App) {
-        let mut render_schedule = Schedule::new(Render);
-        render_schedule.set_executor_kind(ExecutorKind::SingleThreaded);
-        app.add_schedule(render_schedule);
-        app.world_mut().resource_mut::<MainScheduleOrder>()
-            .insert_after(Update, Render);
-        
-        app.add_systems(Render, hello);
+        schedules::init_schedules(app);
+        app.add_systems(PreStartup, create_renderer);
     }
 }
 
-#[derive(ScheduleLabel, Debug, Hash, PartialEq, Eq, Clone)]
-struct Render;
+fn create_renderer(
+    world: &mut World,
+    window_qry: &mut QueryState<Entity, With<PrimaryWindow>>,
+    winit_windows: &mut SystemState<NonSend<WinitWindows>>,
+) {
+    let window_ent = window_qry.single(world).unwrap();
+    let binding = winit_windows.get(world);
+    let winit_window = binding.get_window(window_ent).unwrap();
+    let renderer = renderer::Renderer::new(winit_window);
+    world.insert_non_send_resource(renderer);
+}
 
-fn hello() {
-    info!("Render plugin is working!");
+fn render_frame(mut renderer: NonSendMut<renderer::Renderer>, camera_qry: Query<&camera::Camera>) {
+    let camera = camera_qry.single().unwrap();
+    renderer.render_frame(camera);
 }

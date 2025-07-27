@@ -1689,6 +1689,8 @@ dependencies = [
  "bevy",
  "bevy_asset_loader",
  "bevy_kira_audio",
+ "raw-window-handle",
+ "winit",
 ]
 
 [[package]]

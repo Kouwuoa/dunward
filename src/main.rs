@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 //mod game;
 //mod ui;
-mod assets;
+//mod assets;
 mod render;
 
 fn main() {
