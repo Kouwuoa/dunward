@@ -9,7 +9,7 @@ impl Renderer {
         Self {}
     }
 
-    pub fn render_frame(&self, cam: &Camera) {
+    pub fn render_frame(&mut self, cam: &Camera) {
         // Implement rendering logic here
         // This could involve drawing entities, handling camera views, etc.
         info!("Rendering frame");

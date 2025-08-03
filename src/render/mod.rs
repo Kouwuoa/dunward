@@ -13,8 +13,10 @@ mod viewport;
 pub(super) struct DunwardRenderPlugin;
 impl Plugin for DunwardRenderPlugin {
     fn build(&self, app: &mut App) {
-        schedules::init_schedules(app);
-        app.add_systems(PreStartup, create_renderer);
+        app.add_plugins(schedules::SchedulesPlugin)
+            .add_plugins(camera::CameraPlugin)
+            .add_systems(PreStartup, create_renderer)
+            .add_systems(schedules::Render, render_frame);
     }
 }
 
