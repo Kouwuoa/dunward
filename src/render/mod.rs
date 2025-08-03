@@ -28,7 +28,7 @@ fn create_renderer(
     let window_ent = window_qry.single(world).unwrap();
     let binding = winit_windows.get(world);
     let winit_window = binding.get_window(window_ent).unwrap();
-    let renderer = renderer::Renderer::new(winit_window);
+    let renderer = renderer::Renderer::new(Some(winit_window));
     world.insert_non_send_resource(renderer);
 }
 
