@@ -1,0 +1,20 @@
+[package]
+name = "renderer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ash = "0.38.0"
+ash-window = "0.13.0"
+bytemuck = { version = "1.23.2", features = ["derive"] }
+color-eyre = "0.6.5"
+env_logger = "0.11.8"
+glam = { version = "0.30.5", features = ["bytemuck"] }
+gpu-descriptor = "0.3.2"
+gpu-descriptor-ash = "0.3.0"
+log = "0.4.27"
+presser = "0.3.1"
+raw-window-handle = "0.6"
+smallvec = "1.15.1"
+vk-mem = "0.4.0"
+winit = { version = "0.30", default-features = false, features = ["rwh_06"] }

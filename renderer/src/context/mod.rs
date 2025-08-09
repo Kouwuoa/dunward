@@ -1,7 +1,12 @@
 mod instance;
+mod device;
+mod target;
 
+/// Main abstraction around the graphics API context for rendering.
 pub(super) struct RenderContext {
     pub instance: instance::RenderInstance,
+    pub device: device::RenderDevice,
+    pub target: Option<target::RenderTarget>
 }
 
 impl RenderContext {

@@ -1,14 +1,12 @@
 use bevy::{
     ecs::system::SystemState,
     prelude::*,
-    window::{self, PrimaryWindow},
+    window::PrimaryWindow,
     winit::WinitWindows,
 };
 
 mod camera;
-mod renderer;
 mod schedules;
-mod viewport;
 
 pub(super) struct DunwardRenderPlugin;
 impl Plugin for DunwardRenderPlugin {
@@ -34,5 +32,5 @@ fn create_renderer(
 
 fn render_frame(mut renderer: NonSendMut<renderer::Renderer>, camera_qry: Query<&camera::Camera>) {
     let camera = camera_qry.single().unwrap();
-    renderer.render_frame(camera);
+    renderer.render_frame(&camera.0);
 }
