@@ -3,17 +3,11 @@ use std::str::Utf8Error;
 use std::sync::{Arc, Mutex};
 use ash::vk;
 use color_eyre::eyre::OptionExt;
-use color_eyre::owo_colors::OwoColorize;
 use color_eyre::Result;
 use gpu_descriptor::{CreatePoolError, DescriptorAllocator, DescriptorDevice, DescriptorPoolCreateFlags, DescriptorTotalCount, DeviceAllocationError};
-use crate::renderer::resources::image::Image;
-use crate::renderer::resources::megabuffer::{Megabuffer, MegabufferExt};
-use crate::renderer::contexts::device_ctx::command_encoder_allocator::{CommandEncoderAllocator, CommandEncoderAllocatorExt};
-use crate::renderer::contexts::device_ctx::instance::RenderInstance;
-use crate::renderer::contexts::device_ctx::queue::{Queue, QueueFamily};
-use crate::renderer::contexts::device_ctx::transfer_ctx::TransferContext;
+use super::queue::Queue;
 
-/// Main structure for the renderer
+/// Main way to submit rendering commands to the GPU.
 pub(super) struct RenderDevice {
     pub logical: Arc<ash::Device>,
     pub physical: vk::PhysicalDevice,

@@ -1,6 +1,11 @@
 mod instance;
 mod device;
 mod target;
+mod queue;
+mod cmd_encoder;
+mod cmd_encoder_alloc;
+mod transfer_cmd_encoder;
+mod commands;
 
 /// Main abstraction around the graphics API context for rendering.
 pub(super) struct RenderContext {

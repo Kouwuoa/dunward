@@ -1,5 +1,6 @@
 mod context;
 mod camera;
+mod resources;
 
 pub use camera::Camera;
 
