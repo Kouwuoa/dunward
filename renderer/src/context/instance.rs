@@ -66,7 +66,7 @@ impl RenderInstance {
 
     pub fn create_target(
         &self,
-        window: Arc<Window>,
+        window: &Window,
         surface: (vk::SurfaceKHR, ash::khr::surface::Instance),
         dev: &RenderDevice,
     ) -> Result<RenderTarget> {

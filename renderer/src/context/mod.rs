@@ -1,22 +1,37 @@
-mod instance;
+use color_eyre::Result;
+pub(super) mod commands;
+mod desc_set_layout_builder;
 mod device;
-mod target;
+mod instance;
 mod queue;
-mod cmd_encoder;
-mod cmd_encoder_alloc;
-mod transfer_cmd_encoder;
-mod commands;
+mod target;
+mod swapchain;
 
 /// Main abstraction around the graphics API context for rendering.
 pub(super) struct RenderContext {
     pub instance: instance::RenderInstance,
     pub device: device::RenderDevice,
-    pub target: Option<target::RenderTarget>
+    pub target: Option<target::RenderTarget>,
 }
 
 impl RenderContext {
-    pub fn new(window: Option<&winit::window::Window>) -> Self {
-        let instance = instance::RenderInstance::new(window);
-        Self { instance }
+    pub fn new(window: Option<&winit::window::Window>) -> Result<Self> {
+        let instance = instance::RenderInstance::new(window)?;
+        let surface = if let Some(window) = window {
+            Some(instance.create_surface(window)?)
+        } else {
+            None
+        };
+        let device = instance.create_device(surface.as_ref())?;
+        let target = if let (Some(window), Some(surface)) = (window, surface) {
+            Some(instance.create_target(window, surface, &device)?)
+        } else {
+            None
+        };
+        Ok(Self {
+            instance,
+            device,
+            target,
+        })
     }
 }

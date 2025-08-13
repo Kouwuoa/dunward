@@ -4,7 +4,7 @@ use color_eyre::eyre::Result;
 use color_eyre::eyre::eyre;
 use vk_mem::Alloc;
 
-pub struct Buffer {
+pub(crate) struct Buffer {
     pub buffer: vk::Buffer,
     pub size: u64,
     mapped: bool,

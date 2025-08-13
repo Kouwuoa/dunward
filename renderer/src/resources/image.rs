@@ -1,7 +1,9 @@
-use std::sync::{Arc, Mutex};
+use super::buffer::Buffer;
+use crate::context::commands::TransferCommandEncoder;
 use ash::vk;
 use color_eyre::eyre::Result;
 use color_eyre::eyre::eyre;
+use std::sync::{Arc, Mutex};
 use vk_mem::Alloc;
 
 pub(crate) struct ImageCreateInfo {
@@ -96,7 +98,7 @@ impl Image {
 
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
-        transfer_context: &TransferContext,
+        transfer: &TransferCommandEncoder,
     ) -> Result<Self> {
         let image = {
             let create_info = ImageCreateInfo {
@@ -113,7 +115,7 @@ impl Image {
             let mut image = Self::new(&create_info, memory_allocator, device)?;
 
             if let Some(data) = data {
-                image.upload(data, transfer_context)?;
+                image.upload(data, transfer)?;
             }
 
             image
@@ -209,11 +211,7 @@ impl Image {
         );
     }
 
-    pub fn copy_to_image(
-        &self,
-        cmd: vk::CommandBuffer,
-        dst_image: &Image,
-    ) {
+    pub fn copy_to_image(&self, cmd: vk::CommandBuffer, dst_image: &Image) {
         self.copy_to_vkimage(
             cmd,
             dst_image.image,
@@ -224,11 +222,7 @@ impl Image {
         );
     }
 
-    fn upload(
-        &mut self,
-        data: &[u8],
-        transfer_context: &TransferContext,
-    ) -> Result<()> {
+    fn upload(&mut self, data: &[u8], transfer: &TransferCommandEncoder) -> Result<()> {
         let mut staging_buffer = Buffer::new(
             data.len() as u64,
             256,
@@ -239,88 +233,86 @@ impl Image {
             self.device.clone(),
         )?;
         staging_buffer.write(data, 0)?;
-        transfer_context.immediate_submit(
-            |cmd: vk::CommandBuffer, device: &ash::Device| {
-                let range = vk::ImageSubresourceRange {
+        transfer.immediate_submit(|cmd: vk::CommandBuffer, device: &ash::Device| {
+            let range = vk::ImageSubresourceRange {
+                aspect_mask: self.aspect,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            };
+
+            let img_barrier_to_transfer = vk::ImageMemoryBarrier {
+                old_layout: vk::ImageLayout::UNDEFINED,
+                new_layout: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                image: self.image,
+                subresource_range: range,
+                src_access_mask: vk::AccessFlags::empty(),
+                dst_access_mask: vk::AccessFlags::TRANSFER_WRITE,
+                ..Default::default()
+            };
+
+            unsafe {
+                // Create a pipeline barrier that blocks from
+                // VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT to VK_PIPELINE_STAGE_TRANSFER_BIT
+                // Read more: https://gpuopen.com/learn/vulkan-barriers-explained/
+                device.cmd_pipeline_barrier(
+                    cmd,
+                    vk::PipelineStageFlags::TOP_OF_PIPE,
+                    vk::PipelineStageFlags::TRANSFER,
+                    vk::DependencyFlags::empty(),
+                    &[],
+                    &[],
+                    &[img_barrier_to_transfer],
+                );
+            }
+
+            let copy_region = vk::BufferImageCopy {
+                buffer_offset: 0,
+                buffer_row_length: 0,
+                buffer_image_height: 0,
+                image_subresource: vk::ImageSubresourceLayers {
                     aspect_mask: self.aspect,
-                    base_mip_level: 0,
-                    level_count: 1,
+                    mip_level: 0,
                     base_array_layer: 0,
                     layer_count: 1,
-                };
+                },
+                image_extent: self.extent,
+                ..Default::default()
+            };
 
-                let img_barrier_to_transfer = vk::ImageMemoryBarrier {
-                    old_layout: vk::ImageLayout::UNDEFINED,
-                    new_layout: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                    image: self.image,
-                    subresource_range: range,
-                    src_access_mask: vk::AccessFlags::empty(),
-                    dst_access_mask: vk::AccessFlags::TRANSFER_WRITE,
-                    ..Default::default()
-                };
+            unsafe {
+                // Copy staging buffer into image
+                device.cmd_copy_buffer_to_image(
+                    cmd,
+                    staging_buffer.buffer,
+                    self.image,
+                    vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                    &[copy_region],
+                );
+            }
 
-                unsafe {
-                    // Create a pipeline barrier that blocks from
-                    // VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT to VK_PIPELINE_STAGE_TRANSFER_BIT
-                    // Read more: https://gpuopen.com/learn/vulkan-barriers-explained/
-                    device.cmd_pipeline_barrier(
-                        cmd,
-                        vk::PipelineStageFlags::TOP_OF_PIPE,
-                        vk::PipelineStageFlags::TRANSFER,
-                        vk::DependencyFlags::empty(),
-                        &[],
-                        &[],
-                        &[img_barrier_to_transfer],
-                    );
-                }
+            let mut img_barrier_to_readable = img_barrier_to_transfer;
+            img_barrier_to_readable.old_layout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
+            img_barrier_to_readable.new_layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+            img_barrier_to_readable.src_access_mask = vk::AccessFlags::TRANSFER_WRITE;
+            img_barrier_to_readable.dst_access_mask = vk::AccessFlags::SHADER_READ;
 
-                let copy_region = vk::BufferImageCopy {
-                    buffer_offset: 0,
-                    buffer_row_length: 0,
-                    buffer_image_height: 0,
-                    image_subresource: vk::ImageSubresourceLayers {
-                        aspect_mask: self.aspect,
-                        mip_level: 0,
-                        base_array_layer: 0,
-                        layer_count: 1,
-                    },
-                    image_extent: self.extent,
-                    ..Default::default()
-                };
+            // Barrier the image into the shader-readable layout
+            unsafe {
+                device.cmd_pipeline_barrier(
+                    cmd,
+                    vk::PipelineStageFlags::TRANSFER,
+                    vk::PipelineStageFlags::FRAGMENT_SHADER,
+                    vk::DependencyFlags::empty(),
+                    &[],
+                    &[],
+                    &[img_barrier_to_readable],
+                )
+            }
 
-                unsafe {
-                    // Copy staging buffer into image
-                    device.cmd_copy_buffer_to_image(
-                        cmd,
-                        staging_buffer.buffer,
-                        self.image,
-                        vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                        &[copy_region],
-                    );
-                }
-
-                let mut img_barrier_to_readable = img_barrier_to_transfer;
-                img_barrier_to_readable.old_layout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
-                img_barrier_to_readable.new_layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
-                img_barrier_to_readable.src_access_mask = vk::AccessFlags::TRANSFER_WRITE;
-                img_barrier_to_readable.dst_access_mask = vk::AccessFlags::SHADER_READ;
-
-                // Barrier the image into the shader-readable layout
-                unsafe {
-                    device.cmd_pipeline_barrier(
-                        cmd,
-                        vk::PipelineStageFlags::TRANSFER,
-                        vk::PipelineStageFlags::FRAGMENT_SHADER,
-                        vk::DependencyFlags::empty(),
-                        &[],
-                        &[],
-                        &[img_barrier_to_readable],
-                    )
-                }
-
-                Ok(())
-            },
-        )?;
+            Ok(())
+        })?;
 
         Ok(())
     }
@@ -330,9 +322,7 @@ impl Drop for Image {
     fn drop(&mut self) {
         unsafe {
             self.device.destroy_image_view(self.view, None);
-            let allocation = self.allocation
-                .as_mut()
-                .expect("Allocation does not exist");
+            let allocation = self.allocation.as_mut().expect("Allocation does not exist");
             self.memory_allocator
                 .lock()
                 .expect("Failed to acquire lock for memory allocator")
@@ -413,8 +403,7 @@ fn transition_image_layout(
         src_stage_mask: vk::PipelineStageFlags2::ALL_COMMANDS,
         src_access_mask: vk::AccessFlags2::MEMORY_WRITE,
         dst_stage_mask: vk::PipelineStageFlags2::ALL_COMMANDS,
-        dst_access_mask: vk::AccessFlags2::MEMORY_WRITE
-            | vk::AccessFlags2::MEMORY_READ,
+        dst_access_mask: vk::AccessFlags2::MEMORY_WRITE | vk::AccessFlags2::MEMORY_READ,
         old_layout,
         new_layout,
         subresource_range: vk::ImageSubresourceRange {

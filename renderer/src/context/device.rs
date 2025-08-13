@@ -1,11 +1,18 @@
-use std::ffi::{c_char, c_void, CStr};
+use super::commands::CommandEncoderAllocator;
+use super::commands::{CommandEncoderAllocatorExt, TransferCommandEncoder};
+use super::instance::RenderInstance;
+use super::queue::{Queue, QueueFamily};
+use crate::resources::image::Image;
+use ash::vk;
+use color_eyre::Result;
+use color_eyre::eyre::OptionExt;
+use gpu_descriptor::{
+    CreatePoolError, DescriptorAllocator, DescriptorDevice, DescriptorPoolCreateFlags,
+    DescriptorTotalCount, DeviceAllocationError,
+};
+use std::ffi::{CStr, c_char, c_void};
 use std::str::Utf8Error;
 use std::sync::{Arc, Mutex};
-use ash::vk;
-use color_eyre::eyre::OptionExt;
-use color_eyre::Result;
-use gpu_descriptor::{CreatePoolError, DescriptorAllocator, DescriptorDevice, DescriptorPoolCreateFlags, DescriptorTotalCount, DeviceAllocationError};
-use super::queue::Queue;
 
 /// Main way to submit rendering commands to the GPU.
 pub(super) struct RenderDevice {
@@ -17,11 +24,12 @@ pub(super) struct RenderDevice {
     pub compute_queue: Arc<Queue>,
     pub transfer_queue: Arc<Queue>,
 
+    pub descriptor_allocator:
+        Arc<Mutex<DescriptorAllocator<vk::DescriptorPool, vk::DescriptorSet>>>,
     memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
     command_encoder_allocator: CommandEncoderAllocator,
-    pub descriptor_allocator: Arc<Mutex<DescriptorAllocator<vk::DescriptorPool, vk::DescriptorSet>>>,
 
-    transfer_context: Arc<TransferContext>,
+    transfer: Arc<TransferCommandEncoder>,
 }
 
 impl RenderDevice {
@@ -29,28 +37,17 @@ impl RenderDevice {
         instance: &RenderInstance,
         surface: Option<&(vk::SurfaceKHR, ash::khr::surface::Instance)>,
     ) -> Result<Self> {
-        let (
-            physical_device,
-            graphics_queue_family,
-            compute_queue_family,
-            transfer_queue_family,
-        ) = Self::select_physical_device(
-            &instance.instance,
-            surface,
-        )?;
+        let (physical_device, graphics_queue_family, compute_queue_family, transfer_queue_family) =
+            Self::select_physical_device(&instance.instance, surface)?;
 
-        let (
-            logical_device,
-            graphics_queue,
-            compute_queue,
-            transfer_queue,
-        ) = Self::create_logical_device(
-            &instance.instance,
-            &physical_device,
-            graphics_queue_family,
-            compute_queue_family,
-            transfer_queue_family,
-        )?;
+        let (logical_device, graphics_queue, compute_queue, transfer_queue) =
+            Self::create_logical_device(
+                &instance.instance,
+                &physical_device,
+                graphics_queue_family,
+                compute_queue_family,
+                transfer_queue_family,
+            )?;
 
         let memory_allocator = unsafe {
             vk_mem::Allocator::new(vk_mem::AllocatorCreateInfo::new(
@@ -65,16 +62,11 @@ impl RenderDevice {
         let compute_queue = Arc::new(compute_queue);
         let transfer_queue = Arc::new(transfer_queue);
 
-        let command_encoder_allocator = CommandEncoderAllocator::new(
-            logical_device.clone(),
-        )?;
-        let descriptor_allocator: DescriptorAllocator<vk::DescriptorPool, vk::DescriptorSet>
-            = DescriptorAllocator::new(1024);
+        let command_encoder_allocator = CommandEncoderAllocator::new(logical_device.clone())?;
+        let descriptor_allocator: DescriptorAllocator<vk::DescriptorPool, vk::DescriptorSet> =
+            DescriptorAllocator::new(1024);
 
-        let transfer_context = TransferContext::new(
-            transfer_queue.clone(),
-            logical_device.clone(),
-        )?;
+        let transfer = TransferCommandEncoder::new(transfer_queue.clone(), logical_device.clone())?;
 
         let dev = Self {
             logical: logical_device,
@@ -84,26 +76,24 @@ impl RenderDevice {
             compute_queue,
             transfer_queue,
 
+            descriptor_allocator: Arc::new(Mutex::new(descriptor_allocator)),
             memory_allocator: Arc::new(Mutex::new(memory_allocator)),
             command_encoder_allocator,
-            descriptor_allocator: Arc::new(Mutex::new(descriptor_allocator)),
 
-            transfer_context: Arc::new(transfer_context),
+            transfer: Arc::new(transfer),
         };
 
         Ok(dev)
     }
 
-    pub fn immediate_submit<F>(
-        &self,
-        func: F,
-    ) -> Result<()>
+    pub fn immediate_submit<F>(&self, func: F) -> Result<()>
     where
         F: FnOnce(vk::CommandBuffer, &ash::Device) -> Result<()>,
     {
-        self.transfer_context.immediate_submit(func)
+        self.transfer.immediate_submit(func)
     }
 
+    /*
     pub fn create_megabuffer(
         &self,
         size: u64,
@@ -119,6 +109,7 @@ impl RenderDevice {
             self.transfer_context.clone(),
         )
     }
+     */
 
     pub fn create_color_image(
         &self,
@@ -134,20 +125,16 @@ impl RenderDevice {
             use_dedicated_memory,
             self.memory_allocator.clone(),
             self.logical.clone(),
-            &self.transfer_context.clone(),
+            &self.transfer.clone(),
         )
     }
 
-    pub fn create_depth_image(
-        &self,
-        width: u32,
-        height: u32,
-    ) -> Result<Image> {
+    pub fn create_depth_image(&self, width: u32, height: u32) -> Result<Image> {
         Image::new_depth_image(
             width,
             height,
             self.memory_allocator.clone(),
-            self.logical.clone()
+            self.logical.clone(),
         )
     }
 
@@ -174,15 +161,13 @@ impl RenderDevice {
                     req_device_exts.iter().all(|req_ext| {
                         let req_ext_supported = supported_extensions
                             .iter()
-                            .map(|sup_exts| {
-                                sup_exts.extension_name.as_ptr()
-                            })
-                            .any(|sup_ext| {
-                                match (*req_ext, CStr::from_ptr(sup_ext).to_str()) {
+                            .map(|sup_exts| sup_exts.extension_name.as_ptr())
+                            .any(
+                                |sup_ext| match (*req_ext, CStr::from_ptr(sup_ext).to_str()) {
                                     (req, Ok(sup)) => req == sup,
                                     _ => false,
-                                }
-                            });
+                                },
+                            );
                         if !req_ext_supported {
                             log::error!("Device extension not supported: {}", req_ext);
                         }
@@ -191,21 +176,19 @@ impl RenderDevice {
                 })
                 // Filter out devices that do not contain the required queues
                 .filter_map(|device| {
-                    let props = instance
-                        .get_physical_device_queue_family_properties(device);
+                    let props = instance.get_physical_device_queue_family_properties(device);
 
-                    let graphics_queue_family_index = props
-                        .iter()
-                        .enumerate()
-                        .position(|(i, q)| {
-                            let supports_graphics = q.queue_flags.contains(vk::QueueFlags::GRAPHICS);
+                    let graphics_queue_family_index =
+                        props.iter().enumerate().position(|(i, q)| {
+                            let supports_graphics =
+                                q.queue_flags.contains(vk::QueueFlags::GRAPHICS);
                             if let Some((surface, surface_loader)) = surface {
                                 let supports_present = {
-                                    surface_loader.get_physical_device_surface_support(
-                                        device,
-                                        i as u32,
-                                        *surface,
-                                    ).map_or(false, |b| b)
+                                    surface_loader
+                                        .get_physical_device_surface_support(
+                                            device, i as u32, *surface,
+                                        )
+                                        .map_or(false, |b| b)
                                 };
                                 supports_graphics && supports_present
                             } else {
@@ -213,20 +196,16 @@ impl RenderDevice {
                             }
                         });
 
-                    let compute_queue_family_index = props
-                        .iter()
-                        .enumerate()
-                        .position(|(i, q)| {
-                            let supports_compute = q.queue_flags.contains(vk::QueueFlags::COMPUTE);
-                            let same_as_graphics = graphics_queue_family_index == Some(i);
-                            supports_compute && !same_as_graphics
-                        });
+                    let compute_queue_family_index = props.iter().enumerate().position(|(i, q)| {
+                        let supports_compute = q.queue_flags.contains(vk::QueueFlags::COMPUTE);
+                        let same_as_graphics = graphics_queue_family_index == Some(i);
+                        supports_compute && !same_as_graphics
+                    });
 
-                    let transfer_queue_family_index = props
-                        .iter()
-                        .enumerate()
-                        .position(|(i, q)| {
-                            let supports_transfer = q.queue_flags.contains(vk::QueueFlags::TRANSFER);
+                    let transfer_queue_family_index =
+                        props.iter().enumerate().position(|(i, q)| {
+                            let supports_transfer =
+                                q.queue_flags.contains(vk::QueueFlags::TRANSFER);
                             let same_as_graphics = graphics_queue_family_index == Some(i);
                             let same_as_compute = compute_queue_family_index == Some(i);
                             supports_transfer && !same_as_graphics && !same_as_compute
@@ -235,17 +214,17 @@ impl RenderDevice {
                     if let (
                         Some(graphics_queue_family_index),
                         Some(compute_queue_family_index),
-                        Some(transfer_queue_family_index)
+                        Some(transfer_queue_family_index),
                     ) = (
                         graphics_queue_family_index,
                         compute_queue_family_index,
-                        transfer_queue_family_index
+                        transfer_queue_family_index,
                     ) {
                         Some((
                             device,
                             graphics_queue_family_index as u32,
                             compute_queue_family_index as u32,
-                            transfer_queue_family_index as u32
+                            transfer_queue_family_index as u32,
                         ))
                     } else {
                         None
@@ -262,23 +241,32 @@ impl RenderDevice {
                         _ => 5,
                     }
                 })
-                .map(|(
-                          device,
-                          graphics_queue_family_index,
-                          compute_queue_family_index,
-                          transfer_queue_family_index,
-                      )| {
-                    let queue_family_props = instance.get_physical_device_queue_family_properties(device);
-                    let graphics_props = queue_family_props.get(graphics_queue_family_index as usize).unwrap();
-                    let compute_props = queue_family_props.get(compute_queue_family_index as usize).unwrap();
-                    let transfer_props = queue_family_props.get(transfer_queue_family_index as usize).unwrap();
-                    (
+                .map(
+                    |(
                         device,
-                        QueueFamily::new(graphics_queue_family_index, *graphics_props, true),
-                        QueueFamily::new(compute_queue_family_index, *compute_props, false),
-                        QueueFamily::new(transfer_queue_family_index, *transfer_props, false),
-                    )
-                })
+                        graphics_queue_family_index,
+                        compute_queue_family_index,
+                        transfer_queue_family_index,
+                    )| {
+                        let queue_family_props =
+                            instance.get_physical_device_queue_family_properties(device);
+                        let graphics_props = queue_family_props
+                            .get(graphics_queue_family_index as usize)
+                            .unwrap();
+                        let compute_props = queue_family_props
+                            .get(compute_queue_family_index as usize)
+                            .unwrap();
+                        let transfer_props = queue_family_props
+                            .get(transfer_queue_family_index as usize)
+                            .unwrap();
+                        (
+                            device,
+                            QueueFamily::new(graphics_queue_family_index, *graphics_props, true),
+                            QueueFamily::new(compute_queue_family_index, *compute_props, false),
+                            QueueFamily::new(transfer_queue_family_index, *transfer_props, false),
+                        )
+                    },
+                )
                 .ok_or_eyre("No suitable physical device found")?
         })
     }
@@ -314,8 +302,8 @@ impl RenderDevice {
             unsafe {
                 instance.get_physical_device_features2(*physical_device, &mut features2);
             }
-            let mut features11 = vk::PhysicalDeviceVulkan11Features::default()
-                .shader_draw_parameters(true);
+            let mut features11 =
+                vk::PhysicalDeviceVulkan11Features::default().shader_draw_parameters(true);
             let mut features12 = vk::PhysicalDeviceVulkan12Features::default()
                 .runtime_descriptor_array(true)
                 .buffer_device_address(true)
@@ -345,7 +333,7 @@ impl RenderDevice {
                 .synchronization2(true)
                 .dynamic_rendering(true);
 
-            let device_create_info = vk::DeviceCreateInfo::default()//enabled_features.device_create_info()
+            let device_create_info = vk::DeviceCreateInfo::default() //enabled_features.device_create_info()
                 .push_next(&mut features2)
                 .push_next(&mut features11)
                 .push_next(&mut features12)
@@ -353,9 +341,7 @@ impl RenderDevice {
                 .queue_create_infos(&queue_create_infos)
                 .enabled_extension_names(&enabled_extension_names);
 
-            unsafe {
-                instance.create_device(*physical_device, &device_create_info, None)?
-            }
+            unsafe { instance.create_device(*physical_device, &device_create_info, None)? }
         };
 
         let graphics_queue = unsafe {
@@ -382,7 +368,6 @@ impl RenderDevice {
             ash::khr::synchronization2::NAME,
             ash::khr::maintenance3::NAME,
             ash::ext::descriptor_indexing::NAME,
-
             #[cfg(target_os = "macos")]
             ash::khr::portability_subset::NAME,
         ]
@@ -398,13 +383,13 @@ impl From<Arc<ash::Device>> for AshDescriptorDevice {
 }
 
 impl DescriptorDevice<vk::DescriptorSetLayout, vk::DescriptorPool, vk::DescriptorSet>
-for AshDescriptorDevice
+    for AshDescriptorDevice
 {
     unsafe fn create_descriptor_pool(
         &self,
         descriptor_count: &DescriptorTotalCount,
         max_sets: u32,
-        flags: gpu_descriptor::DescriptorPoolCreateFlags,
+        flags: DescriptorPoolCreateFlags,
     ) -> Result<vk::DescriptorPool, CreatePoolError> {
         let mut array = [vk::DescriptorPoolSize::default(); 13];
         let mut len = 0;
@@ -519,9 +504,7 @@ for AshDescriptorDevice
     }
 
     unsafe fn destroy_descriptor_pool(&self, pool: vk::DescriptorPool) {
-        unsafe {
-            self.0.destroy_descriptor_pool(pool, None)
-        }
+        unsafe { self.0.destroy_descriptor_pool(pool, None) }
     }
 
     unsafe fn alloc_descriptor_sets<'a>(
@@ -548,8 +531,12 @@ for AshDescriptorDevice
                 Err(vk::Result::ERROR_OUT_OF_DEVICE_MEMORY) => {
                     Err(DeviceAllocationError::OutOfDeviceMemory)
                 }
-                Err(vk::Result::ERROR_FRAGMENTED_POOL) => Err(DeviceAllocationError::OutOfPoolMemory),
-                Err(vk::Result::ERROR_OUT_OF_POOL_MEMORY) => Err(DeviceAllocationError::FragmentedPool),
+                Err(vk::Result::ERROR_FRAGMENTED_POOL) => {
+                    Err(DeviceAllocationError::OutOfPoolMemory)
+                }
+                Err(vk::Result::ERROR_OUT_OF_POOL_MEMORY) => {
+                    Err(DeviceAllocationError::FragmentedPool)
+                }
                 Err(err) => panic!("Unexpected return code '{}'", err),
             }
         }

@@ -1,27 +1,24 @@
-use crate::renderer::contexts::device_ctx::swapchain::Swapchain;
 use ash::vk;
 use color_eyre::eyre::OptionExt;
 use color_eyre::Result;
 use std::sync::Arc;
 use winit::window::Window;
-use crate::renderer::contexts::device_ctx::device::RenderDevice;
-use crate::renderer::contexts::device_ctx::instance::RenderInstance;
+use super::instance::RenderInstance;
+use super::device::RenderDevice;
+use super::swapchain::Swapchain;
 
 /// Presentation target of the renderer, encapsulating the window, surface, and swapchain
-pub(super) struct RenderTarget {
-    pub window: Arc<Window>,
-
+pub(crate) struct RenderTarget {
     pub surface: vk::SurfaceKHR,
     pub surface_loader: ash::khr::surface::Instance,
     pub surface_format: vk::SurfaceFormatKHR,
     pub surface_present_mode: vk::PresentModeKHR,
-
     pub swapchain: Swapchain,
 }
 
 impl RenderTarget {
     pub fn new(
-        window: Arc<Window>,
+        window: &Window,
         surface: (vk::SurfaceKHR, ash::khr::surface::Instance),
         ins: &RenderInstance,
         dev: &RenderDevice,
@@ -57,13 +54,12 @@ impl RenderTarget {
             &surface_loader,
             surface_format,
             surface_present_mode,
-            &window,
+            &window.inner_size(),
             ins,
             dev,
         )?;
 
         Ok(Self {
-            window,
             surface,
             surface_loader,
             surface_format: *surface_format,
@@ -74,6 +70,7 @@ impl RenderTarget {
 
     pub fn resize(
         &mut self,
+        size: winit::dpi::PhysicalSize<u32>,
         ins: &RenderInstance,
         dev: &RenderDevice,
     ) -> Result<()> {
@@ -86,7 +83,7 @@ impl RenderTarget {
             &self.surface_loader,
             &self.surface_format,
             &self.surface_present_mode,
-            &self.window,
+            &size,
             ins,
             dev,
         )?;
@@ -95,7 +92,10 @@ impl RenderTarget {
     }
 
     pub fn get_size(&self) -> winit::dpi::PhysicalSize<u32> {
-        self.window.inner_size()
+        winit::dpi::PhysicalSize::new(
+            self.swapchain.swapchain_image_extent.width,
+            self.swapchain.swapchain_image_extent.height,
+        )
     }
 
 }
