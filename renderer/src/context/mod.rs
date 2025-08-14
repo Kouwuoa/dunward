@@ -1,6 +1,6 @@
 use color_eyre::Result;
-pub(super) mod commands;
-mod desc_set_layout_builder;
+pub(crate) mod commands;
+pub(crate) mod desc_set_layout_builder;
 mod device;
 mod instance;
 mod queue;
@@ -8,7 +8,7 @@ mod target;
 mod swapchain;
 
 /// Main abstraction around the graphics API context for rendering.
-pub(super) struct RenderContext {
+pub(crate) struct RenderContext {
     pub instance: instance::RenderInstance,
     pub device: device::RenderDevice,
     pub target: Option<target::RenderTarget>,
@@ -16,6 +16,8 @@ pub(super) struct RenderContext {
 
 impl RenderContext {
     pub fn new(window: Option<&winit::window::Window>) -> Result<Self> {
+        log::info!("Creating RenderContext");
+
         let instance = instance::RenderInstance::new(window)?;
         let surface = if let Some(window) = window {
             Some(instance.create_surface(window)?)

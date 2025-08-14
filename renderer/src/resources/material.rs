@@ -5,6 +5,9 @@ use gpu_descriptor::{DescriptorAllocator, DescriptorSetLayoutCreateFlags, Descri
 use gpu_descriptor_ash::AshDescriptorDevice;
 use std::ffi::CString;
 use std::sync::{Arc, Mutex};
+use crate::resource_type::RenderResourceType;
+use crate::resources::shader::{ComputeShader, GraphicsShader};
+use crate::resources::vertex::VertexInputDescription;
 
 pub struct Material<'a> {
     pipeline: &'a vk::Pipeline,

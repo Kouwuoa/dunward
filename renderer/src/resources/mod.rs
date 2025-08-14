@@ -1,9 +1,9 @@
 pub(crate) mod buffer;
 pub(crate) mod image;
-mod material;
-//mod megabuffer;
-mod mesh;
-mod model;
-mod shader;
-mod texture;
-mod vertex;
+pub(crate) mod material;
+//pub(crate) mod megabuffer;
+pub(crate) mod mesh;
+//pub(crate) mod model;
+pub(crate) mod shader;
+pub(crate) mod texture;
+pub(crate) mod vertex;

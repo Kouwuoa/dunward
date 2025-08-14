@@ -4,7 +4,7 @@ use glam::{Mat4, Vec2, Vec3};
 /// Data unique to each frame passed into uniform buffer
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, Pod, Zeroable)]
-pub struct PerFrameData {
+pub(crate) struct PerFrameData {
     pub viewproj: Mat4,
     pub near: f32,
     pub far: f32,
@@ -14,7 +14,7 @@ pub struct PerFrameData {
 /// Data unique to each material passed as elements into a storage buffer
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, Pod, Zeroable)]
-pub struct PerMaterialData {
+pub(crate) struct PerMaterialData {
     pub texture_index: u32,
     pub sampler_index: u32,
 }
@@ -22,14 +22,14 @@ pub struct PerMaterialData {
 /// Data unique to each object passed as elements into a storage buffer
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, Pod, Zeroable)]
-pub struct PerObjectData {
+pub(crate) struct PerObjectData {
     pub model: Mat4,
 }
 
 /// Data unique to each vertex passed as elements into a vertex buffer
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, Pod, Zeroable)]
-pub struct PerVertexData {
+pub(crate) struct PerVertexData {
     pub position: Vec3,
     pub texcoord: Vec2,
 }
@@ -37,7 +37,7 @@ pub struct PerVertexData {
 /// Data unique to each draw call passed as a push constant
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, Pod, Zeroable)]
-pub struct PerDrawData {
+pub(crate) struct PerDrawData {
     pub object_index: u32,
     pub material_index: u32,
     pub vertex_offset: u32,

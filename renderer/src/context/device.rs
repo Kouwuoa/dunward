@@ -15,7 +15,7 @@ use std::str::Utf8Error;
 use std::sync::{Arc, Mutex};
 
 /// Main way to submit rendering commands to the GPU.
-pub(super) struct RenderDevice {
+pub(crate) struct RenderDevice {
     pub logical: Arc<ash::Device>,
     pub physical: vk::PhysicalDevice,
 

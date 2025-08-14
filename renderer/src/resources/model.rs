@@ -1,6 +1,7 @@
 use super::mesh::Mesh;
 use color_eyre::eyre::{eyre, Result};
 use glam::Vec3;
+use crate::shader_data::PerVertexData;
 
 pub struct FullscreenQuad {
     quad_model: Model,

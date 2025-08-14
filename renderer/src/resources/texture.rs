@@ -3,7 +3,7 @@ use crate::context::commands::TransferCommandEncoder;
 use color_eyre::Result;
 use std::sync::{Arc, Mutex};
 
-pub(super) struct ColorTexture {
+pub(crate) struct ColorTexture {
     pub image: Image,
 }
 
@@ -53,7 +53,7 @@ impl ColorTexture {
     }
 }
 
-pub(super) struct StorageTexture {
+pub(crate) struct StorageTexture {
     pub image: Image,
 }
 
