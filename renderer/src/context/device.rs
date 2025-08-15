@@ -1,16 +1,28 @@
-use super::commands::CommandEncoderAllocator;
-use super::commands::{CommandEncoderAllocatorExt, TransferCommandEncoder};
-use super::instance::RenderInstance;
-use super::queue::{Queue, QueueFamily};
-use crate::resources::image::Image;
+use super::{
+    commands::CommandEncoderAllocator,
+    commands::{CommandEncoderAllocatorExt, TransferCommandEncoder},
+    instance::RenderInstance,
+    queue::{Queue, QueueFamily}
+};
+use crate::{
+    resources::{
+        megabuffer::{
+            Megabuffer,
+            MegabufferExt
+        },
+        image::Image,
+    }
+};
 use ash::vk;
-use color_eyre::Result;
-use color_eyre::eyre::OptionExt;
+use color_eyre::{
+    Result,
+    eyre::OptionExt
+};
 use gpu_descriptor::{
     CreatePoolError, DescriptorAllocator, DescriptorDevice, DescriptorPoolCreateFlags,
     DescriptorTotalCount, DeviceAllocationError,
 };
-use std::ffi::{CStr, c_char, c_void};
+use std::ffi::{CStr, c_char};
 use std::str::Utf8Error;
 use std::sync::{Arc, Mutex};
 
@@ -93,7 +105,6 @@ impl RenderDevice {
         self.transfer.immediate_submit(func)
     }
 
-    /*
     pub fn create_megabuffer(
         &self,
         size: u64,
@@ -106,10 +117,9 @@ impl RenderDevice {
             buf_usage,
             self.memory_allocator.clone(),
             self.logical.clone(),
-            self.transfer_context.clone(),
+            self.transfer.clone(),
         )
     }
-     */
 
     pub fn create_color_image(
         &self,

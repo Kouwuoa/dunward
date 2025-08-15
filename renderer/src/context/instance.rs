@@ -9,7 +9,7 @@ use std::sync::Arc;
 use winit::window::Window;
 
 /// Initializes Vulkan and keeps the Vulkan instance alive
-pub(super) struct RenderInstance {
+pub(crate) struct RenderInstance {
     pub entry: ash::Entry,
     pub instance: ash::Instance,
     pub debug_utils_messenger: vk::DebugUtilsMessengerEXT,

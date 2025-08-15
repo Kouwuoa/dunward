@@ -3,6 +3,8 @@ use crate::context::desc_set_layout_builder::DescriptorSetLayoutBuilder;
 use crate::resource_type::RenderResourceType;
 use crate::resources::buffer::Buffer;
 use crate::resources::material::{GraphicsMaterialFactoryBuilder, MaterialFactory};
+use crate::resources::megabuffer::Megabuffer;
+use crate::resources::model::FullscreenQuad;
 use crate::resources::shader::GraphicsShader;
 use crate::resources::texture::{ColorTexture, StorageTexture};
 use crate::shader_data::PerDrawData;
@@ -10,7 +12,6 @@ use ash::vk;
 use color_eyre::Result;
 use gpu_descriptor::DescriptorAllocator;
 use std::sync::{Arc, Mutex};
-//use crate::resources::buffer::Megabuffer;
 
 const VERTEX_BUFFER_SIZE: u64 = 1024 * 1024 * 256; // 256 MB
 const INDEX_BUFFER_SIZE: u64 = 1024 * 1024 * 64; // 64 MB
@@ -19,23 +20,31 @@ const INDEX_BUFFER_ALIGNMENT: u64 = 4;
 const STORAGE_BUFFER_ALIGNMENT: u64 = 16;
 const UNIFORM_BUFFER_ALIGNMENT: u64 = 256;
 
-pub struct RenderResourceStorage {
+pub(crate) struct RenderResourceStorage {
     pub uniform_buffers: Vec<Buffer>,
-    //pub storage_buffers: Vec<Megabuffer>,
+    pub storage_buffers: Vec<Megabuffer>,
     pub storage_images: Vec<StorageTexture>,
     pub sampled_images: Vec<ColorTexture>,
     pub samplers: Vec<vk::Sampler>,
 
-    //pub vertex_megabuffer: Megabuffer,
-    //pub index_megabuffer: Megabuffer,
+    pub vertex_megabuffer: Megabuffer,
+    pub index_megabuffer: Megabuffer,
     pub bindless_material_factory: MaterialFactory,
+
+    fullscreen_quad: FullscreenQuad,
 }
 
 impl RenderResourceStorage {
     pub fn new(ctx: &RenderContext) -> Result<Self> {
-        let device = &ctx.device;
+        log::info!("Creating RenderResourceStorage");
 
-        /*
+        let device = &ctx.device;
+        if ctx.target.is_none() {
+            return Err(color_eyre::eyre::eyre!(
+                "RenderContext must have a target to create RenderResourceStorage"
+            ));
+        }
+
         let vertex_megabuffer = device.create_megabuffer(
             VERTEX_BUFFER_SIZE,
             VERTEX_BUFFER_ALIGNMENT,
@@ -47,23 +56,30 @@ impl RenderResourceStorage {
             INDEX_BUFFER_ALIGNMENT,
             vk::BufferUsageFlags::INDEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
         )?;
-         */
 
         let bindless_material_factory = Self::create_bindless_material_factory(
             device.logical.clone(),
             device.descriptor_allocator.clone(),
         )?;
 
+        let fullscreen_quad = FullscreenQuad::new(
+            &vertex_megabuffer,
+            &index_megabuffer,
+            ctx.target.as_ref().unwrap(),
+        )?;
+
         Ok(Self {
             uniform_buffers: Vec::new(),
-            //storage_buffers: Vec::new(),
+            storage_buffers: Vec::new(),
             storage_images: Vec::new(),
             samplers: Vec::new(),
             sampled_images: Vec::new(),
 
-            //vertex_megabuffer,
-            //index_megabuffer,
+            vertex_megabuffer,
+            index_megabuffer,
             bindless_material_factory,
+
+            fullscreen_quad,
         })
     }
 

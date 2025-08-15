@@ -1,4 +1,5 @@
 set windows-shell := ["powershell.exe", "-c"]
+export RUST_BACKTRACE := "1"
 
 deb:
     cargo run

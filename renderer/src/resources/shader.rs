@@ -62,6 +62,7 @@ impl Drop for ComputeShader {
 }
 
 fn create_shader_module(filepath: &Path, device: &ash::Device) -> Result<vk::ShaderModule> {
+    log::info!("Creating shader module from file: {:?}", filepath);
     let code = std::fs::read(filepath)?;
 
     let shader_module_info =

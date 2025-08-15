@@ -1,11 +1,11 @@
 use color_eyre::Result;
 pub(crate) mod commands;
 pub(crate) mod desc_set_layout_builder;
-mod device;
-mod instance;
-mod queue;
-mod target;
-mod swapchain;
+pub(crate) mod device;
+pub(crate) mod instance;
+pub(crate) mod queue;
+pub(crate) mod target;
+pub(crate) mod swapchain;
 
 /// Main abstraction around the graphics API context for rendering.
 pub(crate) struct RenderContext {

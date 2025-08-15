@@ -1,7 +1,7 @@
 use ash::vk;
 use std::hash::Hash;
 
-pub(super) struct Queue {
+pub(crate) struct Queue {
     pub family: QueueFamily,
     pub handle: vk::Queue,
 }
@@ -13,7 +13,7 @@ impl Queue {
 }
 
 #[derive(Clone)]
-pub(super) struct QueueFamily {
+pub(crate) struct QueueFamily {
     pub index: u32,
     pub properties: vk::QueueFamilyProperties,
     supports_present: bool,

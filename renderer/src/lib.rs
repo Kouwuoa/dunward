@@ -11,6 +11,7 @@ pub use camera::Camera;
 
 pub struct Renderer {
     ctx: context::RenderContext,
+    res: resource_storage::RenderResourceStorage,
 }
 
 impl Renderer {
@@ -19,7 +20,9 @@ impl Renderer {
         let _ = env_logger::try_init();
 
         let ctx = context::RenderContext::new(window)?;
-        Ok(Self { ctx })
+        let res = resource_storage::RenderResourceStorage::new(&ctx)?;
+
+        Ok(Self { ctx, res })
     }
 
     pub fn render_frame(&mut self, cam: &Camera) {

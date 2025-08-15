@@ -1,7 +1,6 @@
 use ash::vk;
 use color_eyre::eyre::{eyre, OptionExt};
 use color_eyre::Result;
-use std::mem::ManuallyDrop;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Mutex};
 use crate::context::commands::TransferCommandEncoder;
@@ -9,12 +8,7 @@ use super::buffer::Buffer;
 
 static MEGABUFFER_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-pub struct MegaSubbuffer {
-    parent: Megabuffer,
-    allocation: AllocatedMegabufferRegion,
-}
-
-pub struct Megabuffer {
+pub(crate) struct Megabuffer {
     inner: Arc<Mutex<MegabufferInner>>,
     id: usize,
 }
@@ -40,7 +34,7 @@ impl Megabuffer {
     }
 }
 
-pub trait MegabufferExt {
+pub(crate) trait MegabufferExt {
     fn new(
         size: u64,
         alignment: u64,
@@ -49,7 +43,6 @@ pub trait MegabufferExt {
         device: Arc<ash::Device>,
         transfer: Arc<TransferCommandEncoder>,
     ) -> Result<Megabuffer>;
-    fn allocate_subbuffer(&self, size: u64) -> Result<MegaSubbuffer>;
     fn allocate_region(&self, size: u64) -> Result<AllocatedMegabufferRegion>;
     fn deallocate_region(&self, region: &mut AllocatedMegabufferRegion) -> Result<()>;
     fn defragment(&self) -> Result<()>;
@@ -112,48 +105,6 @@ impl MegabufferExt for Megabuffer {
                 mem_allocator: memory_allocator,
                 device,
             })),
-            parent: None,
-            id,
-        })
-    }
-
-    fn allocate_subbuffer(&self, size: u64) -> Result<Self> {
-        let allocated_region = self.allocate_region(size)?;
-        let free_region = FreeMegabufferRegion {
-            offset: allocated_region.offset,
-            size: allocated_region.size,
-        };
-
-        let guard = self.inner
-            .lock()
-            .map_err(|e| eyre!(e.to_string()))?;
-
-        let buffer = guard.buffer.clone();
-        let staging_buffer = guard.staging_buffer.clone();
-        let free_regions = vec![free_region];
-
-        let id = MEGABUFFER_ID_COUNTER
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let alignment = guard.alignment;
-        let mem_allocator = guard.mem_allocator.clone();
-        let device = guard.device.clone();
-        let transfer_context = guard.transfer.clone();
-
-        Ok(Megabuffer {
-            inner: Arc::new(Mutex::new(MegabufferInner {
-                id,
-
-                buffer,
-                staging_buffer,
-                free_regions,
-                alignment,
-
-                mem_allocator,
-                device,
-                transfer,
-            })),
-            parent: Some(self.inner.clone()),
-            parent_allocation: Some(ManuallyDrop::new(allocated_region)),
             id,
         })
     }
@@ -392,12 +343,12 @@ impl PartialEq for MegabufferInner {
         self.id == other.id
     }
 }
-pub struct FreeMegabufferRegion {
+pub(crate) struct FreeMegabufferRegion {
     offset: u64,
     size: u64,
 }
 
-pub struct AllocatedMegabufferRegion {
+pub(crate) struct AllocatedMegabufferRegion {
     offset: u64,
     size: u64,
     megabuffer: Option<Megabuffer>,

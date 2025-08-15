@@ -67,7 +67,7 @@ pub struct MaterialFactory {
 }
 
 impl MaterialFactory {
-    pub fn create_material(&mut self) -> Result<Material> {
+    pub fn create_material(&'_ mut self) -> Result<Material<'_>> {
         let descriptor_set = self.allocate_descriptor_sets()?;
         Ok(Material {
             pipeline: &self.pipeline,
