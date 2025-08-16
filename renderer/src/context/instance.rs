@@ -5,15 +5,18 @@ use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use std::ffi::{CStr, FromBytesUntilNulError, c_char, c_void};
-use std::sync::Arc;
 use winit::window::Window;
 
 /// Initializes Vulkan and keeps the Vulkan instance alive
 pub(crate) struct RenderInstance {
-    pub entry: ash::Entry,
     pub instance: ash::Instance,
-    pub debug_utils_messenger: vk::DebugUtilsMessengerEXT,
-    pub debug_utils_loader: ash::ext::debug_utils::Instance,
+
+    #[cfg(debug_assertions)]
+    debug_utils_messenger: vk::DebugUtilsMessengerEXT,
+    #[cfg(debug_assertions)]
+    debug_utils_loader: ash::ext::debug_utils::Instance,
+
+    entry: ash::Entry,
 }
 
 impl RenderInstance {
@@ -29,13 +32,17 @@ impl RenderInstance {
 
         let instance = Self::create_instance(&entry, window)?;
 
+        #[cfg(debug_assertions)]
         let (debug_utils_messenger, debug_utils_loader) =
             Self::create_debug_utils_messenger(&entry, &instance)?;
 
         Ok(Self {
             instance,
             entry,
+
+            #[cfg(debug_assertions)]
             debug_utils_messenger,
+            #[cfg(debug_assertions)]
             debug_utils_loader,
         })
     }
@@ -91,7 +98,16 @@ impl RenderInstance {
             .iter()
             .map(|ext| ext.as_ptr())
             .collect::<Vec<*const c_char>>();
+
+        #[cfg(not(debug_assertions))]
+        let instance_info = vk::InstanceCreateInfo::default()
+            .application_info(&application_info)
+            .enabled_layer_names(&enabled_layer_names)
+            .enabled_extension_names(&enabled_extension_names);
+
+        #[cfg(debug_assertions)]
         let mut debug_info = debug_utils_messenger_create_info();
+        #[cfg(debug_assertions)]
         let instance_info = vk::InstanceCreateInfo::default()
             .application_info(&application_info)
             .enabled_layer_names(&enabled_layer_names)
@@ -104,6 +120,7 @@ impl RenderInstance {
         Ok(unsafe { entry.create_instance(&instance_info, None)? })
     }
 
+    #[cfg(debug_assertions)]
     fn create_debug_utils_messenger(
         entry: &ash::Entry,
         instance: &ash::Instance,
@@ -115,9 +132,7 @@ impl RenderInstance {
         Ok((debug_utils_messenger, debug_utils_loader))
     }
 
-    fn get_required_instance_extensions(
-        window: Option<&Window>,
-    ) -> Result<Vec<&'static CStr>> {
+    fn get_required_instance_extensions(window: Option<&Window>) -> Result<Vec<&'static CStr>> {
         let mut exts = if let Some(window) = window {
             ash_window::enumerate_required_extensions(window.display_handle()?.as_raw())?
                 .iter()
@@ -127,6 +142,7 @@ impl RenderInstance {
             Vec::new()
         };
 
+        #[cfg(debug_assertions)]
         if Self::ENABLE_VALIDATION_LAYERS {
             exts.push(ash::ext::debug_utils::NAME);
         }
@@ -156,6 +172,8 @@ impl RenderInstance {
         Ok(())
     }
 }
+
+#[cfg(debug_assertions)]
 fn debug_utils_messenger_create_info() -> vk::DebugUtilsMessengerCreateInfoEXT<'static> {
     let message_severity = vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE
         | vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
@@ -169,6 +187,7 @@ fn debug_utils_messenger_create_info() -> vk::DebugUtilsMessengerCreateInfoEXT<'
         .pfn_user_callback(Some(debug_callback))
 }
 
+#[cfg(debug_assertions)]
 unsafe extern "system" fn debug_callback(
     message_severity: vk::DebugUtilsMessageSeverityFlagsEXT,
     message_type: vk::DebugUtilsMessageTypeFlagsEXT,

@@ -32,10 +32,7 @@ fn main() {
         .add_plugins(render::DunwardRenderPlugin)
         //.add_plugins(game::DunwardGamePlugin)
         //.add_plugins(ui::DunwardUiPlugin)
-        .add_systems(
-            PreUpdate,
-            request_close_on_esc,
-        )
+        .add_systems(PreUpdate, request_close_on_esc)
         .run();
 }
 

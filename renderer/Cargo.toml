@@ -16,6 +16,7 @@ image = "0.25.6"
 log = "0.4.27"
 presser = "0.3.1"
 raw-window-handle = "0.6"
+rust-embed = "8.7.2"
 smallvec = "1.15.1"
 vk-mem = "0.4.0"
 winit = { version = "0.30", default-features = false, features = ["rwh_06"] }

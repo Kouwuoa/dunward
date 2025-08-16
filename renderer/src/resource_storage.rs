@@ -12,6 +12,7 @@ use ash::vk;
 use color_eyre::Result;
 use gpu_descriptor::DescriptorAllocator;
 use std::sync::{Arc, Mutex};
+use rust_embed::Embed;
 
 const VERTEX_BUFFER_SIZE: u64 = 1024 * 1024 * 256; // 256 MB
 const INDEX_BUFFER_SIZE: u64 = 1024 * 1024 * 64; // 64 MB
