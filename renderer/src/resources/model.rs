@@ -90,6 +90,8 @@ impl Model {
         vertex_megabuffer: &Megabuffer,
         index_megabuffer: &Megabuffer,
     ) -> Result<Self> {
+        log::info!("Creating model with {} meshes", meshes.len());
+
         if meshes.is_empty() {
             return Err(eyre!("Model must have at least one mesh"));
         }
