@@ -2,22 +2,16 @@ use super::{
     commands::CommandEncoderAllocator,
     commands::{CommandEncoderAllocatorExt, TransferCommandEncoder},
     instance::RenderInstance,
-    queue::{Queue, QueueFamily}
+    queue::{Queue, QueueFamily},
 };
-use crate::{
-    resources::{
-        megabuffer::{
-            Megabuffer,
-            MegabufferExt
-        },
-        image::Image,
-    }
+use crate::context::commands::CommandEncoder;
+use crate::resources::texture::{ColorTexture, DepthTexture, StorageTexture};
+use crate::resources::{
+    megabuffer::{Megabuffer, MegabufferExt},
+    texture::Texture,
 };
 use ash::vk;
-use color_eyre::{
-    Result,
-    eyre::OptionExt
-};
+use color_eyre::{Result, eyre::OptionExt};
 use gpu_descriptor::{
     CreatePoolError, DescriptorAllocator, DescriptorDevice, DescriptorPoolCreateFlags,
     DescriptorTotalCount, DeviceAllocationError,
@@ -25,7 +19,6 @@ use gpu_descriptor::{
 use std::ffi::{CStr, c_char};
 use std::str::Utf8Error;
 use std::sync::{Arc, Mutex};
-use crate::context::commands::CommandEncoder;
 
 /// Main way to submit rendering commands to the GPU.
 pub(crate) struct RenderDevice {
@@ -122,14 +115,14 @@ impl RenderDevice {
         )
     }
 
-    pub fn create_color_image(
+    pub fn create_color_texture(
         &self,
         width: u32,
         height: u32,
         data: Option<&[u8]>,
         use_dedicated_memory: bool,
-    ) -> Result<Image> {
-        Image::new_color_image(
+    ) -> Result<ColorTexture> {
+        Texture::new_color_texture_from_bytes(
             width,
             height,
             data,
@@ -140,8 +133,8 @@ impl RenderDevice {
         )
     }
 
-    pub fn create_depth_image(&self, width: u32, height: u32) -> Result<Image> {
-        Image::new_depth_image(
+    pub fn create_depth_texture(&self, width: u32, height: u32) -> Result<DepthTexture> {
+        Texture::new_depth_texture(
             width,
             height,
             self.memory_allocator.clone(),
@@ -149,10 +142,22 @@ impl RenderDevice {
         )
     }
 
-    pub fn allocate_command_encoder(
-        &mut self,
-        queue: Arc<Queue>,
-    ) -> Result<CommandEncoder> {
+    pub fn create_storage_texture(
+        &self,
+        width: u32,
+        height: u32,
+        use_dedicated_memory: bool,
+    ) -> Result<StorageTexture> {
+        Texture::new_storage_texture(
+            width,
+            height,
+            use_dedicated_memory,
+            self.memory_allocator.clone(),
+            self.logical.clone(),
+        )
+    }
+
+    pub fn allocate_command_encoder(&mut self, queue: Arc<Queue>) -> Result<CommandEncoder> {
         self.command_encoder_allocator.allocate(queue)
     }
 

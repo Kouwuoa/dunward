@@ -1,3 +1,4 @@
+use crate::resources::texture::DepthTexture;
 use crate::{
     context::RenderContext,
     context::desc_set_layout_builder::DescriptorSetLayoutBuilder,
@@ -29,8 +30,8 @@ const STORAGE_BUFFER_ALIGNMENT: u64 = 16;
 const UNIFORM_BUFFER_ALIGNMENT: u64 = 256;
 
 pub(crate) struct RenderStorage {
-    pub storage_images: Vec<StorageTexture>,
-    pub sampled_images: Vec<ColorTexture>,
+    pub storage_textures: Vec<StorageTexture>,
+    pub sampled_textures: Vec<ColorTexture>,
     pub samplers: Vec<vk::Sampler>,
 
     pub vertex_megabuffer: Megabuffer,
@@ -40,7 +41,7 @@ pub(crate) struct RenderStorage {
     pub per_object_megabuffer: Megabuffer,
     pub bindless_material_factory: MaterialFactory,
 
-    fullscreen_quad: FullscreenQuad,
+    pub fullscreen_quad: FullscreenQuad,
 }
 
 impl RenderStorage {
@@ -95,10 +96,24 @@ impl RenderStorage {
             ctx.target.as_ref().unwrap(),
         )?;
 
+        let mut samplers = Vec::new();
+        samplers.push(unsafe {
+            device.logical.create_sampler(
+                &vk::SamplerCreateInfo::default()
+                    .mag_filter(vk::Filter::NEAREST)
+                    .min_filter(vk::Filter::NEAREST)
+                    .mipmap_mode(vk::SamplerMipmapMode::NEAREST)
+                    .address_mode_u(vk::SamplerAddressMode::REPEAT)
+                    .address_mode_v(vk::SamplerAddressMode::REPEAT)
+                    .address_mode_w(vk::SamplerAddressMode::REPEAT),
+                None,
+            )?
+        });
+
         Ok(Self {
-            storage_images: Vec::new(),
-            samplers: Vec::new(),
-            sampled_images: Vec::new(),
+            storage_textures: Vec::new(),
+            sampled_textures: Vec::new(),
+            samplers,
 
             vertex_megabuffer,
             index_megabuffer,

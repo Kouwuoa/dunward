@@ -5,14 +5,18 @@ use ash::vk;
 use color_eyre::Result;
 use winit::dpi::PhysicalSize;
 
+pub(crate) type SwapchainImageIndex = u32;
+pub(crate) type SwapchainImage = vk::Image;
+pub(crate) type SwapchainImageExtent = vk::Extent2D;
+
 pub(crate) struct Swapchain {
     pub swapchain: vk::SwapchainKHR,
     pub swapchain_loader: ash::khr::swapchain::Device,
     pub swapchain_present_mode: vk::PresentModeKHR,
-    pub swapchain_images: Vec<vk::Image>,
+    pub swapchain_images: Vec<SwapchainImage>,
     pub swapchain_image_count: u32,
     pub swapchain_image_views: Vec<vk::ImageView>,
-    pub swapchain_image_extent: vk::Extent2D,
+    pub swapchain_image_extent: SwapchainImageExtent,
     pub swapchain_image_format: vk::Format,
     pub swapchain_image_color_space: vk::ColorSpaceKHR,
     pub swapchain_image_usage: vk::ImageUsageFlags,

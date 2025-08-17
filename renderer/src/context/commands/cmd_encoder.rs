@@ -1,6 +1,6 @@
 use super::super::queue::Queue;
 use super::cmd_encoder_alloc::{CommandEncoderAllocator, CommandEncoderAllocatorExt};
-use crate::resources::image::Image;
+use crate::resources::texture::Texture;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
@@ -63,15 +63,15 @@ impl CommandEncoder {
 
     pub fn transition_image_layout(
         &self,
-        image: &mut Image,
+        image: &mut Texture,
         old_layout: vk::ImageLayout,
         new_layout: vk::ImageLayout,
     ) {
         image.transition_layout(self.command_buffer, old_layout, new_layout)
     }
 
-    pub fn copy_image_to_image(&self, src_image: &Image, dst_image: &Image) {
-        src_image.copy_to_image(self.command_buffer, dst_image)
+    pub fn copy_texture_to_texture(&self, src: &Texture, dst: &Texture) {
+        src.copy_to(dst, self.command_buffer)
     }
 }
 

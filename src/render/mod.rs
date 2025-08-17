@@ -32,5 +32,5 @@ fn create_renderer(
 
 fn render_frame(mut renderer: NonSendMut<renderer::Renderer>, camera_qry: Query<&camera::Camera>) {
     let camera = camera_qry.single().unwrap();
-    renderer.render_frame(&camera.0);
+    renderer.render_frame(&camera.0).unwrap();
 }
