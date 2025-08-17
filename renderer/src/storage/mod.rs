@@ -20,6 +20,9 @@ pub(crate) mod shader_data;
 
 const VERTEX_BUFFER_SIZE: u64 = 1024 * 1024 * 256; // 256 MB
 const INDEX_BUFFER_SIZE: u64 = 1024 * 1024 * 64; // 64 MB
+const PER_FRAME_BUFFER_SIZE: u64 = 16 * 1024 * 1024; // 16 MB
+const PER_MATERIAL_BUFFER_SIZE: u64 = 16 * 1024 * 1024; // 16 MB
+const PER_OBJECT_BUFFER_SIZE: u64 = 16 * 1024 * 1024; // 16 MB
 const VERTEX_BUFFER_ALIGNMENT: u64 = 16;
 const INDEX_BUFFER_ALIGNMENT: u64 = 4;
 const STORAGE_BUFFER_ALIGNMENT: u64 = 16;
@@ -64,19 +67,19 @@ impl RenderStorage {
         )?;
 
         let per_frame_megabuffer = device.create_megabuffer(
-            UNIFORM_BUFFER_ALIGNMENT,
+            PER_FRAME_BUFFER_SIZE,
             UNIFORM_BUFFER_ALIGNMENT,
             vk::BufferUsageFlags::UNIFORM_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
         )?;
 
         let per_material_megabuffer = device.create_megabuffer(
-            STORAGE_BUFFER_ALIGNMENT,
+            PER_MATERIAL_BUFFER_SIZE,
             STORAGE_BUFFER_ALIGNMENT,
             vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
         )?;
 
         let per_object_megabuffer = device.create_megabuffer(
-            STORAGE_BUFFER_ALIGNMENT,
+            PER_OBJECT_BUFFER_SIZE,
             STORAGE_BUFFER_ALIGNMENT,
             vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
         )?;

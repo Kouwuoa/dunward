@@ -8,7 +8,7 @@ use std::collections::{HashMap, hash_map};
 use std::sync::{Arc, Mutex};
 
 #[repr(transparent)]
-pub(crate) struct CommandEncoderAllocator(pub Arc<Mutex<CommandEncoderAllocatorInner>>);
+pub(crate) struct CommandEncoderAllocator(Arc<Mutex<CommandEncoderAllocatorInner>>);
 
 impl Clone for CommandEncoderAllocator {
     fn clone(&self) -> Self {
@@ -86,7 +86,10 @@ impl CommandEncoderAllocatorExt<CommandEncoderAllocator> for CommandEncoderAlloc
         let command_pool = guard
             .command_pools
             .get(&command_encoder.queue.family)
-            .unwrap();
+            .ok_or_eyre(format!(
+                "Failed to get command pool for queue family: {}",
+                command_encoder.queue.family.index
+            ))?;
         let command_buffer = command_encoder.command_buffer;
         unsafe {
             guard
@@ -112,22 +115,21 @@ impl CommandEncoderAllocatorExt<CommandEncoderAllocator> for CommandEncoderAlloc
     }
 }
 
-impl Drop for CommandEncoderAllocator {
+impl Drop for CommandEncoderAllocatorInner {
     fn drop(&mut self) {
-        let mut guard = self.0.lock().map_err(|e| eyre!(e.to_string())).unwrap();
-
-        let command_pools = guard.command_pools.drain().collect::<Vec<_>>();
+        let command_pools = self.command_pools.drain().collect::<Vec<_>>();
 
         for (queue_family, command_pool) in command_pools {
-            let command_buffers = guard
+            let command_buffers = self
                 .allocated_command_buffers
                 .remove(&queue_family)
                 .unwrap();
             unsafe {
-                guard
-                    .device
-                    .free_command_buffers(command_pool, &command_buffers);
-                guard.device.destroy_command_pool(command_pool, None);
+                if !command_buffers.is_empty() {
+                    self.device
+                        .free_command_buffers(command_pool, &command_buffers);
+                }
+                self.device.destroy_command_pool(command_pool, None);
             }
         }
     }

@@ -32,7 +32,6 @@ features = [
     "bevy_window",
     "bevy_winit",
     "custom_cursor",
-    "dynamic_linking",
     "multi_threaded",
     "std",
     "sysinfo_plugin",

@@ -282,11 +282,6 @@ impl MegabufferInner {
             .enumerate()
             // Find the first free region that can fit the allocation
             .find(|(_, region)| {
-                    log::error!(
-                        "Free region: {} < {}",
-                        region.size,
-                        alloc_size
-                    );
                 region.size >= alloc_size
             })
             .map(|(i, region)| {

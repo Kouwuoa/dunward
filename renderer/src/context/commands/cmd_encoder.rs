@@ -87,7 +87,6 @@ impl Drop for CommandEncoder {
             .allocator
             .take()
             .expect("CommandEncoderAllocator not found for CommandEncoder");
-
         allocator.deallocate(self).unwrap();
     }
 }
