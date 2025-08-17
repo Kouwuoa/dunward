@@ -18,7 +18,9 @@ impl Clone for CommandEncoderAllocator {
 
 pub(crate) trait CommandEncoderAllocatorExt<A> {
     fn new(device: Arc<ash::Device>) -> Result<A>;
+    /// Note that this is mutably borrowed to force the allocator to be used in a single-threaded context.
     fn allocate(&mut self, queue: Arc<Queue>) -> Result<CommandEncoder>;
+    /// Note that this is mutably borrowed to force the allocator to be used in a single-threaded context.
     fn deallocate(&mut self, command_encoder: &CommandEncoder) -> Result<()>;
 }
 

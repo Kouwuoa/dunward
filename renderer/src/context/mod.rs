@@ -1,3 +1,4 @@
+use ash::vk;
 use color_eyre::Result;
 
 pub(crate) mod commands;
@@ -36,5 +37,16 @@ impl RenderContext {
             device,
             target,
         })
+    }
+
+    pub fn wait_and_reset_fence(&self, fence: vk::Fence, timeout: u64) -> Result<()> {
+        unsafe {
+            let fences = [fence];
+            self.device
+                .logical
+                .wait_for_fences(&fences, true, timeout)?;
+            self.device.logical.reset_fences(&fences)?;
+        }
+        Ok(())
     }
 }
