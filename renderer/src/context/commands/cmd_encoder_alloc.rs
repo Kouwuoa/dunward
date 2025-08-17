@@ -19,7 +19,7 @@ impl Clone for CommandEncoderAllocator {
 pub(crate) trait CommandEncoderAllocatorExt<A> {
     fn new(device: Arc<ash::Device>) -> Result<A>;
     fn allocate(&mut self, queue: Arc<Queue>) -> Result<CommandEncoder>;
-    fn free(&mut self, command_encoder: &CommandEncoder) -> Result<()>;
+    fn deallocate(&mut self, command_encoder: &CommandEncoder) -> Result<()>;
 }
 
 struct CommandEncoderAllocatorInner {
@@ -80,7 +80,7 @@ impl CommandEncoderAllocatorExt<CommandEncoderAllocator> for CommandEncoderAlloc
         Ok(command_encoder)
     }
 
-    fn free(&mut self, command_encoder: &CommandEncoder) -> Result<()> {
+    fn deallocate(&mut self, command_encoder: &CommandEncoder) -> Result<()> {
         let mut guard = self.0.lock().map_err(|e| eyre!(e.to_string()))?;
 
         let command_pool = guard

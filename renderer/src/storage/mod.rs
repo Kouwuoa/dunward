@@ -1,17 +1,22 @@
-use crate::context::RenderContext;
-use crate::context::desc_set_layout_builder::DescriptorSetLayoutBuilder;
-use crate::resources::resource_type::RenderResourceType;
-use crate::resources::buffer::Buffer;
-use crate::resources::material::{GraphicsMaterialFactoryBuilder, MaterialFactory};
-use crate::resources::megabuffer::Megabuffer;
-use crate::resources::model::FullscreenQuad;
-use crate::resources::shader::GraphicsShader;
-use crate::resources::texture::{ColorTexture, StorageTexture};
-use crate::resources::shader_data::PerDrawData;
+use crate::{
+    context::RenderContext,
+    context::desc_set_layout_builder::DescriptorSetLayoutBuilder,
+    resources::{
+        material::{GraphicsMaterialFactoryBuilder, MaterialFactory},
+        megabuffer::Megabuffer,
+        model::FullscreenQuad,
+        resource_type::RenderResourceType,
+        shader::GraphicsShader,
+        texture::{ColorTexture, StorageTexture},
+    },
+};
 use ash::vk;
 use color_eyre::Result;
 use gpu_descriptor::DescriptorAllocator;
+use shader_data::PerDrawData;
 use std::sync::{Arc, Mutex};
+
+pub(crate) mod shader_data;
 
 const VERTEX_BUFFER_SIZE: u64 = 1024 * 1024 * 256; // 256 MB
 const INDEX_BUFFER_SIZE: u64 = 1024 * 1024 * 64; // 64 MB
@@ -21,14 +26,15 @@ const STORAGE_BUFFER_ALIGNMENT: u64 = 16;
 const UNIFORM_BUFFER_ALIGNMENT: u64 = 256;
 
 pub(crate) struct RenderStorage {
-    pub uniform_buffers: Vec<Buffer>,
-    pub storage_buffers: Vec<Megabuffer>,
     pub storage_images: Vec<StorageTexture>,
     pub sampled_images: Vec<ColorTexture>,
     pub samplers: Vec<vk::Sampler>,
 
     pub vertex_megabuffer: Megabuffer,
     pub index_megabuffer: Megabuffer,
+    pub per_frame_megabuffer: Megabuffer,
+    pub per_material_megabuffer: Megabuffer,
+    pub per_object_megabuffer: Megabuffer,
     pub bindless_material_factory: MaterialFactory,
 
     fullscreen_quad: FullscreenQuad,
@@ -57,6 +63,24 @@ impl RenderStorage {
             vk::BufferUsageFlags::INDEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
         )?;
 
+        let per_frame_megabuffer = device.create_megabuffer(
+            UNIFORM_BUFFER_ALIGNMENT,
+            UNIFORM_BUFFER_ALIGNMENT,
+            vk::BufferUsageFlags::UNIFORM_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
+        )?;
+
+        let per_material_megabuffer = device.create_megabuffer(
+            STORAGE_BUFFER_ALIGNMENT,
+            STORAGE_BUFFER_ALIGNMENT,
+            vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
+        )?;
+
+        let per_object_megabuffer = device.create_megabuffer(
+            STORAGE_BUFFER_ALIGNMENT,
+            STORAGE_BUFFER_ALIGNMENT,
+            vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
+        )?;
+
         let bindless_material_factory = Self::create_bindless_material_factory(
             device.logical.clone(),
             device.descriptor_allocator.clone(),
@@ -69,14 +93,15 @@ impl RenderStorage {
         )?;
 
         Ok(Self {
-            uniform_buffers: Vec::new(),
-            storage_buffers: Vec::new(),
             storage_images: Vec::new(),
             samplers: Vec::new(),
             sampled_images: Vec::new(),
 
             vertex_megabuffer,
             index_megabuffer,
+            per_frame_megabuffer,
+            per_material_megabuffer,
+            per_object_megabuffer,
             bindless_material_factory,
 
             fullscreen_quad,
@@ -125,7 +150,7 @@ impl RenderStorage {
                 None,
             )
             .add_binding(
-                // Per-material
+                // Per-object
                 2,
                 RenderResourceType::StorageBuffer.descriptor_type(),
                 RenderResourceType::StorageBuffer.descriptor_count(),

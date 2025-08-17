@@ -25,6 +25,7 @@ use gpu_descriptor::{
 use std::ffi::{CStr, c_char};
 use std::str::Utf8Error;
 use std::sync::{Arc, Mutex};
+use crate::context::commands::CommandEncoder;
 
 /// Main way to submit rendering commands to the GPU.
 pub(crate) struct RenderDevice {
@@ -146,6 +147,13 @@ impl RenderDevice {
             self.memory_allocator.clone(),
             self.logical.clone(),
         )
+    }
+
+    pub fn allocate_command_encoder(
+        &mut self,
+        queue: Arc<Queue>,
+    ) -> Result<CommandEncoder> {
+        self.command_encoder_allocator.allocate(queue)
     }
 
     fn select_physical_device(

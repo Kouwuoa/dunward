@@ -281,7 +281,14 @@ impl MegabufferInner {
             .iter_mut()
             .enumerate()
             // Find the first free region that can fit the allocation
-            .find(|(_, region)| region.size >= alloc_size)
+            .find(|(_, region)| {
+                    log::error!(
+                        "Free region: {} < {}",
+                        region.size,
+                        alloc_size
+                    );
+                region.size >= alloc_size
+            })
             .map(|(i, region)| {
                 // Split the free region into 2 regions:
                 // 1. A free region that fits the allocation exactly
@@ -317,6 +324,8 @@ impl PartialEq for MegabufferInner {
         self.id == other.id
     }
 }
+
+#[derive(Debug)]
 pub(crate) struct FreeMegabufferRegion {
     offset: u64,
     size: u64,

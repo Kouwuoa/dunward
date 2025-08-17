@@ -13,6 +13,8 @@ pub(crate) struct CommandEncoder {
     is_recording: bool,
 
     device: Arc<ash::Device>,
+
+    /// Note that this is only an `Option` to allow for the allocator to be dropped.
     allocator: Option<CommandEncoderAllocator>,
 }
 
@@ -78,7 +80,7 @@ impl CommandEncoder {
 impl Drop for CommandEncoder {
     fn drop(&mut self) {
         if self.is_recording {
-            log::warn!("Dropping CommandEncoder while still recording");
+            log::error!("Dropping CommandEncoder while still recording");
         }
 
         let mut allocator = self
@@ -86,6 +88,6 @@ impl Drop for CommandEncoder {
             .take()
             .expect("CommandEncoderAllocator not found for CommandEncoder");
 
-        allocator.free(self).unwrap();
+        allocator.deallocate(self).unwrap();
     }
 }
