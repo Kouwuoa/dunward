@@ -7,3 +7,6 @@ pub(crate) mod model;
 pub(crate) mod shader;
 pub(crate) mod texture;
 pub(crate) mod vertex;
+
+pub(crate) mod resource_type;
+pub(crate) mod shader_data;

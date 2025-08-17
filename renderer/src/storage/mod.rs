@@ -1,18 +1,17 @@
 use crate::context::RenderContext;
 use crate::context::desc_set_layout_builder::DescriptorSetLayoutBuilder;
-use crate::resource_type::RenderResourceType;
+use crate::resources::resource_type::RenderResourceType;
 use crate::resources::buffer::Buffer;
 use crate::resources::material::{GraphicsMaterialFactoryBuilder, MaterialFactory};
 use crate::resources::megabuffer::Megabuffer;
 use crate::resources::model::FullscreenQuad;
 use crate::resources::shader::GraphicsShader;
 use crate::resources::texture::{ColorTexture, StorageTexture};
-use crate::shader_data::PerDrawData;
+use crate::resources::shader_data::PerDrawData;
 use ash::vk;
 use color_eyre::Result;
 use gpu_descriptor::DescriptorAllocator;
 use std::sync::{Arc, Mutex};
-use rust_embed::Embed;
 
 const VERTEX_BUFFER_SIZE: u64 = 1024 * 1024 * 256; // 256 MB
 const INDEX_BUFFER_SIZE: u64 = 1024 * 1024 * 64; // 64 MB
@@ -21,7 +20,7 @@ const INDEX_BUFFER_ALIGNMENT: u64 = 4;
 const STORAGE_BUFFER_ALIGNMENT: u64 = 16;
 const UNIFORM_BUFFER_ALIGNMENT: u64 = 256;
 
-pub(crate) struct RenderResourceStorage {
+pub(crate) struct RenderStorage {
     pub uniform_buffers: Vec<Buffer>,
     pub storage_buffers: Vec<Megabuffer>,
     pub storage_images: Vec<StorageTexture>,
@@ -35,9 +34,9 @@ pub(crate) struct RenderResourceStorage {
     fullscreen_quad: FullscreenQuad,
 }
 
-impl RenderResourceStorage {
+impl RenderStorage {
     pub fn new(ctx: &RenderContext) -> Result<Self> {
-        log::info!("Creating RenderResourceStorage");
+        log::info!("Creating RenderStorage");
 
         let device = &ctx.device;
         if ctx.target.is_none() {

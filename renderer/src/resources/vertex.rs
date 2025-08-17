@@ -1,7 +1,7 @@
 use ash::vk;
 use glam::{Vec2, Vec3};
 use std::mem::offset_of;
-use crate::shader_data::PerVertexData;
+use crate::resources::shader_data::PerVertexData;
 
 #[derive(Debug)]
 pub struct Vertex {

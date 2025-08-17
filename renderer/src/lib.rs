@@ -2,16 +2,17 @@ use color_eyre::Result;
 
 mod camera;
 mod context;
-mod resource_storage;
-mod resource_type;
 mod resources;
-mod shader_data;
+mod storage;
+//mod frame;
 
 pub use camera::Camera;
 
 pub struct Renderer {
     ctx: context::RenderContext,
-    res: resource_storage::RenderResourceStorage,
+    sto: storage::RenderStorage,
+    //frames: Vec<frame::RenderFrame>,
+    resize_requested: bool,
 }
 
 impl Renderer {
@@ -20,13 +21,22 @@ impl Renderer {
         let _ = env_logger::try_init();
 
         let ctx = context::RenderContext::new(window)?;
-        let res = resource_storage::RenderResourceStorage::new(&ctx)?;
+        let sto = storage::RenderStorage::new(&ctx)?;
 
-        Ok(Self { ctx, res })
+        Ok(Self {
+            ctx,
+            sto,
+            //frames: Vec::new(),
+            resize_requested: false,
+        })
     }
 
     pub fn render_frame(&mut self, cam: &Camera) {
         // Implement rendering logic here
         // This could involve drawing entities, handling camera views, etc.
+    }
+
+    pub fn request_resize(&mut self) {
+        self.resize_requested = true;
     }
 }
