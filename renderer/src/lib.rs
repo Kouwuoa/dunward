@@ -1,6 +1,6 @@
 use color_eyre::Result;
-use std::sync::{Arc, Mutex, RwLock};
 use color_eyre::eyre::OptionExt;
+use std::sync::{Arc, Mutex, RwLock};
 
 mod camera;
 mod context;
@@ -9,12 +9,12 @@ mod resources;
 mod storage;
 mod utils;
 
+use crate::utils::GuardResultExt;
 pub use camera::Camera;
 use context::RenderContext;
 use frame::RenderFrame;
 use frame::packet::{FrameRenderMetadata, FrameRenderPacket, FrameRenderPayload};
 use storage::RenderStorage;
-use crate::utils::GuardResultExt;
 
 pub struct Renderer {
     ctx: Arc<Mutex<RenderContext>>,
@@ -36,11 +36,10 @@ impl Renderer {
         let sto = RenderStorage::new(&ctx)?;
 
         let ctx = Arc::new(Mutex::new(ctx));
-        let frm = (0..Self::FRAMES_IN_FLIGHT)
-            .map(|_| RenderFrame::new(ctx.clone(), &sto).map(Arc::new))
-            .collect::<Result<Vec<_>>>()?;
-
         let sto = Arc::new(Mutex::new(sto));
+        let frm = (0..Self::FRAMES_IN_FLIGHT)
+            .map(|_| RenderFrame::new(ctx.clone(), sto.clone()).map(Arc::new))
+            .collect::<Result<Vec<_>>>()?;
 
         Ok(Self {
             ctx,

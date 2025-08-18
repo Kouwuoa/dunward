@@ -1,3 +1,8 @@
+use crate::resources::{
+    resource_type::RenderResourceType,
+    shader::{ComputeShader, GraphicsShader},
+    vertex::VertexInputDescription,
+};
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
@@ -5,25 +10,24 @@ use gpu_descriptor::{DescriptorAllocator, DescriptorSetLayoutCreateFlags, Descri
 use gpu_descriptor_ash::AshDescriptorDevice;
 use std::ffi::CString;
 use std::sync::{Arc, Mutex};
-use crate::resources::resource_type::RenderResourceType;
-use crate::resources::shader::{ComputeShader, GraphicsShader};
-use crate::resources::vertex::VertexInputDescription;
 
-pub struct Material<'a> {
-    pipeline: &'a vk::Pipeline,
-    pipeline_layout: &'a vk::PipelineLayout,
-    pipeline_bind_point: &'a vk::PipelineBindPoint,
+/// You can think of a Material as a shader instance that you can bind resources and data to.
+/// You only need to create a Material once, and then you can use it to render multiple objects.
+/// You only need to switch the Material when you want to change the shader or pipeline.
+pub(crate) struct Material {
+    pipeline: vk::Pipeline,
+    pipeline_layout: vk::PipelineLayout,
+    pipeline_bind_point: vk::PipelineBindPoint,
     descriptor_set: gpu_descriptor::DescriptorSet<vk::DescriptorSet>,
-
-    device: &'a ash::Device,
+    device: Arc<ash::Device>,
 }
 
-impl<'a> Material<'a> {
+impl Material {
     pub fn update_push_constants(&self, command_buffer: vk::CommandBuffer, data: &[u8]) {
         unsafe {
             self.device.cmd_push_constants(
                 command_buffer,
-                *self.pipeline_layout,
+                self.pipeline_layout,
                 vk::ShaderStageFlags::ALL,
                 0,
                 data,
@@ -33,11 +37,8 @@ impl<'a> Material<'a> {
 
     pub fn bind_pipeline(&self, command_buffer: vk::CommandBuffer) {
         unsafe {
-            self.device.cmd_bind_pipeline(
-                command_buffer,
-                *self.pipeline_bind_point,
-                *self.pipeline,
-            );
+            self.device
+                .cmd_bind_pipeline(command_buffer, self.pipeline_bind_point, self.pipeline);
         }
     }
 
@@ -46,8 +47,8 @@ impl<'a> Material<'a> {
         unsafe {
             self.device.cmd_bind_descriptor_sets(
                 command_buffer,
-                *self.pipeline_bind_point,
-                *self.pipeline_layout,
+                self.pipeline_bind_point,
+                self.pipeline_layout,
                 0,
                 &descriptor_sets,
                 &[],
@@ -56,7 +57,7 @@ impl<'a> Material<'a> {
     }
 }
 
-pub struct MaterialFactory {
+pub(crate) struct MaterialFactory {
     pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
     pipeline_bind_point: vk::PipelineBindPoint,
@@ -67,14 +68,14 @@ pub struct MaterialFactory {
 }
 
 impl MaterialFactory {
-    pub fn create_material(&'_ mut self) -> Result<Material<'_>> {
+    pub fn create_material(&'_ mut self) -> Result<Material> {
         let descriptor_set = self.allocate_descriptor_sets()?;
         Ok(Material {
-            pipeline: &self.pipeline,
-            pipeline_layout: &self.pipeline_layout,
-            pipeline_bind_point: &self.pipeline_bind_point,
+            pipeline: self.pipeline,
+            pipeline_layout: self.pipeline_layout,
+            pipeline_bind_point: self.pipeline_bind_point,
             descriptor_set,
-            device: &self.device,
+            device: self.device.clone(),
         })
     }
 
@@ -114,7 +115,7 @@ impl MaterialFactory {
     }
 }
 
-pub struct GraphicsMaterialFactoryBuilder<'a> {
+pub(crate) struct GraphicsMaterialFactoryBuilder<'a> {
     vertex_input_description: VertexInputDescription,
     input_assembly: vk::PipelineInputAssemblyStateCreateInfo<'a>,
     rasterization: vk::PipelineRasterizationStateCreateInfo<'a>,
@@ -431,7 +432,7 @@ impl<'a> GraphicsMaterialFactoryBuilder<'a> {
     }
 }
 
-pub struct ComputeMaterialFactoryBuilder {
+pub(crate) struct ComputeMaterialFactoryBuilder {
     shader: Option<ComputeShader>,
     pipeline_layout: Option<vk::PipelineLayout>,
     descriptor_set_layout: Option<vk::DescriptorSetLayout>,

@@ -3,8 +3,51 @@ use crate::context::commands::TransferCommandEncoder;
 use ash::vk;
 use color_eyre::eyre::Result;
 use color_eyre::eyre::eyre;
+use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use vk_mem::Alloc;
+
+#[repr(transparent)]
+pub(crate) struct ColorTexture(pub Texture);
+impl Deref for ColorTexture {
+    type Target = Texture;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl DerefMut for ColorTexture {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+#[repr(transparent)]
+pub(crate) struct DepthTexture(pub Texture);
+impl Deref for DepthTexture {
+    type Target = Texture;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl DerefMut for DepthTexture {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+#[repr(transparent)]
+pub(crate) struct StorageTexture(pub Texture);
+impl Deref for StorageTexture {
+    type Target = Texture;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl DerefMut for StorageTexture {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 pub(crate) struct TextureCreateInfo {
     pub format: vk::Format,
@@ -14,10 +57,6 @@ pub(crate) struct TextureCreateInfo {
     /// Should be true for larger images like fullscreen images
     pub use_dedicated_memory: bool,
 }
-
-pub(crate) type ColorTexture = Texture;
-pub(crate) type DepthTexture = Texture;
-pub(crate) type StorageTexture = Texture;
 
 pub(crate) struct Texture {
     pub image: vk::Image,
@@ -127,7 +166,7 @@ impl Texture {
             image
         };
 
-        Ok(image)
+        Ok(ColorTexture(image))
     }
 
     pub fn new_color_texture_from_image(
@@ -136,7 +175,7 @@ impl Texture {
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
         transfer: &TransferCommandEncoder,
-    ) -> Result<Self> {
+    ) -> Result<ColorTexture> {
         let data = image.to_rgba8().into_raw();
         let width = image.width();
         let height = image.height();
@@ -169,7 +208,11 @@ impl Texture {
             aspect: vk::ImageAspectFlags::DEPTH,
             use_dedicated_memory: true, // Assuming the depth image will be used as a fullscreen attachment
         };
-        Self::new(&create_info, memory_allocator, device)
+        Ok(DepthTexture(Self::new(
+            &create_info,
+            memory_allocator,
+            device,
+        )?))
     }
 
     /// Create a special type of texture likely used by compute shaders
@@ -200,7 +243,7 @@ impl Texture {
             Texture::new(&create_info, memory_allocator, device)?
         };
 
-        Ok(image)
+        Ok(StorageTexture(image))
     }
 
     pub fn transition_layout(

@@ -2,6 +2,7 @@ use crate::context::RenderContext;
 use crate::context::commands::CommandEncoder;
 use crate::context::target::RenderTarget;
 use crate::frame::packet::{FramePresentPacket, FrameRenderPacket};
+use crate::resources::material::Material;
 use crate::resources::megabuffer::MegabufferExt;
 use crate::resources::megabuffer::{AllocatedMegabufferRegion, Megabuffer};
 use crate::resources::texture::{ColorTexture, DepthTexture, Texture};
@@ -44,63 +45,72 @@ pub(crate) struct RenderFrame {
     render_fence: vk::Fence,
 
     cmd_encoder: CommandEncoder,
+    bindless_material: Material,
+
     ctx: Arc<Mutex<RenderContext>>,
+    sto: Arc<Mutex<RenderStorage>>,
 }
 
 impl RenderFrame {
-    pub fn new(ctx: Arc<Mutex<RenderContext>>, sto: &RenderStorage) -> Result<Self> {
+    pub fn new(ctx: Arc<Mutex<RenderContext>>, sto: Arc<Mutex<RenderStorage>>) -> Result<Self> {
         log::info!("Creating RenderFrame");
 
-        let mut guard = ctx.lock().eyre()?;
-        let target_size = guard.target.as_ref().unwrap().get_size();
+        let mut ctx_grd = ctx.lock().eyre()?;
+        let mut sto_grd = sto.lock().eyre()?;
 
-        let draw_color_tex =
-            guard
-                .device
-                .create_color_texture(target_size.width, target_size.height, None, true)?;
-        let draw_depth_tex = guard
+        let target_size = ctx_grd.target.as_ref().unwrap().get_size();
+        let draw_color_tex = ctx_grd.device.create_color_texture(
+            target_size.width,
+            target_size.height,
+            None,
+            true,
+        )?;
+        let draw_depth_tex = ctx_grd
             .device
             .create_depth_texture(target_size.width, target_size.height)?;
 
-        let vertex_region = sto
+        let vertex_region = sto_grd
             .vertex_megabuffer
             .allocate_region(FRAME_VERTEX_BUFFER_SIZE)?;
-        let index_region = sto
+        let index_region = sto_grd
             .index_megabuffer
             .allocate_region(FRAME_INDEX_BUFFER_SIZE)?;
-        let per_frame_region = sto
+        let per_frame_region = sto_grd
             .per_frame_megabuffer
             .allocate_region(FRAME_PER_FRAME_BUFFER_SIZE)?;
-        let per_material_region = sto
+        let per_material_region = sto_grd
             .per_material_megabuffer
             .allocate_region(FRAME_PER_MATERIAL_BUFFER_SIZE)?;
-        let per_object_region = sto
+        let per_object_region = sto_grd
             .per_object_megabuffer
             .allocate_region(FRAME_PER_OBJECT_BUFFER_SIZE)?;
 
         let present_semaphore = unsafe {
-            guard
+            ctx_grd
                 .device
                 .logical
                 .create_semaphore(&vk::SemaphoreCreateInfo::default(), None)?
         };
         let render_semaphore = unsafe {
-            guard
+            ctx_grd
                 .device
                 .logical
                 .create_semaphore(&vk::SemaphoreCreateInfo::default(), None)?
         };
         let render_fence = unsafe {
-            guard.device.logical.create_fence(
+            ctx_grd.device.logical.create_fence(
                 &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
                 None,
             )?
         };
 
-        let graphics_queue = guard.device.graphics_queue.clone();
-        let cmd_encoder = guard.device.allocate_command_encoder(graphics_queue)?;
+        let graphics_queue = ctx_grd.device.graphics_queue.clone();
+        let cmd_encoder = ctx_grd.device.allocate_command_encoder(graphics_queue)?;
 
-        drop(guard);
+        let bindless_material = sto_grd.bindless_material_factory.create_material()?;
+
+        drop(ctx_grd);
+        drop(sto_grd);
 
         Ok(Self {
             draw_color_tex,
@@ -117,7 +127,10 @@ impl RenderFrame {
             render_fence,
 
             cmd_encoder,
+            bindless_material,
+
             ctx,
+            sto,
         })
     }
 
