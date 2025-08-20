@@ -356,11 +356,15 @@ impl RenderDevice {
                 .synchronization2(true)
                 .dynamic_rendering(true);
 
+            let mut shader_object_features =
+                vk::PhysicalDeviceShaderObjectFeaturesEXT::default().shader_object(true);
+
             let device_create_info = vk::DeviceCreateInfo::default() //enabled_features.device_create_info()
                 .push_next(&mut features2)
                 .push_next(&mut features11)
                 .push_next(&mut features12)
                 .push_next(&mut features13)
+                .push_next(&mut shader_object_features)
                 .queue_create_infos(&queue_create_infos)
                 .enabled_extension_names(&enabled_extension_names);
 
@@ -391,12 +395,14 @@ impl RenderDevice {
             ash::khr::synchronization2::NAME,
             ash::khr::maintenance3::NAME,
             ash::ext::descriptor_indexing::NAME,
+            ash::ext::shader_object::NAME,
             #[cfg(target_os = "macos")]
             ash::khr::portability_subset::NAME,
         ]
     }
 }
 
+/*
 pub struct AshDescriptorDevice(pub Arc<ash::Device>);
 
 impl From<Arc<ash::Device>> for AshDescriptorDevice {
@@ -579,3 +585,4 @@ impl DescriptorDevice<vk::DescriptorSetLayout, vk::DescriptorPool, vk::Descripto
         }
     }
 }
+*/
