@@ -1,8 +1,8 @@
 use ash::vk;
 
-const UNIFORM_BUFFER_DESCRIPTOR_COUNT: u32 = 1;
-const STORAGE_BUFFER_DESCRIPTOR_COUNT: u32 = 1;
-const STORAGE_IMAGE_DESCRIPTOR_COUNT: u32 = 1;
+const UNIFORM_BUFFER_DESCRIPTOR_COUNT: u32 = 4;
+const STORAGE_BUFFER_DESCRIPTOR_COUNT: u32 = 4;
+const STORAGE_IMAGE_DESCRIPTOR_COUNT: u32 = 4;
 const SAMPLER_DESCRIPTOR_COUNT: u32 = 16;
 const SAMPLED_IMAGE_DESCRIPTOR_COUNT: u32 = 1024;
 
@@ -23,6 +23,10 @@ impl RenderResourceType {
         Self::Sampler,
         Self::SampledImage,
     ];
+
+    pub fn max_update_after_bind_descriptors_in_all_pools() -> u32 {
+        Self::ALL.iter().map(|ty| ty.descriptor_count()).sum()
+    }
 
     pub fn descriptor_type(&self) -> vk::DescriptorType {
         match self {

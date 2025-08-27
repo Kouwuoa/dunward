@@ -5,6 +5,7 @@ use super::{
     queue::{Queue, QueueFamily},
 };
 use crate::context::commands::CommandEncoder;
+use crate::resources::resource_type::RenderResourceType;
 use crate::resources::texture::{ColorTexture, DepthTexture, StorageTexture};
 use crate::resources::{
     megabuffer::{Megabuffer, MegabufferExt},
@@ -70,7 +71,9 @@ impl RenderDevice {
 
         let command_encoder_allocator = CommandEncoderAllocator::new(logical_device.clone())?;
         let descriptor_allocator: DescriptorAllocator<vk::DescriptorPool, vk::DescriptorSet> =
-            DescriptorAllocator::new(1024);
+            DescriptorAllocator::new(
+                RenderResourceType::max_update_after_bind_descriptors_in_all_pools(),
+            );
 
         let transfer = TransferCommandEncoder::new(transfer_queue.clone(), logical_device.clone())?;
 

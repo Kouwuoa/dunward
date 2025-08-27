@@ -1,6 +1,5 @@
 use crate::context::RenderContext;
 use crate::context::commands::CommandEncoder;
-use crate::context::target::RenderTarget;
 use crate::frame::packet::{FramePresentPacket, FrameRenderPacket};
 use crate::resources::material::Material;
 use crate::resources::megabuffer::MegabufferExt;
@@ -11,7 +10,7 @@ use crate::utils::GuardResultExt;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
-use std::sync::{Arc, LockResult, Mutex, RwLock, RwLockWriteGuard};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 pub(crate) mod packet;

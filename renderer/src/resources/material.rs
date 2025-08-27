@@ -4,8 +4,8 @@ use crate::resources::{
     vertex::VertexInputDescription,
 };
 use ash::vk;
-use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
+use color_eyre::{Result, Section};
 use gpu_descriptor::{DescriptorAllocator, DescriptorSetLayoutCreateFlags, DescriptorTotalCount};
 use gpu_descriptor_ash::AshDescriptorDevice;
 use std::ffi::CString;
@@ -69,7 +69,7 @@ pub(crate) struct MaterialFactory {
 
 impl MaterialFactory {
     pub fn create_material(&'_ mut self) -> Result<Material> {
-        let descriptor_set = self.allocate_descriptor_sets()?;
+        let descriptor_set = self.allocate_descriptor_set()?;
         Ok(Material {
             pipeline: self.pipeline,
             pipeline_layout: self.pipeline_layout,
@@ -79,7 +79,7 @@ impl MaterialFactory {
         })
     }
 
-    fn allocate_descriptor_sets(
+    fn allocate_descriptor_set(
         &mut self,
     ) -> Result<gpu_descriptor::DescriptorSet<vk::DescriptorSet>> {
         unsafe {
@@ -107,7 +107,14 @@ impl MaterialFactory {
                         inline_uniform_block_bindings: 0,
                     },
                     1,
-                )?
+                )
+                .map_err(|e| match e {
+                    gpu_descriptor::AllocationError::Fragmentation => {
+                        eyre!("Failed to allocate descriptor set: {}", e.to_string())
+                            .suggestion("Try increasing the layout_descriptor_count")
+                    }
+                    _ => eyre!(e.to_string()),
+                })?
                 .drain(..)
                 .next()
                 .ok_or_eyre("Failed to allocate descriptor set")

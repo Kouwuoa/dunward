@@ -11,21 +11,17 @@ use winit::window::Window;
 pub(crate) struct RenderInstance {
     pub instance: ash::Instance,
 
-    #[cfg(debug_assertions)]
-    debug_utils_messenger: vk::DebugUtilsMessengerEXT,
-    #[cfg(debug_assertions)]
-    debug_utils_loader: ash::ext::debug_utils::Instance,
-
     entry: ash::Entry,
+
+    #[cfg(debug_assertions)]
+    _debug_utils_messenger: vk::DebugUtilsMessengerEXT,
+    #[cfg(debug_assertions)]
+    _debug_utils_loader: ash::ext::debug_utils::Instance,
 }
 
 impl RenderInstance {
     const ENABLE_VALIDATION_LAYERS: bool = cfg!(debug_assertions);
-    const REQUIRED_VALIDATION_LAYERS: &'static [&'static CStr] = unsafe {
-        &[CStr::from_bytes_with_nul_unchecked(
-            b"VK_LAYER_KHRONOS_validation\0",
-        )]
-    };
+    const REQUIRED_VALIDATION_LAYERS: &'static [&'static CStr] = &[c"VK_LAYER_KHRONOS_validation"];
 
     pub fn new(window: Option<&Window>) -> Result<Self> {
         let entry = unsafe { ash::Entry::load() }?;
@@ -41,9 +37,9 @@ impl RenderInstance {
             entry,
 
             #[cfg(debug_assertions)]
-            debug_utils_messenger,
+            _debug_utils_messenger: debug_utils_messenger,
             #[cfg(debug_assertions)]
-            debug_utils_loader,
+            _debug_utils_loader: debug_utils_loader,
         })
     }
 
