@@ -1,12 +1,7 @@
-use bevy::{
-    ecs::system::SystemState,
-    prelude::*,
-    window::PrimaryWindow,
-    winit::WinitWindows,
-};
-
 mod camera;
 mod schedules;
+
+use bevy::{ecs::system::SystemState, prelude::*, window::PrimaryWindow, winit::WinitWindows};
 
 pub(super) struct DunwardRenderPlugin;
 impl Plugin for DunwardRenderPlugin {
@@ -26,7 +21,7 @@ fn create_renderer(
     let window_ent = window_qry.single(world).unwrap();
     let binding = winit_windows.get(world);
     let winit_window = binding.get_window(window_ent).unwrap();
-    let renderer = renderer::Renderer::new(Some(winit_window)).unwrap();
+    let renderer = renderer::Renderer::new(winit_window).unwrap();
     world.insert_non_send_resource(renderer);
 }
 

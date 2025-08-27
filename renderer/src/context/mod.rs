@@ -1,40 +1,31 @@
-use crate::context::swapchain::{SwapchainImage, SwapchainImageExtent, SwapchainImageIndex};
-use ash::vk;
-use color_eyre::Result;
-use color_eyre::eyre::{OptionExt, eyre};
-use std::time::Duration;
-
 pub(crate) mod commands;
 pub(crate) mod desc_set_layout_builder;
 pub(crate) mod device;
 pub(crate) mod instance;
 pub(crate) mod queue;
-pub(crate) mod swapchain;
 pub(crate) mod target;
+
+use ash::vk;
+use color_eyre::Result;
+use color_eyre::eyre::{OptionExt, eyre};
+use std::time::Duration;
 
 /// Main abstraction around the graphics API context for rendering.
 pub(crate) struct RenderContext {
     pub instance: instance::RenderInstance,
     pub device: device::RenderDevice,
-    pub target: Option<target::RenderTarget>,
+    pub target: target::RenderTarget,
 }
 
 impl RenderContext {
-    pub fn new(window: Option<&winit::window::Window>) -> Result<Self> {
+    pub fn new(window: &winit::window::Window) -> Result<Self> {
         log::info!("Creating RenderContext");
 
-        let instance = instance::RenderInstance::new(window)?;
-        let surface = if let Some(window) = window {
-            Some(instance.create_surface(window)?)
-        } else {
-            None
-        };
-        let device = instance.create_device(surface.as_ref())?;
-        let target = if let (Some(window), Some(surface)) = (window, surface) {
-            Some(instance.create_target(window, surface, &device)?)
-        } else {
-            None
-        };
+        let instance = instance::RenderInstance::new(Some(window))?;
+        let surface = instance.create_surface(window)?;
+        let device = instance.create_device(&surface)?;
+        let target = instance.create_target(surface, window, &device)?;
+
         Ok(Self {
             instance,
             device,

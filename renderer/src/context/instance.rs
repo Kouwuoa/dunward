@@ -1,3 +1,5 @@
+use crate::context::target::Surface;
+
 use super::device::RenderDevice;
 use super::target::RenderTarget;
 use ash::vk;
@@ -43,17 +45,11 @@ impl RenderInstance {
         })
     }
 
-    pub fn create_device(
-        &self,
-        surface: Option<&(vk::SurfaceKHR, ash::khr::surface::Instance)>,
-    ) -> Result<RenderDevice> {
-        RenderDevice::new(self, surface)
+    pub fn create_device(&self, surface: &Surface) -> Result<RenderDevice> {
+        RenderDevice::new(self, Some((&surface.surface, &surface.surface_loader)))
     }
 
-    pub fn create_surface(
-        &self,
-        window: &Window,
-    ) -> Result<(vk::SurfaceKHR, ash::khr::surface::Instance)> {
+    pub fn create_surface(&self, window: &Window) -> Result<Surface> {
         let surface = unsafe {
             ash_window::create_surface(
                 &self.entry,
@@ -64,16 +60,16 @@ impl RenderInstance {
             )?
         };
         let surface_loader = ash::khr::surface::Instance::new(&self.entry, &self.instance);
-        Ok((surface, surface_loader))
+        Ok(Surface {
+            surface,
+            surface_loader,
+            surface_formats: vec![],
+            surface_present_modes: vec![],
+        })
     }
 
-    pub fn create_target(
-        &self,
-        window: &Window,
-        surface: (vk::SurfaceKHR, ash::khr::surface::Instance),
-        dev: &RenderDevice,
-    ) -> Result<RenderTarget> {
-        RenderTarget::new(window, surface, self, dev)
+    pub fn create_target(&self, surface: Surface, win: &Window, dev: &RenderDevice) -> Result<RenderTarget> {
+        RenderTarget::new(surface, win, self, dev)
     }
 
     fn create_instance(entry: &ash::Entry, window: Option<&Window>) -> Result<ash::Instance> {

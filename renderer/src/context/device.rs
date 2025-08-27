@@ -13,10 +13,7 @@ use crate::resources::{
 };
 use ash::vk;
 use color_eyre::{Result, eyre::OptionExt};
-use gpu_descriptor::{
-    CreatePoolError, DescriptorAllocator, DescriptorDevice, DescriptorPoolCreateFlags,
-    DescriptorTotalCount, DeviceAllocationError,
-};
+use gpu_descriptor::DescriptorAllocator;
 use std::ffi::{CStr, c_char};
 use std::str::Utf8Error;
 use std::sync::{Arc, Mutex};
@@ -42,7 +39,7 @@ pub(crate) struct RenderDevice {
 impl RenderDevice {
     pub fn new(
         instance: &RenderInstance,
-        surface: Option<&(vk::SurfaceKHR, ash::khr::surface::Instance)>,
+        surface: Option<(&vk::SurfaceKHR, &ash::khr::surface::Instance)>,
     ) -> Result<Self> {
         let (physical_device, graphics_queue_family, compute_queue_family, transfer_queue_family) =
             Self::select_physical_device(&instance.instance, surface)?;
@@ -166,7 +163,7 @@ impl RenderDevice {
 
     fn select_physical_device(
         instance: &ash::Instance,
-        surface: Option<&(vk::SurfaceKHR, ash::khr::surface::Instance)>,
+        surface: Option<(&vk::SurfaceKHR, &ash::khr::surface::Instance)>,
     ) -> Result<(vk::PhysicalDevice, QueueFamily, QueueFamily, QueueFamily)> {
         let req_device_exts = Self::get_required_device_extensions();
         let req_device_exts = req_device_exts

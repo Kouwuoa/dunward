@@ -1,8 +1,10 @@
-use super::device::RenderDevice;
-use super::instance::RenderInstance;
+use crate::context::device::RenderDevice;
+use crate::context::instance::RenderInstance;
+use crate::context::target::Surface;
 use ash::prelude::VkResult;
 use ash::vk;
 use color_eyre::Result;
+use color_eyre::eyre::OptionExt;
 use winit::dpi::PhysicalSize;
 
 pub(crate) type SwapchainImageIndex = u32;
@@ -25,16 +27,30 @@ pub(crate) struct Swapchain {
 
 impl Swapchain {
     pub fn new(
-        surface: &vk::SurfaceKHR,
-        surface_loader: &ash::khr::surface::Instance,
-        surface_format: &vk::SurfaceFormatKHR,
-        surface_present_mode: &vk::PresentModeKHR,
+        surface: &Surface,
         size: &PhysicalSize<u32>,
         ins: &RenderInstance,
         dev: &RenderDevice,
     ) -> Result<Self> {
+        let surface_format = surface
+            .surface_formats
+            .iter()
+            .find(|format| {
+                format.format == vk::Format::B8G8R8A8_SRGB
+                    && format.color_space == vk::ColorSpaceKHR::SRGB_NONLINEAR
+            })
+            .ok_or_eyre("No suitable surface format found")?;
+
+        let surface_present_mode = surface
+            .surface_present_modes
+            .iter()
+            .find(|mode| **mode == vk::PresentModeKHR::MAILBOX)
+            .unwrap_or(&vk::PresentModeKHR::FIFO);
+
         let surface_capabilities = unsafe {
-            surface_loader.get_physical_device_surface_capabilities(dev.physical, *surface)?
+            surface
+                .surface_loader
+                .get_physical_device_surface_capabilities(dev.physical, surface.surface)?
         };
 
         let image_extent = {
@@ -79,7 +95,7 @@ impl Swapchain {
 
         let swapchain_loader = ash::khr::swapchain::Device::new(&ins.instance, &dev.logical);
         let swapchain_info = vk::SwapchainCreateInfoKHR::default()
-            .surface(*surface)
+            .surface(surface.surface)
             .min_image_count(min_image_count)
             .image_format(surface_format.format)
             .image_color_space(surface_format.color_space)
