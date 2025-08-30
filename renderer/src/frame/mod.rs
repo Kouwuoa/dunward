@@ -7,6 +7,7 @@ use crate::resources::megabuffer::{AllocatedMegabufferRegion, Megabuffer};
 use crate::resources::texture::{ColorTexture, DepthTexture, Texture};
 use crate::storage::RenderStorage;
 use crate::utils::GuardResultExt;
+use crate::viewport::RenderViewport;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
@@ -36,7 +37,7 @@ pub(crate) struct RenderFrame {
     per_material_region: AllocatedMegabufferRegion,
     per_object_region: AllocatedMegabufferRegion,
 
-    /// Signals when the swapchain is ready to present.
+    /// Signals when the swapchain is ready to present (i.e. when the next swapchain image has been acquired successfully).
     present_semaphore: vk::Semaphore,
     /// Signals when rendering commands have been submitted to a queue.
     render_semaphore: vk::Semaphore,
@@ -47,6 +48,7 @@ pub(crate) struct RenderFrame {
     bindless_material: Material,
 
     ctx: Arc<Mutex<RenderContext>>,
+    vpt: Arc<Mutex<RenderViewport>>,
     sto: Arc<Mutex<RenderStorage>>,
 }
 
@@ -57,7 +59,7 @@ impl RenderFrame {
         let mut ctx_grd = ctx.lock().eyre()?;
         let mut sto_grd = sto.lock().eyre()?;
 
-        let target_size = ctx_grd.target.as_ref().unwrap().get_size();
+        let target_size = ctx_grd.target.get_size();
         let draw_color_tex = ctx_grd.device.create_color_texture(
             target_size.width,
             target_size.height,
@@ -135,27 +137,25 @@ impl RenderFrame {
 
     pub fn render(&self, pkt: FrameRenderPacket) -> Result<FramePresentPacket> {
         let ctx = self.ctx.lock().eyre()?;
+        let vpt = self.vpt.lock().eyre()?;
+
         let timeout = Duration::from_secs(1);
 
         // Wait until the commands have finished from the last time this frame was rendered
         ctx.wait_and_reset_fence(self.render_fence, timeout)?;
 
         // Acquire the next image from the swapchain
-        let (swapchain_image, swapchain_image_index, swapchain_image_extent) =
-            ctx.acquire_next_swapchain_image(self.present_semaphore, timeout)?;
+        let image = vpt.acquire_next_present_image(self.present_semaphore, timeout)?;
 
         Ok(FramePresentPacket {
-            swapchain_image_index,
+            image
         })
     }
 
     pub fn present(&self, pkt: FramePresentPacket) -> Result<PresentResult> {
         let ctx = self.ctx.lock().eyre()?;
+        ctx.target.present(pkt.swapchain_imageIndex);
 
-        let target = ctx
-            .target
-            .as_ref()
-            .ok_or_eyre("Render target was not set")?;
         let swapchain_image_index = pkt.swapchain_image_index;
         let present_info = vk::PresentInfoKHR {
             p_swapchains: &target.swapchain.swapchain,

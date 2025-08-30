@@ -1,17 +1,17 @@
 use crate::context::device::RenderDevice;
 use crate::context::instance::RenderInstance;
-use crate::context::target::Surface;
 use ash::prelude::VkResult;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::OptionExt;
 use winit::dpi::PhysicalSize;
+use crate::viewport::RenderSurface;
 
-pub(crate) type SwapchainImageIndex = u32;
 pub(crate) type SwapchainImage = vk::Image;
+pub(crate) type SwapchainImageIndex = u32;
 pub(crate) type SwapchainImageExtent = vk::Extent2D;
 
-pub(crate) struct Swapchain {
+pub(crate) struct RenderSwapchain {
     pub swapchain: vk::SwapchainKHR,
     pub swapchain_loader: ash::khr::swapchain::Device,
     pub swapchain_present_mode: vk::PresentModeKHR,
@@ -25,9 +25,9 @@ pub(crate) struct Swapchain {
     pub swapchain_image_sharing_mode: vk::SharingMode,
 }
 
-impl Swapchain {
+impl RenderSwapchain {
     pub fn new(
-        surface: &Surface,
+        surface: &RenderSurface,
         size: &PhysicalSize<u32>,
         ins: &RenderInstance,
         dev: &RenderDevice,

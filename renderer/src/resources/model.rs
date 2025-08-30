@@ -1,10 +1,10 @@
 use super::megabuffer::{AllocatedMegabufferRegion, Megabuffer, MegabufferExt};
 use super::mesh::Mesh;
-use crate::context::target::RenderTarget;
+use crate::context::target::RenderViewport;
+use crate::resources::vertex::Vertex;
 use crate::storage::shader_data::PerVertexData;
 use color_eyre::eyre::{Result, eyre};
 use glam::Vec3;
-use crate::resources::vertex::Vertex;
 
 pub struct FullscreenQuad {
     quad_model: Model,
@@ -17,7 +17,7 @@ impl FullscreenQuad {
     pub fn new(
         vertex_megabuffer: &Megabuffer,
         index_megabuffer: &Megabuffer,
-        tgt: &RenderTarget,
+        tgt: &RenderViewport,
     ) -> Result<Self> {
         let quad_mesh = Mesh::new_quad();
         let quad_model = Model::new(vec![quad_mesh], vertex_megabuffer, index_megabuffer)?;
@@ -33,7 +33,7 @@ impl FullscreenQuad {
 
     pub fn resize_to_target(
         &mut self,
-        tgt: &RenderTarget,
+        tgt: &RenderViewport,
         vertex_megabuffer: &Megabuffer,
     ) -> Result<()> {
         // Correct for image aspect ratio

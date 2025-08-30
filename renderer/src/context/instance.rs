@@ -1,18 +1,15 @@
-use crate::context::target::Surface;
-
 use super::device::RenderDevice;
-use super::target::RenderTarget;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use std::ffi::{CStr, FromBytesUntilNulError, c_char, c_void};
 use winit::window::Window;
+use crate::viewport::{RenderSurface, RenderViewport};
 
 /// Initializes Vulkan and keeps the Vulkan instance alive
 pub(crate) struct RenderInstance {
-    pub instance: ash::Instance,
-
+    instance: ash::Instance,
     entry: ash::Entry,
 
     #[cfg(debug_assertions)]
@@ -45,11 +42,11 @@ impl RenderInstance {
         })
     }
 
-    pub fn create_device(&self, surface: &Surface) -> Result<RenderDevice> {
+    pub fn create_device(&self, surface: &RenderSurface) -> Result<RenderDevice> {
         RenderDevice::new(self, Some((&surface.surface, &surface.surface_loader)))
     }
 
-    pub fn create_surface(&self, window: &Window) -> Result<Surface> {
+    pub fn create_surface(&self, window: &Window) -> Result<RenderSurface> {
         let surface = unsafe {
             ash_window::create_surface(
                 &self.entry,
@@ -60,7 +57,7 @@ impl RenderInstance {
             )?
         };
         let surface_loader = ash::khr::surface::Instance::new(&self.entry, &self.instance);
-        Ok(Surface {
+        Ok(RenderSurface {
             surface,
             surface_loader,
             surface_formats: vec![],
@@ -68,8 +65,13 @@ impl RenderInstance {
         })
     }
 
-    pub fn create_target(&self, surface: Surface, win: &Window, dev: &RenderDevice) -> Result<RenderTarget> {
-        RenderTarget::new(surface, win, self, dev)
+    pub fn create_viewport(
+        &self,
+        sfc: RenderSurface,
+        win: &Window,
+        dev: &RenderDevice,
+    ) -> Result<RenderViewport> {
+        RenderViewport::new(sfc, win, self, dev)
     }
 
     fn create_instance(entry: &ash::Entry, window: Option<&Window>) -> Result<ash::Instance> {

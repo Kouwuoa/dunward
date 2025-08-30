@@ -1,13 +1,14 @@
-use color_eyre::Result;
-use color_eyre::eyre::OptionExt;
-use std::sync::{Arc, Mutex, RwLock};
-
 mod camera;
 mod context;
 mod frame;
 mod resources;
 mod storage;
 mod utils;
+mod viewport;
+
+use color_eyre::Result;
+use color_eyre::eyre::OptionExt;
+use std::sync::{Arc, Mutex, RwLock};
 
 use crate::utils::GuardResultExt;
 pub use camera::Camera;
@@ -15,9 +16,11 @@ use context::RenderContext;
 use frame::RenderFrame;
 use frame::packet::{FrameRenderMetadata, FrameRenderPacket, FrameRenderPayload};
 use storage::RenderStorage;
+use crate::viewport::RenderViewport;
 
 pub struct Renderer {
     ctx: Arc<Mutex<RenderContext>>,
+    vpt: Arc<Mutex<RenderViewport>>,
     sto: Arc<Mutex<RenderStorage>>,
     frm: Vec<Arc<RenderFrame>>,
 
