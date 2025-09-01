@@ -6,17 +6,17 @@ mod storage;
 mod utils;
 mod viewport;
 
-use color_eyre::Result;
-use color_eyre::eyre::OptionExt;
-use std::sync::{Arc, Mutex, RwLock};
+pub use camera::Camera;
 
 use crate::utils::GuardResultExt;
-pub use camera::Camera;
-use context::RenderContext;
-use frame::RenderFrame;
-use frame::packet::{FrameRenderMetadata, FrameRenderPacket, FrameRenderPayload};
-use storage::RenderStorage;
 use crate::viewport::RenderViewport;
+use color_eyre::eyre::OptionExt;
+use color_eyre::Result;
+use context::RenderContext;
+use frame::packet::FrameRenderPacket;
+use frame::RenderFrame;
+use std::sync::{Arc, Mutex};
+use storage::RenderStorage;
 
 pub struct Renderer {
     ctx: Arc<Mutex<RenderContext>>,
@@ -65,10 +65,10 @@ impl Renderer {
 
         // Present the frame
         match current_frame.present(present_pkt)? {
-            frame::PresentResult::ResizeRequested => {
+            viewport::PresentResult::ResizeRequested => {
                 self.request_resize();
             }
-            frame::PresentResult::Success => {}
+            viewport::PresentResult::Success => {}
         }
 
         Ok(())

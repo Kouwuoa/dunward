@@ -42,6 +42,10 @@ impl RenderInstance {
         })
     }
 
+    pub fn inner(&self) -> &ash::Instance {
+        &self.instance
+    }
+
     pub fn create_device(&self, surface: &RenderSurface) -> Result<RenderDevice> {
         RenderDevice::new(self, Some((&surface.surface, &surface.surface_loader)))
     }

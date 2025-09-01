@@ -1,15 +1,17 @@
 mod surface;
 mod swapchain;
 
-use ash::vk;
-use color_eyre::eyre::{OptionExt, eyre};
-use std::time::Duration;
 pub(crate) use surface::RenderSurface;
 
 use crate::context::device::RenderDevice;
 use crate::context::instance::RenderInstance;
+use crate::context::queue::Queue;
 use crate::viewport::swapchain::{SwapchainImage, SwapchainImageExtent, SwapchainImageIndex};
+use ash::vk;
 use color_eyre::Result;
+use color_eyre::eyre::{OptionExt, eyre};
+use std::sync::Arc;
+use std::time::Duration;
 use swapchain::RenderSwapchain;
 use winit::window::Window;
 
@@ -20,10 +22,16 @@ pub(crate) struct PresentImage {
     pub suboptimal: bool,
 }
 
+pub(crate) enum PresentResult {
+    Success,
+    ResizeRequested,
+}
+
 /// Presentation target of the renderer, encapsulating the surface and swapchain
 pub(crate) struct RenderViewport {
     surface: RenderSurface,
     swapchain: RenderSwapchain,
+    present_queue: Arc<Queue>,
 }
 
 impl RenderViewport {
@@ -40,19 +48,23 @@ impl RenderViewport {
 
         let swapchain = RenderSwapchain::new(&surface, &win.inner_size(), ins, dev)?;
 
-        Ok(Self { surface, swapchain })
+        Ok(Self {
+            surface,
+            swapchain,
+            present_queue: dev.get_present_queue(),
+        })
     }
 
     pub fn acquire_next_present_image(
         &self,
-        image_acquired_sem: vk::Semaphore,
+        signal_image_acquired_sem: vk::Semaphore,
         timeout: Duration,
     ) -> Result<PresentImage> {
         let (image_index, suboptimal) = unsafe {
             self.swapchain.swapchain_loader.acquire_next_image(
                 self.swapchain.swapchain,
                 timeout.as_nanos() as u64,
-                image_acquired_sem,
+                signal_image_acquired_sem,
                 vk::Fence::null(),
             )?
         };
@@ -79,34 +91,36 @@ impl RenderViewport {
         })
     }
 
-    pub fn present(&self, image: PresentImage) -> Result<bool> {
+    pub fn present(
+        &self,
+        image: PresentImage,
+        wait_render_finished_sem: vk::Semaphore,
+    ) -> Result<PresentResult> {
+        let swapchain_image_index = image.index;
         let present_info = vk::PresentInfoKHR {
             p_swapchains: &self.swapchain.swapchain,
             swapchain_count: 1,
-            p_wait_semaphores: &image.image.render_complete_semaphore, // Wait until rendering is done before presenting
+            p_wait_semaphores: &wait_render_finished_sem, // Wait until rendering is done before presenting
             wait_semaphore_count: 1,
-            p_image_indices: &image.index,
+            p_image_indices: &swapchain_image_index,
             ..Default::default()
         };
 
-        let present_queue = self
-            .swapchain
-            .swapchain_loader
-            .get_device()
-            .graphics_queue
-            .as_ref();
+        let present_queue = &self.present_queue;
         assert!(present_queue.family.supports_present()); // Ensure the queue supports presentation
 
-        let result = unsafe {
+        let present_result = unsafe {
             self.swapchain
                 .swapchain_loader
                 .queue_present(present_queue.handle, &present_info)
         };
-
-        match result {
-            Ok(is_suboptimal) => Ok(is_suboptimal || image.suboptimal),
-            Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => Ok(true), // Swapchain is out of date and needs to be recreated
-            Err(e) => Err(eyre!("Failed to present swapchain image: {:?}", e)),
+        match present_result {
+            Ok(true) => Ok(PresentResult::ResizeRequested),
+            Ok(false) => Ok(PresentResult::Success),
+            Err(err_code) => Err(eyre!(
+                "Failed to present frame. VkResult error code: {}",
+                err_code
+            )),
         }
     }
 

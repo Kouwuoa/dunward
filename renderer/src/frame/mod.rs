@@ -1,3 +1,7 @@
+pub(crate) mod packet;
+
+pub(crate) use crate::viewport::PresentResult;
+
 use crate::context::RenderContext;
 use crate::context::commands::CommandEncoder;
 use crate::frame::packet::{FramePresentPacket, FrameRenderPacket};
@@ -10,22 +14,14 @@ use crate::utils::GuardResultExt;
 use crate::viewport::RenderViewport;
 use ash::vk;
 use color_eyre::Result;
-use color_eyre::eyre::{OptionExt, eyre};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-
-pub(crate) mod packet;
 
 const FRAME_VERTEX_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_INDEX_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_PER_FRAME_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_PER_MATERIAL_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_PER_OBJECT_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
-
-pub(crate) enum PresentResult {
-    Success,
-    ResizeRequested,
-}
 
 pub(crate) struct RenderFrame {
     draw_color_tex: ColorTexture,
@@ -53,10 +49,15 @@ pub(crate) struct RenderFrame {
 }
 
 impl RenderFrame {
-    pub fn new(ctx: Arc<Mutex<RenderContext>>, sto: Arc<Mutex<RenderStorage>>) -> Result<Self> {
+    pub fn new(
+        ctx: Arc<Mutex<RenderContext>>,
+        vpt: Arc<Mutex<RenderViewport>>,
+        sto: Arc<Mutex<RenderStorage>>,
+    ) -> Result<Self> {
         log::info!("Creating RenderFrame");
 
         let mut ctx_grd = ctx.lock().eyre()?;
+        let mut vpt_grd = vpt.lock().eyre()?;
         let mut sto_grd = sto.lock().eyre()?;
 
         let target_size = ctx_grd.target.get_size();
@@ -123,8 +124,8 @@ impl RenderFrame {
             per_material_region,
             per_object_region,
 
-            present_semaphore,
-            render_semaphore,
+            swapchain_ready_sem: present_semaphore,
+            render_finished_sem: render_semaphore,
             render_fence,
 
             cmd_encoder,
@@ -153,35 +154,7 @@ impl RenderFrame {
     }
 
     pub fn present(&self, pkt: FramePresentPacket) -> Result<PresentResult> {
-        let ctx = self.ctx.lock().eyre()?;
-        ctx.target.present(pkt.swapchain_imageIndex);
-
-        let swapchain_image_index = pkt.swapchain_image_index;
-        let present_info = vk::PresentInfoKHR {
-            p_swapchains: &target.swapchain.swapchain,
-            swapchain_count: 1,
-            p_wait_semaphores: &self.render_semaphore, // Wait until rendering is done before presenting
-            wait_semaphore_count: 1,
-            p_image_indices: &swapchain_image_index,
-            ..Default::default()
-        };
-
-        let present_queue = ctx.device.graphics_queue.as_ref();
-        assert!(present_queue.family.supports_present()); // Ensure the queue supports presentation
-
-        let present_result = unsafe {
-            target
-                .swapchain
-                .swapchain_loader
-                .queue_present(present_queue.handle, &present_info)
-        };
-        match present_result {
-            Ok(true) => Ok(PresentResult::ResizeRequested),
-            Ok(false) => Ok(PresentResult::Success),
-            Err(err_code) => Err(eyre!(
-                "Failed to present frame. VkResult error code: {}",
-                err_code
-            )),
-        }
+        let vpt = self.vpt.lock().eyre()?;
+        vpt.present(pkt.image, self.render_semaphore)
     }
 }
