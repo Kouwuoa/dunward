@@ -29,9 +29,9 @@ pub(crate) enum PresentResult {
 
 /// Presentation target of the renderer, encapsulating the surface and swapchain
 pub(crate) struct RenderViewport {
-    surface: RenderSurface,
-    swapchain: RenderSwapchain,
-    present_queue: Arc<Queue>,
+    pub surface: RenderSurface,
+    pub swapchain: RenderSwapchain,
+    pub present_queue: Arc<Queue>,
 }
 
 impl RenderViewport {

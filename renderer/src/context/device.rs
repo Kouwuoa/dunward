@@ -24,16 +24,16 @@ pub(crate) struct RenderDevice {
     pub physical: vk::PhysicalDevice,
 
     // For now, require the graphics queue to support presentation
-    graphics_queue: Arc<Queue>,
-    compute_queue: Arc<Queue>,
-    transfer_queue: Arc<Queue>,
+    pub graphics_queue: Arc<Queue>,
+    pub compute_queue: Arc<Queue>,
+    pub transfer_queue: Arc<Queue>,
 
     pub descriptor_allocator:
         Arc<Mutex<DescriptorAllocator<vk::DescriptorPool, vk::DescriptorSet>>>,
-    memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
-    command_encoder_allocator: CommandEncoderAllocator,
+    pub memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
+    pub command_encoder_allocator: CommandEncoderAllocator,
 
-    transfer: Arc<TransferCommandEncoder>,
+    pub transfer: Arc<TransferCommandEncoder>,
 }
 
 impl RenderDevice {

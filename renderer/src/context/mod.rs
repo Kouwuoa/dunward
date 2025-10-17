@@ -11,8 +11,8 @@ use std::time::Duration;
 
 /// Main abstraction around the graphics API context for rendering.
 pub(crate) struct RenderContext {
-    ins: instance::RenderInstance,
-    dev: device::RenderDevice,
+    pub ins: instance::RenderInstance,
+    pub dev: device::RenderDevice,
 }
 
 impl RenderContext {

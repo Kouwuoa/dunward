@@ -60,16 +60,16 @@ impl RenderFrame {
         let mut vpt_grd = vpt.lock().eyre()?;
         let mut sto_grd = sto.lock().eyre()?;
 
-        let target_size = ctx_grd.target.get_size();
-        let draw_color_tex = ctx_grd.device.create_color_texture(
-            target_size.width,
-            target_size.height,
+        let vpt_size = vpt_grd.get_size();
+        let draw_color_tex = ctx_grd.dev.create_color_texture(
+            vpt_size.width,
+            vpt_size.height,
             None,
             true,
         )?;
         let draw_depth_tex = ctx_grd
-            .device
-            .create_depth_texture(target_size.width, target_size.height)?;
+            .dev
+            .create_depth_texture(vpt_size.width, vpt_size.height)?;
 
         let vertex_region = sto_grd
             .vertex_megabuffer
@@ -89,29 +89,30 @@ impl RenderFrame {
 
         let present_semaphore = unsafe {
             ctx_grd
-                .device
+                .dev
                 .logical
                 .create_semaphore(&vk::SemaphoreCreateInfo::default(), None)?
         };
         let render_semaphore = unsafe {
             ctx_grd
-                .device
+                .dev
                 .logical
                 .create_semaphore(&vk::SemaphoreCreateInfo::default(), None)?
         };
         let render_fence = unsafe {
-            ctx_grd.device.logical.create_fence(
+            ctx_grd.dev.logical.create_fence(
                 &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
                 None,
             )?
         };
 
-        let graphics_queue = ctx_grd.device.graphics_queue.clone();
-        let cmd_encoder = ctx_grd.device.allocate_command_encoder(graphics_queue)?;
+        let graphics_queue = ctx_grd.dev.graphics_queue.clone();
+        let cmd_encoder = ctx_grd.dev.allocate_command_encoder(graphics_queue)?;
 
         let bindless_material = sto_grd.bindless_material_factory.create_material()?;
 
         drop(ctx_grd);
+        drop(vpt_grd);
         drop(sto_grd);
 
         Ok(Self {
@@ -124,8 +125,8 @@ impl RenderFrame {
             per_material_region,
             per_object_region,
 
-            swapchain_ready_sem: present_semaphore,
-            render_finished_sem: render_semaphore,
+            present_semaphore,
+            render_semaphore,
             render_fence,
 
             cmd_encoder,
@@ -133,6 +134,7 @@ impl RenderFrame {
 
             ctx,
             sto,
+            vpt,
         })
     }
 

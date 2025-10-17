@@ -14,6 +14,7 @@ use color_eyre::eyre::OptionExt;
 use color_eyre::Result;
 use context::RenderContext;
 use frame::packet::FrameRenderPacket;
+use frame::packet::{FrameRenderMetadata, FrameRenderPayload};
 use frame::RenderFrame;
 use std::sync::{Arc, Mutex};
 use storage::RenderStorage;
@@ -35,17 +36,19 @@ impl Renderer {
         let _ = color_eyre::install();
         let _ = env_logger::try_init();
 
-        let ctx = RenderContext::new(window)?;
-        let sto = RenderStorage::new(&ctx)?;
+        let (ctx, vpt) = RenderContext::new(window)?;
+        let sto = RenderStorage::new(&ctx, &vpt)?;
 
         let ctx = Arc::new(Mutex::new(ctx));
+        let vpt = Arc::new(Mutex::new(vpt));
         let sto = Arc::new(Mutex::new(sto));
         let frm = (0..Self::FRAMES_IN_FLIGHT)
-            .map(|_| RenderFrame::new(ctx.clone(), sto.clone()).map(Arc::new))
+            .map(|_| RenderFrame::new(ctx.clone(), vpt.clone(), sto.clone()).map(Arc::new))
             .collect::<Result<Vec<_>>>()?;
 
         Ok(Self {
             ctx,
+            vpt,
             sto,
             frm,
             current_frame_index: 0,
@@ -79,14 +82,7 @@ impl Renderer {
     }
 
     fn update_scene<'a>(&mut self, cam: &'a Camera) -> Result<FrameRenderPacket<'a>> {
-        let target_size = self
-            .ctx
-            .lock()
-            .eyre()?
-            .target
-            .as_ref()
-            .ok_or_eyre("Render target was not set")?
-            .get_size();
+        let target_size = self.vpt.lock().eyre()?.get_size();
         let frame_metadata = FrameRenderMetadata {
             frame_index: self.current_frame_index,
             target_size,

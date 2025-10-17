@@ -1,4 +1,4 @@
-use crate::resources::texture::DepthTexture;
+use crate::viewport::RenderViewport;
 use crate::{
     context::RenderContext,
     context::desc_set_layout_builder::DescriptorSetLayoutBuilder,
@@ -45,15 +45,10 @@ pub(crate) struct RenderStorage {
 }
 
 impl RenderStorage {
-    pub fn new(ctx: &RenderContext) -> Result<Self> {
+    pub fn new(ctx: &RenderContext, vpt: &RenderViewport) -> Result<Self> {
         log::info!("Creating RenderStorage");
-
-        let device = &ctx.device;
-        if ctx.target.is_none() {
-            return Err(color_eyre::eyre::eyre!(
-                "RenderContext must have a target to create RenderResourceStorage"
-            ));
-        }
+        
+        let device = &ctx.dev;
 
         let vertex_megabuffer = device.create_megabuffer(
             VERTEX_BUFFER_SIZE,
@@ -93,7 +88,7 @@ impl RenderStorage {
         let fullscreen_quad = FullscreenQuad::new(
             &vertex_megabuffer,
             &index_megabuffer,
-            ctx.target.as_ref().unwrap(),
+            vpt,
         )?;
 
         let mut samplers = Vec::new();

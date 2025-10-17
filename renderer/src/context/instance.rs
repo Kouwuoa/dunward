@@ -9,8 +9,8 @@ use crate::viewport::{RenderSurface, RenderViewport};
 
 /// Initializes Vulkan and keeps the Vulkan instance alive
 pub(crate) struct RenderInstance {
-    instance: ash::Instance,
-    entry: ash::Entry,
+    pub instance: ash::Instance,
+    pub entry: ash::Entry,
 
     #[cfg(debug_assertions)]
     _debug_utils_messenger: vk::DebugUtilsMessengerEXT,
