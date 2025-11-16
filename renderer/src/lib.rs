@@ -23,7 +23,7 @@ pub struct Renderer {
     ctx: Arc<Mutex<RenderContext>>,
     vpt: Arc<Mutex<RenderViewport>>,
     sto: Arc<Mutex<RenderStorage>>,
-    frm: Vec<Arc<RenderFrame>>,
+    frm: Vec<Arc<Mutex<RenderFrame>>>,
 
     current_frame_index: usize,
     resize_requested: bool,
@@ -43,8 +43,12 @@ impl Renderer {
         let vpt = Arc::new(Mutex::new(vpt));
         let sto = Arc::new(Mutex::new(sto));
         let frm = (0..Self::FRAMES_IN_FLIGHT)
-            .map(|_| RenderFrame::new(ctx.clone(), vpt.clone(), sto.clone()).map(Arc::new))
-            .collect::<Result<Vec<_>>>()?;
+    .map(|_| {
+        RenderFrame::new(ctx.clone(), vpt.clone(), sto.clone())
+            .map(|rf| Arc::new(Mutex::new(rf)))
+    })
+    .collect::<Result<Vec<Arc<Mutex<RenderFrame>>>>>()?;
+
 
         Ok(Self {
             ctx,
@@ -58,7 +62,7 @@ impl Renderer {
 
     pub fn render_frame(&mut self, cam: &Camera) -> Result<()> {
         self.current_frame_index = (self.current_frame_index + 1) % self.frm.len();
-        let current_frame = self.frm[self.current_frame_index].clone();
+        let mut current_frame = self.frm[self.current_frame_index].lock().eyre()?;
 
         // Update the scene and prepare the frame packet
         let render_pkt = self.update_scene(cam)?;

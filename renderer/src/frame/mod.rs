@@ -61,12 +61,10 @@ impl RenderFrame {
         let mut sto_grd = sto.lock().eyre()?;
 
         let vpt_size = vpt_grd.get_size();
-        let draw_color_tex = ctx_grd.dev.create_color_texture(
-            vpt_size.width,
-            vpt_size.height,
-            None,
-            true,
-        )?;
+        let draw_color_tex =
+            ctx_grd
+                .dev
+                .create_color_texture(vpt_size.width, vpt_size.height, None, true)?;
         let draw_depth_tex = ctx_grd
             .dev
             .create_depth_texture(vpt_size.width, vpt_size.height)?;
@@ -138,7 +136,7 @@ impl RenderFrame {
         })
     }
 
-    pub fn render(&self, pkt: FrameRenderPacket) -> Result<FramePresentPacket> {
+    pub fn render(&mut self, pkt: FrameRenderPacket) -> Result<FramePresentPacket> {
         let ctx = self.ctx.lock().eyre()?;
         let vpt = self.vpt.lock().eyre()?;
 
@@ -150,9 +148,20 @@ impl RenderFrame {
         // Acquire the next image from the swapchain
         let image = vpt.acquire_next_present_image(self.present_semaphore, timeout)?;
 
-        Ok(FramePresentPacket {
-            image
-        })
+        // Record render commands
+        self.cmd_encoder.begin_recording()?;
+        let cmd = self.cmd_encoder.end_recording()?;
+        
+        // Submit render commands
+        ctx.dev.submit(
+            cmd,
+            ctx.dev.get_graphics_queue(),
+            &[self.present_semaphore],
+            &[self.render_semaphore],
+            self.render_fence,
+        );
+
+        Ok(FramePresentPacket { image })
     }
 
     pub fn present(&self, pkt: FramePresentPacket) -> Result<PresentResult> {

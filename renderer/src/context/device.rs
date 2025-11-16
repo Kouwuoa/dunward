@@ -92,6 +92,33 @@ impl RenderDevice {
         Ok(dev)
     }
 
+    pub fn submit(
+        &self,
+        cmd: vk::CommandBuffer,
+        queue: Arc<Queue>,
+        wait_semaphores: &[vk::Semaphore],
+        signal_semaphores: &[vk::Semaphore],
+        fence: vk::Fence,
+    ) -> Result<()> {
+        let wait_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
+        let command_buffers = [cmd];
+        let submit = vk::SubmitInfo::default()
+            .wait_dst_stage_mask(&wait_stages)
+            .wait_semaphores(wait_semaphores)
+            .signal_semaphores(signal_semaphores)
+            .command_buffers(&command_buffers);
+
+        unsafe {
+            self.logical.queue_submit(
+                queue.handle,
+                &[submit],
+                fence,
+            )?;
+        }
+
+        Ok(())
+    }
+
     pub fn immediate_submit<F>(&self, func: F) -> Result<()>
     where
         F: FnOnce(vk::CommandBuffer, &ash::Device) -> Result<()>,

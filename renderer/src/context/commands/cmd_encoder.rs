@@ -49,7 +49,7 @@ impl CommandEncoder {
         Ok(())
     }
 
-    pub fn end_recording(&mut self) -> Result<()> {
+    pub fn end_recording(&mut self) -> Result<vk::CommandBuffer> {
         if !self.is_recording {
             return Err(eyre!("Command buffer is not recording"));
         }
@@ -58,9 +58,9 @@ impl CommandEncoder {
 
         self.is_recording = false;
 
-        Ok(())
+        Ok(self.command_buffer)
     }
-
+    
     pub fn transition_image_layout(
         &self,
         image: &mut Texture,
