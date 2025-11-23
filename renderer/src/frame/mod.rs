@@ -150,6 +150,9 @@ impl RenderFrame {
 
         // Record render commands
         self.cmd_encoder.begin_recording()?;
+
+        // TODO: Perform render operations here
+
         let cmd = self.cmd_encoder.end_recording()?;
         
         // Submit render commands
@@ -159,7 +162,7 @@ impl RenderFrame {
             &[self.present_semaphore],
             &[self.render_semaphore],
             self.render_fence,
-        );
+        )?;
 
         Ok(FramePresentPacket { image })
     }
