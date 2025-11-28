@@ -6,7 +6,7 @@ pub(crate) use surface::RenderSurface;
 use crate::context::device::RenderDevice;
 use crate::context::instance::RenderInstance;
 use crate::context::queue::Queue;
-use crate::viewport::swapchain::{SwapchainImage, SwapchainImageExtent, SwapchainImageIndex};
+use crate::resources::texture::{ColorTexture, Texture};
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
@@ -15,10 +15,9 @@ use std::time::Duration;
 use swapchain::RenderSwapchain;
 use winit::window::Window;
 
-pub(crate) struct PresentImage {
-    pub image: SwapchainImage,
-    pub index: SwapchainImageIndex,
-    pub extent: SwapchainImageExtent,
+pub(crate) struct PresentTextureBundle {
+    pub texture: ColorTexture,
+    pub index: u32,
     pub suboptimal: bool,
 }
 
@@ -55,11 +54,12 @@ impl RenderViewport {
         })
     }
 
-    pub fn acquire_next_present_image(
+    pub fn acquire_next_present_texture(
         &self,
         signal_image_acquired_sem: vk::Semaphore,
         timeout: Duration,
-    ) -> Result<PresentImage> {
+        dev: &RenderDevice,
+    ) -> Result<PresentTextureBundle> {
         let (image_index, suboptimal) = unsafe {
             self.swapchain.swapchain_loader.acquire_next_image(
                 self.swapchain.swapchain,
@@ -80,23 +80,38 @@ impl RenderViewport {
                 "Failed to get swapchain image at index {}",
                 image_index
             ))?;
+        let view = self
+            .swapchain
+            .swapchain_image_views
+            .get(image_index as usize)
+            .ok_or_eyre(eyre!(
+                "Failed to get swapchain image view at index {}",
+                image_index
+            ))?;
+        let format = &self.swapchain.swapchain_image_format;
+        let extent = &self.swapchain.swapchain_image_extent;
+        let texture = Texture::new_color_texture_from_vkimage(
+            image,
+            view,
+            format,
+            extent,
+            dev.memory_allocator.clone(),
+            dev.logical.clone(),
+        );
 
-        let image_extent = self.swapchain.swapchain_image_extent;
-
-        Ok(PresentImage {
-            image: *image,
+        Ok(PresentTextureBundle {
+            texture,
             index: image_index,
-            extent: image_extent,
             suboptimal,
         })
     }
 
     pub fn present(
         &self,
-        image: PresentImage,
+        texture: PresentTextureBundle,
         wait_render_finished_sem: vk::Semaphore,
     ) -> Result<PresentResult> {
-        let swapchain_image_index = image.index;
+        let swapchain_image_index = texture.index;
         let present_info = vk::PresentInfoKHR {
             p_swapchains: &self.swapchain.swapchain,
             swapchain_count: 1,

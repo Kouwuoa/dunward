@@ -146,15 +146,28 @@ impl RenderFrame {
         ctx.wait_and_reset_fence(self.render_fence, timeout)?;
 
         // Acquire the next image from the swapchain
-        let image = vpt.acquire_next_present_image(self.present_semaphore, timeout)?;
+        let mut texture =
+            vpt.acquire_next_present_texture(self.present_semaphore, timeout, &ctx.dev)?;
 
         // Record render commands
         self.cmd_encoder.begin_recording()?;
+        
+        self.cmd_encoder.transition_texture_layout(
+            &mut texture.texture,
+            vk::ImageLayout::UNDEFINED,
+            vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+        );
 
         // TODO: Perform render operations here
 
+        self.cmd_encoder.transition_texture_layout(
+            &mut texture.texture,
+            vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+            vk::ImageLayout::PRESENT_SRC_KHR,
+        );
+
         let cmd = self.cmd_encoder.end_recording()?;
-        
+
         // Submit render commands
         ctx.dev.submit(
             cmd,
@@ -164,11 +177,11 @@ impl RenderFrame {
             self.render_fence,
         )?;
 
-        Ok(FramePresentPacket { image })
+        Ok(FramePresentPacket { texture })
     }
 
     pub fn present(&self, pkt: FramePresentPacket) -> Result<PresentResult> {
         let vpt = self.vpt.lock().eyre()?;
-        vpt.present(pkt.image, self.render_semaphore)
+        vpt.present(pkt.texture, self.render_semaphore)
     }
 }

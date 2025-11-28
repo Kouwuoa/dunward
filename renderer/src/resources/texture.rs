@@ -190,6 +190,30 @@ impl Texture {
         )
     }
 
+    pub fn new_color_texture_from_vkimage(
+        image: &vk::Image,
+        view: &vk::ImageView,
+        format: &vk::Format,
+        extent: &vk::Extent2D,
+        memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
+        device: Arc<ash::Device>,
+    ) -> ColorTexture {
+        ColorTexture(Texture {
+            image: *image,
+            view: *view,
+            format: *format,
+            extent: vk::Extent3D {
+                width: extent.width,
+                height: extent.height,
+                depth: 1,
+            },
+            aspect: vk::ImageAspectFlags::COLOR,
+            allocation: None,
+            memory_allocator,
+            device,
+        })
+    }
+
     /// Create a special type of texture used for the depth buffer
     pub fn new_depth_texture(
         width: u32,
@@ -391,12 +415,14 @@ impl Texture {
 impl Drop for Texture {
     fn drop(&mut self) {
         unsafe {
+            // TODO: do not destroy image view for swapchain textures
             self.device.destroy_image_view(self.view, None);
-            let allocation = self.allocation.as_mut().expect("Allocation does not exist");
-            self.memory_allocator
-                .lock()
-                .expect("Failed to acquire lock for memory allocator")
-                .destroy_image(self.image, allocation);
+            if let Some(allocation) = self.allocation.as_mut() {
+                self.memory_allocator
+                    .lock()
+                    .expect("Failed to acquire lock for memory allocator")
+                    .destroy_image(self.image, allocation);
+            }
         }
     }
 }

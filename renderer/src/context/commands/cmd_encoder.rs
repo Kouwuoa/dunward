@@ -61,13 +61,13 @@ impl CommandEncoder {
         Ok(self.command_buffer)
     }
     
-    pub fn transition_image_layout(
+    pub fn transition_texture_layout(
         &self,
-        image: &mut Texture,
+        texture: &mut Texture,
         old_layout: vk::ImageLayout,
         new_layout: vk::ImageLayout,
     ) {
-        image.transition_layout(self.command_buffer, old_layout, new_layout)
+        texture.transition_layout(self.command_buffer, old_layout, new_layout)
     }
 
     pub fn copy_texture_to_texture(&self, src: &Texture, dst: &Texture) {

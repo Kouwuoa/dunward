@@ -1,4 +1,4 @@
-use crate::viewport::PresentImage;
+use crate::viewport::PresentTextureBundle;
 
 /// This struct is used to pass all necessary data for rendering a single frame.
 /// It contains a payload with data about the objects to render
@@ -30,5 +30,5 @@ pub(crate) struct FrameRenderMetadata {
 }
 
 pub(crate) struct FramePresentPacket {
-    pub image: PresentImage,
+    pub texture: PresentTextureBundle,
 }
