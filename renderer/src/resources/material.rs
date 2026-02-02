@@ -18,8 +18,10 @@ pub(crate) struct Material {
     pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
     pipeline_bind_point: vk::PipelineBindPoint,
-    descriptor_set: gpu_descriptor::DescriptorSet<vk::DescriptorSet>,
+    descriptor_set: Option<gpu_descriptor::DescriptorSet<vk::DescriptorSet>>, // Option used for cleanup in the dtor
+
     device: Arc<ash::Device>,
+    descriptor_allocator: Arc<Mutex<DescriptorAllocator<vk::DescriptorPool, vk::DescriptorSet>>>,
 }
 
 impl Material {
@@ -43,7 +45,7 @@ impl Material {
     }
 
     pub fn bind_descriptor_sets(&self, command_buffer: vk::CommandBuffer) {
-        let descriptor_sets = [*self.descriptor_set.raw()];
+        let descriptor_sets = [*self.descriptor_set.as_ref().unwrap().raw()];
         unsafe {
             self.device.cmd_bind_descriptor_sets(
                 command_buffer,
@@ -53,6 +55,19 @@ impl Material {
                 &descriptor_sets,
                 &[],
             );
+        }
+    }
+}
+
+impl Drop for Material {
+    fn drop(&mut self) {
+        let device = AshDescriptorDevice::wrap(&self.device);
+        let desc_set = self.descriptor_set.take().unwrap();
+        unsafe {
+            self.descriptor_allocator
+                .lock()
+                .unwrap()
+                .free(device, [desc_set]);
         }
     }
 }
@@ -74,8 +89,9 @@ impl MaterialFactory {
             pipeline: self.pipeline,
             pipeline_layout: self.pipeline_layout,
             pipeline_bind_point: self.pipeline_bind_point,
-            descriptor_set,
+            descriptor_set: Some(descriptor_set),
             device: self.device.clone(),
+            descriptor_allocator: self.descriptor_allocator.clone(),
         })
     }
 

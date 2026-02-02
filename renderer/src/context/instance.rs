@@ -117,7 +117,7 @@ impl RenderInstance {
 
         Ok(unsafe { entry.create_instance(&instance_info, None)? })
     }
-
+    
     #[cfg(debug_assertions)]
     fn create_debug_utils_messenger(
         entry: &ash::Entry,

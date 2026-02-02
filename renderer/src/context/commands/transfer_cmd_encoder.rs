@@ -14,9 +14,9 @@ use std::sync::Arc;
 ///
 /// # Safety
 ///
-/// The `TransferCommandEncoder` assumes exclusive access to its internal command buffer.
-/// It is not thread-safe to call `immediate_submit` concurrently.
-/// The queue passed in the constructor must support transfer operations.
+/// - The `TransferCommandEncoder` assumes exclusive access to its internal command buffer.
+/// - It is not thread-safe to call `immediate_submit()` concurrently.
+/// - The queue passed in the constructor must support transfer operations.
 pub(crate) struct TransferCommandEncoder {
     transfer_fence: vk::Fence,
     command_pool: vk::CommandPool,

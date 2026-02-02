@@ -41,7 +41,7 @@ pub(crate) struct RenderFrame {
     render_fence: vk::Fence,
 
     cmd_encoder: CommandEncoder,
-    bindless_material: Material,
+    //bindless_material: Material,
 
     ctx: Arc<Mutex<RenderContext>>,
     vpt: Arc<Mutex<RenderViewport>>,
@@ -128,7 +128,7 @@ impl RenderFrame {
             render_fence,
 
             cmd_encoder,
-            bindless_material,
+            //bindless_material,
 
             ctx,
             sto,

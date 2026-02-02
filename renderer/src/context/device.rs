@@ -4,16 +4,24 @@ use super::{
     instance::RenderInstance,
     queue::{Queue, QueueFamily},
 };
-use crate::context::commands::CommandEncoder;
 use crate::resources::resource_type::RenderResourceType;
 use crate::resources::texture::{ColorTexture, DepthTexture, StorageTexture};
 use crate::resources::{
     megabuffer::{Megabuffer, MegabufferExt},
     texture::Texture,
 };
+use crate::{
+    context::{commands::CommandEncoder, desc_set_layout_builder::DescriptorSetLayoutBuilder},
+    resources::{
+        material::{GraphicsMaterialFactoryBuilder, MaterialFactory},
+        shader::GraphicsShader,
+    },
+    storage::shader_data::PerDrawData,
+};
 use ash::vk;
 use color_eyre::{Result, eyre::OptionExt};
 use gpu_descriptor::DescriptorAllocator;
+use gpu_descriptor_ash::AshDescriptorDevice;
 use std::ffi::{CStr, c_char};
 use std::str::Utf8Error;
 use std::sync::{Arc, Mutex};
@@ -28,12 +36,20 @@ pub(crate) struct RenderDevice {
     pub compute_queue: Arc<Queue>,
     pub transfer_queue: Arc<Queue>,
 
-    pub descriptor_allocator:
-        Arc<Mutex<DescriptorAllocator<vk::DescriptorPool, vk::DescriptorSet>>>,
+    descriptor_allocator: Arc<Mutex<DescriptorAllocator<vk::DescriptorPool, vk::DescriptorSet>>>,
     pub memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
     pub command_encoder_allocator: CommandEncoderAllocator,
 
     pub transfer: Arc<TransferCommandEncoder>,
+}
+
+impl Drop for RenderDevice {
+    fn drop(&mut self) {
+        let device = AshDescriptorDevice::wrap(&self.logical);
+        unsafe {
+            self.descriptor_allocator.lock().unwrap().cleanup(device);
+        }
+    }
 }
 
 impl RenderDevice {
@@ -109,11 +125,7 @@ impl RenderDevice {
             .command_buffers(&command_buffers);
 
         unsafe {
-            self.logical.queue_submit(
-                queue.handle,
-                &[submit],
-                fence,
-            )?;
+            self.logical.queue_submit(queue.handle, &[submit], fence)?;
         }
 
         Ok(())
@@ -202,6 +214,97 @@ impl RenderDevice {
 
     pub fn get_transfer_queue(&self) -> Arc<Queue> {
         self.transfer_queue.clone()
+    }
+
+    pub fn create_bindless_material_factory(&self) -> Result<MaterialFactory> {
+        let bindless_descriptor_set_layout = self.create_bindless_descriptor_set_layout()?;
+        let bindless_pipeline_layout =
+            self.create_bindless_pipeline_layout(bindless_descriptor_set_layout)?;
+        let default_shader = GraphicsShader::new("default", self.logical.clone())?;
+        GraphicsMaterialFactoryBuilder::new(self.logical.clone(), self.descriptor_allocator.clone())
+            .with_shader(default_shader)
+            .with_pipeline_layout(bindless_pipeline_layout)
+            .with_descriptor_set_layout(bindless_descriptor_set_layout)
+            .with_color_attachment_format(vk::Format::R8G8B8A8_SRGB)
+            .with_depth_attachment_format(vk::Format::D32_SFLOAT)
+            .build()
+    }
+
+    pub fn create_bindless_descriptor_set_layout(&self) -> Result<vk::DescriptorSetLayout> {
+        DescriptorSetLayoutBuilder::new()
+            .add_binding(
+                // Per-frame
+                0,
+                RenderResourceType::UniformBuffer.descriptor_type(),
+                RenderResourceType::UniformBuffer.descriptor_count(),
+                vk::ShaderStageFlags::ALL,
+                RenderResourceType::UniformBuffer.descriptor_binding_flags(),
+                None,
+            )
+            .add_binding(
+                // Per-material
+                1,
+                RenderResourceType::StorageBuffer.descriptor_type(),
+                RenderResourceType::StorageBuffer.descriptor_count(),
+                vk::ShaderStageFlags::ALL,
+                RenderResourceType::StorageBuffer.descriptor_binding_flags(),
+                None,
+            )
+            .add_binding(
+                // Per-object
+                2,
+                RenderResourceType::StorageBuffer.descriptor_type(),
+                RenderResourceType::StorageBuffer.descriptor_count(),
+                vk::ShaderStageFlags::ALL,
+                RenderResourceType::StorageBuffer.descriptor_binding_flags(),
+                None,
+            )
+            .add_binding(
+                // Samplers
+                3,
+                RenderResourceType::Sampler.descriptor_type(),
+                RenderResourceType::Sampler.descriptor_count(),
+                vk::ShaderStageFlags::ALL,
+                RenderResourceType::Sampler.descriptor_binding_flags(),
+                None,
+            )
+            .add_binding(
+                // Textures
+                4,
+                RenderResourceType::SampledImage.descriptor_type(),
+                RenderResourceType::SampledImage.descriptor_count(),
+                vk::ShaderStageFlags::ALL,
+                RenderResourceType::SampledImage.descriptor_binding_flags(),
+                None,
+            )
+            .build(
+                vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
+                &self.logical,
+            )
+    }
+
+    pub fn create_bindless_pipeline_layout(
+        &self,
+        bindless_descriptor_set_layout: vk::DescriptorSetLayout,
+    ) -> Result<vk::PipelineLayout> {
+        let push_constant_size = size_of::<PerDrawData>() as u32;
+        let push_constant_range = vk::PushConstantRange::default()
+            .stage_flags(vk::ShaderStageFlags::ALL)
+            .offset(0)
+            .size(push_constant_size);
+        let push_constant_ranges = [push_constant_range];
+
+        let set_layouts = [bindless_descriptor_set_layout];
+        let pipeline_layout_create_info = vk::PipelineLayoutCreateInfo::default()
+            .set_layouts(&set_layouts)
+            .push_constant_ranges(&push_constant_ranges);
+
+        let pipeline_layout = unsafe {
+            self.logical
+                .create_pipeline_layout(&pipeline_layout_create_info, None)?
+        };
+
+        Ok(pipeline_layout)
     }
 
     fn select_physical_device(
