@@ -65,6 +65,9 @@ pub(crate) struct Texture {
     pub extent: vk::Extent3D,
     pub aspect: vk::ImageAspectFlags,
 
+    /// Determines if the dtor should destroy the vk::ImageView associated with this texture
+    destroy_view: bool,
+
     allocation: Option<vk_mem::Allocation>, // GPU-only memory block
     memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
     device: Arc<ash::Device>,
@@ -126,6 +129,8 @@ impl Texture {
             format: create_info.format,
             extent: create_info.extent,
             aspect: create_info.aspect,
+
+            destroy_view: true, // Since we created the view in this ctor, we'll need to clean it up
 
             allocation: Some(allocation),
             memory_allocator,
@@ -190,11 +195,14 @@ impl Texture {
         )
     }
 
+    /// # Arguments
+    /// * `view` - If false, this function creates a `ColorTexture` that is NOT responsible for the lifetime of the `vk::ImageView`
     pub fn new_color_texture_from_vkimage(
         image: &vk::Image,
         view: &vk::ImageView,
         format: &vk::Format,
         extent: &vk::Extent2D,
+        destroy_view: bool,
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
     ) -> ColorTexture {
@@ -208,6 +216,7 @@ impl Texture {
                 depth: 1,
             },
             aspect: vk::ImageAspectFlags::COLOR,
+            destroy_view,
             allocation: None,
             memory_allocator,
             device,
@@ -415,8 +424,9 @@ impl Texture {
 impl Drop for Texture {
     fn drop(&mut self) {
         unsafe {
-            // TODO: do not destroy image view for swapchain textures
-            self.device.destroy_image_view(self.view, None);
+            if self.destroy_view {
+                self.device.destroy_image_view(self.view, None);
+            }
             if let Some(allocation) = self.allocation.as_mut() {
                 self.memory_allocator
                     .lock()

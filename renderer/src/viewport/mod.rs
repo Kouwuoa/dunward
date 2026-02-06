@@ -71,7 +71,7 @@ impl RenderViewport {
         if suboptimal {
             log::warn!("Acquired swapchain image is suboptimal. A resize may be necessary.");
         }
-
+        
         let image = self
             .swapchain
             .swapchain_images
@@ -95,6 +95,7 @@ impl RenderViewport {
             view,
             format,
             extent,
+            false,
             dev.memory_allocator.clone(),
             dev.logical.clone(),
         );

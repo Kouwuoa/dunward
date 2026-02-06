@@ -80,7 +80,7 @@ impl Drop for CommandEncoder {
         if self.is_recording {
             log::warn!("Dropping CommandEncoder while still recording");
         }
-
+        
         self.allocator
             .take()
             .expect("CommandEncoderAllocator not found for CommandEncoder")

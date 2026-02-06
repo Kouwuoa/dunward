@@ -45,6 +45,7 @@ pub(crate) struct RenderDevice {
 
 impl Drop for RenderDevice {
     fn drop(&mut self) {
+        // Clean up descriptor sets
         let device = AshDescriptorDevice::wrap(&self.logical);
         unsafe {
             self.descriptor_allocator.lock().unwrap().cleanup(device);
