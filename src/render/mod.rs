@@ -1,7 +1,7 @@
 mod camera;
 mod schedules;
 
-use bevy::{ecs::system::SystemState, prelude::*, window::PrimaryWindow, winit::WinitWindows};
+use bevy::{ecs::system::SystemState, prelude::*, window::PrimaryWindow, winit::{WINIT_WINDOWS, WinitWindows}};
 
 pub(super) struct DunwardRenderPlugin;
 impl Plugin for DunwardRenderPlugin {
@@ -16,13 +16,13 @@ impl Plugin for DunwardRenderPlugin {
 fn create_renderer(
     world: &mut World,
     window_qry: &mut QueryState<Entity, With<PrimaryWindow>>,
-    winit_windows: &mut SystemState<NonSend<WinitWindows>>,
 ) {
     let window_ent = window_qry.single(world).unwrap();
-    let binding = winit_windows.get(world);
-    let winit_window = binding.get_window(window_ent).unwrap();
-    let renderer = renderer::Renderer::new(winit_window).unwrap();
-    world.insert_non_send_resource(renderer);
+    WINIT_WINDOWS.with_borrow(|winit_windows| {
+        let winit_window = winit_windows.get_window(window_ent).unwrap();
+        let renderer = renderer::Renderer::new(winit_window).unwrap();
+        world.insert_non_send_resource(renderer);
+    });
 }
 
 fn render_frame(mut renderer: NonSendMut<renderer::Renderer>, camera_qry: Query<&camera::Camera>) {

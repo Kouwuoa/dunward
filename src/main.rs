@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, window::WindowResolution};
 
 //mod game;
 //mod ui;
@@ -15,7 +15,7 @@ fn main() {
                         title: "Dunward".to_string(),
                         canvas: Some("#bevy".to_string()),
                         present_mode: bevy::window::PresentMode::AutoVsync,
-                        resolution: (800.0, 600.0).into(),
+                        resolution: WindowResolution::new(800, 600),
                         resizable: true,
                         fit_canvas_to_parent: true,
                         ..default()
@@ -39,7 +39,7 @@ fn main() {
 // Temporary system to close the window when Escape is pressed
 fn request_close_on_esc(
     windows: Query<Entity, With<bevy::window::PrimaryWindow>>,
-    mut window_close_evts: EventWriter<bevy::window::WindowCloseRequested>,
+    mut window_close_evts: MessageWriter<bevy::window::WindowCloseRequested>,
     input: Res<ButtonInput<KeyCode>>,
 ) {
     if input.just_released(KeyCode::Escape) {

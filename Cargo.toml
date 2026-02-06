@@ -19,10 +19,9 @@ opt-level = "s"
 strip = "debuginfo"
 
 [dependencies.bevy]
-version = "0.16.1"
+version = "0.18.0"
 default-features = false
 features = [
-    "animation",
     "bevy_asset",
     "bevy_color",
     "bevy_gilrs",
@@ -36,9 +35,10 @@ features = [
     "std",
     "sysinfo_plugin",
     "x11",
+    "debug",
 ]
 
 [dependencies]
-bevy_asset_loader = "0.23.0"
-bevy_kira_audio = "0.23.0"
+bevy_asset_loader = "0.25.0"
+bevy_kira_audio = "0.25.0"
 renderer = { path = "renderer" }
