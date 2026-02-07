@@ -3,6 +3,7 @@ pub(crate) mod desc_set_layout_builder;
 pub(crate) mod device;
 pub(crate) mod instance;
 pub(crate) mod queue;
+pub mod surface;
 
 use crate::contexts::swapchain_context::SwapchainContext;
 use ash::vk;
@@ -13,6 +14,7 @@ use std::time::Duration;
 pub(crate) struct DeviceContext {
     pub ins: instance::Instance,
     pub dev: device::Device,
+    pub sfc: surface::RenderSurface,
 }
 
 impl DeviceContext {
@@ -20,11 +22,11 @@ impl DeviceContext {
         log::info!("Creating DeviceContext");
 
         let ins = instance::Instance::new(Some(win))?;
-        let sfc = ins.create_surface(win)?;
+        let mut sfc = ins.create_surface(win)?;
         let dev = ins.create_device(&sfc)?;
-        let vpt = ins.create_viewport(sfc, win, &dev)?;
+        let vpt = ins.create_viewport(&mut sfc, win, &dev)?;
 
-        Ok((Self { ins, dev }, vpt))
+        Ok((Self { ins, dev, sfc }, vpt))
     }
 
     pub fn wait_and_reset_fence(&self, fence: vk::Fence, timeout: Duration) -> Result<()> {

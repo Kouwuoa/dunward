@@ -1,15 +1,14 @@
-mod surface;
 mod swapchain;
 
-pub(crate) use surface::RenderSurface;
+pub(crate) use crate::contexts::device_context::surface::RenderSurface;
 
 use crate::resources::texture::{ColorTexture, Texture};
 use ash::vk;
 use color_eyre::Result;
-use color_eyre::eyre::{OptionExt, eyre};
+use color_eyre::eyre::{eyre, OptionExt};
 use std::sync::Arc;
 use std::time::Duration;
-use swapchain::RenderSwapchain;
+use swapchain::Swapchain;
 use winit::window::Window;
 use crate::contexts::device_context::device::Device;
 use crate::contexts::device_context::instance::Instance;
@@ -28,14 +27,13 @@ pub(crate) enum PresentResult {
 
 /// Presentation target of the renderer, encapsulating the surface and swapchain
 pub(crate) struct SwapchainContext {
-    pub surface: RenderSurface,
-    pub swapchain: RenderSwapchain,
+    pub swapchain: Swapchain,
     pub present_queue: Arc<Queue>,
 }
 
 impl SwapchainContext {
     pub fn new(
-        mut surface: RenderSurface,
+        surface: &mut RenderSurface,
         win: &Window,
         ins: &Instance,
         dev: &Device,
@@ -45,10 +43,9 @@ impl SwapchainContext {
         let _ = surface.generate_surface_formats(dev)?;
         let _ = surface.generate_surface_present_modes(dev)?;
 
-        let swapchain = RenderSwapchain::new(&surface, &win.inner_size(), ins, dev)?;
+        let swapchain = Swapchain::new(&surface, &win.inner_size(), ins, dev)?;
 
         Ok(Self {
-            surface,
             swapchain,
             present_queue: dev.get_present_queue(),
         })
@@ -145,12 +142,13 @@ impl SwapchainContext {
         size: winit::dpi::PhysicalSize<u32>,
         ins: &Instance,
         dev: &Device,
+        sfc: &mut RenderSurface,
     ) -> Result<()> {
         unsafe {
             dev.logical.device_wait_idle()?;
         }
 
-        self.swapchain = RenderSwapchain::new(&self.surface, &size, ins, dev)?;
+        self.swapchain = Swapchain::new(sfc, &size, ins, dev)?;
 
         Ok(())
     }

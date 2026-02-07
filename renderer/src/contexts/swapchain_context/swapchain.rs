@@ -11,7 +11,7 @@ pub(crate) type SwapchainImage = vk::Image;
 pub(crate) type SwapchainImageIndex = u32;
 pub(crate) type SwapchainImageExtent = vk::Extent2D;
 
-pub(crate) struct RenderSwapchain {
+pub(crate) struct Swapchain {
     pub swapchain: vk::SwapchainKHR,
     pub swapchain_loader: ash::khr::swapchain::Device,
     pub swapchain_present_mode: vk::PresentModeKHR,
@@ -25,7 +25,7 @@ pub(crate) struct RenderSwapchain {
     pub swapchain_image_sharing_mode: vk::SharingMode,
 }
 
-impl RenderSwapchain {
+impl Swapchain {
     pub fn new(
         surface: &RenderSurface,
         size: &PhysicalSize<u32>,

@@ -71,7 +71,7 @@ impl Instance {
 
     pub fn create_viewport(
         &self,
-        sfc: RenderSurface,
+        sfc: &mut RenderSurface,
         win: &Window,
         dev: &Device,
     ) -> Result<SwapchainContext> {
