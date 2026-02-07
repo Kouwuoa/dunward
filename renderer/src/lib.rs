@@ -1,23 +1,21 @@
 mod camera;
-mod context;
-mod frame;
+mod contexts;
+mod resource_store;
 mod resources;
-mod storage;
 mod utils;
-mod viewport;
 
 pub use camera::Camera;
 
+use crate::contexts::frame_context::FrameContext;
+use crate::contexts::frame_context::packet::{
+    FrameRenderMetadata, FrameRenderPacket, FrameRenderPayload,
+};
+use crate::contexts::swapchain_context::{PresentResult, SwapchainContext};
+use crate::resource_store::ResourceStore;
 use crate::utils::GuardResultExt;
-use crate::viewport::RenderViewport;
 use color_eyre::Result;
-use color_eyre::eyre::OptionExt;
-use context::RenderContext;
-use frame::RenderFrame;
-use frame::packet::FrameRenderPacket;
-use frame::packet::{FrameRenderMetadata, FrameRenderPayload};
-use std::sync::{Arc, Mutex, MutexGuard};
-use storage::RenderStorage;
+use contexts::device_context::DeviceContext;
+use std::sync::{Arc, Mutex};
 
 /// We split up the Renderer by lifetimes:
 /// * Tier 1 - Device lifetime (lives until app shutdown)
@@ -38,10 +36,10 @@ use storage::RenderStorage;
 ///   * Fences
 ///   * Per-frame descriptor sets
 pub struct Renderer {
-    ctx: Arc<Mutex<RenderContext>>,
-    vpt: Arc<Mutex<RenderViewport>>,
-    sto: Arc<Mutex<RenderStorage>>,
-    frm: Vec<RenderFrame>,
+    dvc_ctx: Arc<Mutex<DeviceContext>>,
+    swc_ctx: Arc<Mutex<SwapchainContext>>,
+    frm_ctxs: Vec<FrameContext>,
+    rsc_sto: Arc<Mutex<ResourceStore>>,
 
     frame_number: u64,
     resize_requested: bool,
@@ -54,21 +52,21 @@ impl Renderer {
         let _ = color_eyre::install();
         let _ = env_logger::try_init();
 
-        let (ctx, vpt) = RenderContext::new(window)?;
-        let sto = RenderStorage::new(&ctx, &vpt)?;
+        let (dvc_ctx, swc_ctx) = DeviceContext::new(window)?;
+        let rsc_sto = ResourceStore::new(&dvc_ctx, &swc_ctx)?;
 
-        let ctx = Arc::new(Mutex::new(ctx));
-        let vpt = Arc::new(Mutex::new(vpt));
-        let sto = Arc::new(Mutex::new(sto));
-        let frm = (0..Self::FRAMES_IN_FLIGHT)
-            .map(|_| RenderFrame::new(ctx.clone(), vpt.clone(), sto.clone()))
-            .collect::<Result<Vec<RenderFrame>>>()?;
+        let dvc_ctx = Arc::new(Mutex::new(dvc_ctx));
+        let swc_ctx = Arc::new(Mutex::new(swc_ctx));
+        let rsc_sto = Arc::new(Mutex::new(rsc_sto));
+        let frm_ctxs = (0..Self::FRAMES_IN_FLIGHT)
+            .map(|_| FrameContext::new(dvc_ctx.clone(), swc_ctx.clone(), rsc_sto.clone()))
+            .collect::<Result<Vec<FrameContext>>>()?;
 
         Ok(Self {
-            ctx,
-            vpt,
-            sto,
-            frm,
+            dvc_ctx,
+            swc_ctx,
+            frm_ctxs,
+            rsc_sto,
             frame_number: 0,
             resize_requested: false,
         })
@@ -83,10 +81,10 @@ impl Renderer {
 
         // Present the frame
         match self.get_current_frame().present(present_pkt)? {
-            viewport::PresentResult::ResizeRequested => {
+            PresentResult::ResizeRequested => {
                 self.request_resize();
             }
-            viewport::PresentResult::Success => {}
+            PresentResult::Success => {}
         }
 
         // Increment the frame counter
@@ -100,7 +98,7 @@ impl Renderer {
     }
 
     fn update_scene<'a>(&mut self, cam: &'a Camera) -> Result<FrameRenderPacket<'a>> {
-        let target_size = self.vpt.lock().eyre()?.get_size();
+        let target_size = self.swc_ctx.lock().eyre()?.get_size();
         let frame_metadata = FrameRenderMetadata {
             frame_index: self.get_current_frame_index(),
             target_size,
@@ -112,9 +110,9 @@ impl Renderer {
         })
     }
 
-    fn get_current_frame(&mut self) -> &mut RenderFrame {
+    fn get_current_frame(&mut self) -> &mut FrameContext {
         let idx = self.get_current_frame_index();
-        &mut self.frm[idx]
+        &mut self.frm_ctxs[idx]
     }
 
     fn get_current_frame_index(&self) -> usize {
@@ -125,7 +123,13 @@ impl Renderer {
 impl Drop for Renderer {
     fn drop(&mut self) {
         unsafe {
-            self.ctx.lock().unwrap().dev.logical.device_wait_idle().unwrap();
+            self.dvc_ctx
+                .lock()
+                .unwrap()
+                .dev
+                .logical
+                .device_wait_idle()
+                .unwrap();
         }
     }
 }

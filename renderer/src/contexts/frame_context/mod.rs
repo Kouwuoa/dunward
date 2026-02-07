@@ -1,17 +1,15 @@
 pub(crate) mod packet;
 
-pub(crate) use crate::viewport::PresentResult;
-
-use crate::context::RenderContext;
-use crate::context::commands::CommandEncoder;
-use crate::frame::packet::{FramePresentPacket, FrameRenderPacket};
+use crate::contexts::device_context::DeviceContext;
+use crate::contexts::device_context::commands::CommandEncoder;
+use crate::contexts::frame_context::packet::{FramePresentPacket, FrameRenderPacket};
+use crate::contexts::swapchain_context::{PresentResult, SwapchainContext};
+use crate::resource_store::ResourceStore;
 use crate::resources::material::Material;
 use crate::resources::megabuffer::MegabufferExt;
 use crate::resources::megabuffer::{AllocatedMegabufferRegion, Megabuffer};
 use crate::resources::texture::{ColorTexture, DepthTexture, Texture};
-use crate::storage::RenderStorage;
 use crate::utils::GuardResultExt;
-use crate::viewport::RenderViewport;
 use ash::vk;
 use color_eyre::Result;
 use std::sync::{Arc, Mutex};
@@ -23,7 +21,7 @@ const FRAME_PER_FRAME_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_PER_MATERIAL_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_PER_OBJECT_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 
-pub(crate) struct RenderFrame {
+pub(crate) struct FrameContext {
     draw_color_tex: ColorTexture,
     draw_depth_tex: DepthTexture,
 
@@ -43,16 +41,16 @@ pub(crate) struct RenderFrame {
     cmd_encoder: CommandEncoder,
     bindless_material: Material,
 
-    ctx: Arc<Mutex<RenderContext>>,
-    vpt: Arc<Mutex<RenderViewport>>,
-    sto: Arc<Mutex<RenderStorage>>,
+    ctx: Arc<Mutex<DeviceContext>>,
+    vpt: Arc<Mutex<SwapchainContext>>,
+    sto: Arc<Mutex<ResourceStore>>,
 }
 
-impl RenderFrame {
+impl FrameContext {
     pub fn new(
-        ctx: Arc<Mutex<RenderContext>>,
-        vpt: Arc<Mutex<RenderViewport>>,
-        sto: Arc<Mutex<RenderStorage>>,
+        ctx: Arc<Mutex<DeviceContext>>,
+        vpt: Arc<Mutex<SwapchainContext>>,
+        sto: Arc<Mutex<ResourceStore>>,
     ) -> Result<Self> {
         log::info!("Creating RenderFrame");
 
@@ -151,7 +149,7 @@ impl RenderFrame {
 
         // Record render commands
         self.cmd_encoder.begin_recording()?;
-        
+
         self.cmd_encoder.transition_texture_layout(
             &mut texture.texture,
             vk::ImageLayout::UNDEFINED,

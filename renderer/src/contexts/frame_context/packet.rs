@@ -1,4 +1,4 @@
-use crate::viewport::PresentTextureBundle;
+use crate::contexts::swapchain_context::PresentTextureBundle;
 
 /// This struct is used to pass all necessary data for rendering a single frame.
 /// It contains a payload with data about the objects to render

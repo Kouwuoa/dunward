@@ -1,14 +1,14 @@
-use super::device::RenderDevice;
+use super::device::Device;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use std::ffi::{CStr, FromBytesUntilNulError, c_char, c_void};
 use winit::window::Window;
-use crate::viewport::{RenderSurface, RenderViewport};
+use crate::contexts::swapchain_context::{RenderSurface, SwapchainContext};
 
 /// Initializes Vulkan and keeps the Vulkan instance alive
-pub(crate) struct RenderInstance {
+pub(crate) struct Instance {
     pub instance: ash::Instance,
     pub entry: ash::Entry,
 
@@ -18,7 +18,7 @@ pub(crate) struct RenderInstance {
     _debug_utils_loader: ash::ext::debug_utils::Instance,
 }
 
-impl RenderInstance {
+impl Instance {
     const ENABLE_VALIDATION_LAYERS: bool = cfg!(debug_assertions);
     const REQUIRED_VALIDATION_LAYERS: &'static [&'static CStr] = &[c"VK_LAYER_KHRONOS_validation"];
 
@@ -46,8 +46,8 @@ impl RenderInstance {
         &self.instance
     }
 
-    pub fn create_device(&self, surface: &RenderSurface) -> Result<RenderDevice> {
-        RenderDevice::new(self, Some((&surface.surface, &surface.surface_loader)))
+    pub fn create_device(&self, surface: &RenderSurface) -> Result<Device> {
+        Device::new(self, Some((&surface.surface, &surface.surface_loader)))
     }
 
     pub fn create_surface(&self, window: &Window) -> Result<RenderSurface> {
@@ -73,9 +73,9 @@ impl RenderInstance {
         &self,
         sfc: RenderSurface,
         win: &Window,
-        dev: &RenderDevice,
-    ) -> Result<RenderViewport> {
-        RenderViewport::new(sfc, win, self, dev)
+        dev: &Device,
+    ) -> Result<SwapchainContext> {
+        SwapchainContext::new(sfc, win, self, dev)
     }
 
     fn create_instance(entry: &ash::Entry, window: Option<&Window>) -> Result<ash::Instance> {

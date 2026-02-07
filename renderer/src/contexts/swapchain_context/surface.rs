@@ -1,6 +1,6 @@
-use crate::context::device::RenderDevice;
 use ash::vk;
 use color_eyre::{Result, eyre::eyre};
+use crate::contexts::device_context::device::Device;
 
 pub(crate) struct RenderSurface {
     pub surface: vk::SurfaceKHR,
@@ -12,7 +12,7 @@ pub(crate) struct RenderSurface {
 impl RenderSurface {
     pub(crate) fn generate_surface_present_modes(
         &mut self,
-        dev: &RenderDevice,
+        dev: &Device,
     ) -> Result<&Vec<vk::PresentModeKHR>> {
         if !self.surface_present_modes.is_empty() {
             return Err(eyre!("Surface present modes have already been generated"));
@@ -28,7 +28,7 @@ impl RenderSurface {
 
     pub(crate) fn generate_surface_formats(
         &mut self,
-        dev: &RenderDevice,
+        dev: &Device,
     ) -> Result<&Vec<vk::SurfaceFormatKHR>> {
         if !self.surface_formats.is_empty() {
             return Err(eyre!("Surface formats have already been generated"));

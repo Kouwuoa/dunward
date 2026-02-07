@@ -1,7 +1,7 @@
 use super::{
     commands::CommandEncoderAllocator,
     commands::{CommandEncoderAllocatorExt, TransferCommandEncoder},
-    instance::RenderInstance,
+    instance::Instance,
     queue::{Queue, QueueFamily},
 };
 use crate::resources::resource_type::RenderResourceType;
@@ -10,13 +10,12 @@ use crate::resources::{
     megabuffer::{Megabuffer, MegabufferExt},
     texture::Texture,
 };
+use super::{commands::CommandEncoder, desc_set_layout_builder::DescriptorSetLayoutBuilder};
 use crate::{
-    context::{commands::CommandEncoder, desc_set_layout_builder::DescriptorSetLayoutBuilder},
     resources::{
         material::{GraphicsMaterialFactoryBuilder, MaterialFactory},
         shader::GraphicsShader,
     },
-    storage::shader_data::PerDrawData,
 };
 use ash::vk;
 use color_eyre::{Result, eyre::OptionExt};
@@ -25,9 +24,10 @@ use gpu_descriptor_ash::AshDescriptorDevice;
 use std::ffi::{CStr, c_char};
 use std::str::Utf8Error;
 use std::sync::{Arc, Mutex};
+use crate::resources::shader_data::PerDrawData;
 
 /// Main way to submit rendering commands to the GPU.
-pub(crate) struct RenderDevice {
+pub(crate) struct Device {
     pub logical: Arc<ash::Device>,
     pub physical: vk::PhysicalDevice,
 
@@ -43,7 +43,7 @@ pub(crate) struct RenderDevice {
     pub transfer: Arc<TransferCommandEncoder>,
 }
 
-impl Drop for RenderDevice {
+impl Drop for Device {
     fn drop(&mut self) {
         // Clean up descriptor sets
         let device = AshDescriptorDevice::wrap(&self.logical);
@@ -53,9 +53,9 @@ impl Drop for RenderDevice {
     }
 }
 
-impl RenderDevice {
+impl Device {
     pub fn new(
-        instance: &RenderInstance,
+        instance: &Instance,
         surface: Option<(&vk::SurfaceKHR, &ash::khr::surface::Instance)>,
     ) -> Result<Self> {
         let (physical_device, graphics_queue_family, compute_queue_family, transfer_queue_family) =

@@ -4,22 +4,22 @@ pub(crate) mod device;
 pub(crate) mod instance;
 pub(crate) mod queue;
 
-use crate::viewport::RenderViewport;
+use crate::contexts::swapchain_context::SwapchainContext;
 use ash::vk;
 use color_eyre::Result;
 use std::time::Duration;
 
 /// Main abstraction around the graphics API context for rendering.
-pub(crate) struct RenderContext {
-    pub ins: instance::RenderInstance,
-    pub dev: device::RenderDevice,
+pub(crate) struct DeviceContext {
+    pub ins: instance::Instance,
+    pub dev: device::Device,
 }
 
-impl RenderContext {
-    pub fn new(win: &winit::window::Window) -> Result<(Self, RenderViewport)> {
-        log::info!("Creating RenderContext");
+impl DeviceContext {
+    pub fn new(win: &winit::window::Window) -> Result<(Self, SwapchainContext)> {
+        log::info!("Creating DeviceContext");
 
-        let ins = instance::RenderInstance::new(Some(win))?;
+        let ins = instance::Instance::new(Some(win))?;
         let sfc = ins.create_surface(win)?;
         let dev = ins.create_device(&sfc)?;
         let vpt = ins.create_viewport(sfc, win, &dev)?;

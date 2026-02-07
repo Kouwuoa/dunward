@@ -1,7 +1,4 @@
-use crate::viewport::RenderViewport;
 use crate::{
-    context::RenderContext,
-    context::desc_set_layout_builder::DescriptorSetLayoutBuilder,
     resources::{
         material::{GraphicsMaterialFactoryBuilder, MaterialFactory},
         megabuffer::Megabuffer,
@@ -14,10 +11,9 @@ use crate::{
 use ash::vk;
 use color_eyre::Result;
 use gpu_descriptor::DescriptorAllocator;
-use shader_data::PerDrawData;
 use std::sync::{Arc, Mutex};
-
-pub(crate) mod shader_data;
+use crate::contexts::device_context::DeviceContext;
+use crate::contexts::swapchain_context::SwapchainContext;
 
 const VERTEX_BUFFER_SIZE: u64 = 1024 * 1024 * 256; // 256 MB
 const INDEX_BUFFER_SIZE: u64 = 1024 * 1024 * 64; // 64 MB
@@ -29,7 +25,7 @@ const INDEX_BUFFER_ALIGNMENT: u64 = 4;
 const STORAGE_BUFFER_ALIGNMENT: u64 = 16;
 const UNIFORM_BUFFER_ALIGNMENT: u64 = 256;
 
-pub(crate) struct RenderStorage {
+pub(crate) struct ResourceStore {
     pub storage_textures: Vec<StorageTexture>,
     pub sampled_textures: Vec<ColorTexture>,
     pub samplers: Vec<vk::Sampler>,
@@ -44,8 +40,8 @@ pub(crate) struct RenderStorage {
     pub fullscreen_quad: FullscreenQuad,
 }
 
-impl RenderStorage {
-    pub fn new(ctx: &RenderContext, vpt: &RenderViewport) -> Result<Self> {
+impl ResourceStore {
+    pub fn new(ctx: &DeviceContext, vpt: &SwapchainContext) -> Result<Self> {
         log::info!("Creating RenderStorage");
         
         let device = &ctx.dev;

@@ -1,11 +1,11 @@
 use super::buffer::Buffer;
-use crate::context::commands::TransferCommandEncoder;
 use ash::vk;
 use color_eyre::eyre::Result;
 use color_eyre::eyre::eyre;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use vk_mem::Alloc;
+use crate::contexts::device_context::commands::TransferCommandEncoder;
 
 #[repr(transparent)]
 pub(crate) struct ColorTexture(pub Texture);

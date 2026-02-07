@@ -3,6 +3,8 @@ use ash::vk;
 use color_eyre::eyre::Result;
 use std::sync::Arc;
 
+// TODO: Rename to TransferRecorder for clarity
+
 /// This is a specialized command encoder designed for performing on-off GPU transfer operations.
 ///
 /// This struct manages its own Vulkan fence, command pool, and command buffer

@@ -3,9 +3,6 @@ mod swapchain;
 
 pub(crate) use surface::RenderSurface;
 
-use crate::context::device::RenderDevice;
-use crate::context::instance::RenderInstance;
-use crate::context::queue::Queue;
 use crate::resources::texture::{ColorTexture, Texture};
 use ash::vk;
 use color_eyre::Result;
@@ -14,6 +11,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use swapchain::RenderSwapchain;
 use winit::window::Window;
+use crate::contexts::device_context::device::Device;
+use crate::contexts::device_context::instance::Instance;
+use crate::contexts::device_context::queue::Queue;
 
 pub(crate) struct PresentTextureBundle {
     pub texture: ColorTexture,
@@ -27,18 +27,18 @@ pub(crate) enum PresentResult {
 }
 
 /// Presentation target of the renderer, encapsulating the surface and swapchain
-pub(crate) struct RenderViewport {
+pub(crate) struct SwapchainContext {
     pub surface: RenderSurface,
     pub swapchain: RenderSwapchain,
     pub present_queue: Arc<Queue>,
 }
 
-impl RenderViewport {
+impl SwapchainContext {
     pub fn new(
         mut surface: RenderSurface,
         win: &Window,
-        ins: &RenderInstance,
-        dev: &RenderDevice,
+        ins: &Instance,
+        dev: &Device,
     ) -> Result<Self> {
         log::info!("Creating RenderViewport");
 
@@ -58,7 +58,7 @@ impl RenderViewport {
         &self,
         signal_image_acquired_sem: vk::Semaphore,
         timeout: Duration,
-        dev: &RenderDevice,
+        dev: &Device,
     ) -> Result<PresentTextureBundle> {
         let (image_index, suboptimal) = unsafe {
             self.swapchain.swapchain_loader.acquire_next_image(
@@ -143,8 +143,8 @@ impl RenderViewport {
     pub fn resize(
         &mut self,
         size: winit::dpi::PhysicalSize<u32>,
-        ins: &RenderInstance,
-        dev: &RenderDevice,
+        ins: &Instance,
+        dev: &Device,
     ) -> Result<()> {
         unsafe {
             dev.logical.device_wait_idle()?;

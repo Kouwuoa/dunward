@@ -1,10 +1,10 @@
 use super::buffer::Buffer;
-use crate::context::commands::TransferCommandEncoder;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Mutex};
+use crate::contexts::device_context::commands::TransferCommandEncoder;
 
 static MEGABUFFER_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 

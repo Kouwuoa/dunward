@@ -1,11 +1,11 @@
-use crate::context::device::RenderDevice;
-use crate::context::instance::RenderInstance;
 use ash::prelude::VkResult;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::OptionExt;
 use winit::dpi::PhysicalSize;
-use crate::viewport::RenderSurface;
+use crate::contexts::device_context::device::Device;
+use crate::contexts::device_context::instance::Instance;
+use crate::contexts::swapchain_context::RenderSurface;
 
 pub(crate) type SwapchainImage = vk::Image;
 pub(crate) type SwapchainImageIndex = u32;
@@ -29,8 +29,8 @@ impl RenderSwapchain {
     pub fn new(
         surface: &RenderSurface,
         size: &PhysicalSize<u32>,
-        ins: &RenderInstance,
-        dev: &RenderDevice,
+        ins: &Instance,
+        dev: &Device,
     ) -> Result<Self> {
         let surface_format = surface
             .surface_formats
@@ -138,7 +138,7 @@ impl RenderSwapchain {
         swapchain: &vk::SwapchainKHR,
         swapchain_loader: &ash::khr::swapchain::Device,
         swapchain_image_format: &vk::Format,
-        dev: &RenderDevice,
+        dev: &Device,
     ) -> Result<(Vec<vk::Image>, Vec<vk::ImageView>)> {
         let swapchain_images = unsafe { swapchain_loader.get_swapchain_images(*swapchain)? };
         let swapchain_image_views = swapchain_images
