@@ -1,16 +1,17 @@
 use super::device::Device;
+use crate::contexts::swapchain_context::SwapchainContext;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use std::ffi::{CStr, FromBytesUntilNulError, c_char, c_void};
 use winit::window::Window;
-use crate::contexts::swapchain_context::{RenderSurface, SwapchainContext};
+use crate::contexts::device_context::surface::Surface;
 
 /// Initializes Vulkan and keeps the Vulkan instance alive
 pub(crate) struct Instance {
-    pub instance: ash::Instance,
-    pub entry: ash::Entry,
+    instance: ash::Instance,
+    entry: ash::Entry,
 
     #[cfg(debug_assertions)]
     _debug_utils_messenger: vk::DebugUtilsMessengerEXT,
@@ -46,11 +47,11 @@ impl Instance {
         &self.instance
     }
 
-    pub fn create_device(&self, surface: &RenderSurface) -> Result<Device> {
+    pub fn create_device(&self, surface: &Surface) -> Result<Device> {
         Device::new(self, Some((&surface.surface, &surface.surface_loader)))
     }
 
-    pub fn create_surface(&self, window: &Window) -> Result<RenderSurface> {
+    pub fn create_surface(&self, window: &Window) -> Result<Surface> {
         let surface = unsafe {
             ash_window::create_surface(
                 &self.entry,
@@ -61,7 +62,7 @@ impl Instance {
             )?
         };
         let surface_loader = ash::khr::surface::Instance::new(&self.entry, &self.instance);
-        Ok(RenderSurface {
+        Ok(Surface {
             surface,
             surface_loader,
             surface_formats: vec![],
@@ -69,9 +70,9 @@ impl Instance {
         })
     }
 
-    pub fn create_viewport(
+    pub fn create_swapchain_context(
         &self,
-        sfc: &mut RenderSurface,
+        sfc: &mut Surface,
         win: &Window,
         dev: &Device,
     ) -> Result<SwapchainContext> {
@@ -117,7 +118,7 @@ impl Instance {
 
         Ok(unsafe { entry.create_instance(&instance_info, None)? })
     }
-    
+
     #[cfg(debug_assertions)]
     fn create_debug_utils_messenger(
         entry: &ash::Entry,

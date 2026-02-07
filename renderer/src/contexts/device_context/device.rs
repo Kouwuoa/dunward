@@ -28,19 +28,18 @@ use crate::resources::shader_data::PerDrawData;
 
 /// Main way to submit rendering commands to the GPU.
 pub(crate) struct Device {
-    pub logical: Arc<ash::Device>,
-    pub physical: vk::PhysicalDevice,
+    pub(super) logical: ash::Device,
+    pub(super) physical: vk::PhysicalDevice,
 
     // For now, require the graphics queue to support presentation
-    pub graphics_queue: Arc<Queue>,
-    pub compute_queue: Arc<Queue>,
-    pub transfer_queue: Arc<Queue>,
+    pub(super) graphics_queue: Arc<Queue>,
+    pub(super) compute_queue: Arc<Queue>,
+    pub(super) transfer_queue: Arc<Queue>,
 
     descriptor_allocator: Arc<Mutex<DescriptorAllocator<vk::DescriptorPool, vk::DescriptorSet>>>,
-    pub memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
-    pub command_encoder_allocator: CommandEncoderAllocator,
+    pub(super) command_encoder_allocator: CommandEncoderAllocator,
 
-    pub transfer: Arc<TransferCommandEncoder>,
+    pub(super) transfer: Arc<TransferCommandEncoder>,
 }
 
 impl Drop for Device {
@@ -70,15 +69,6 @@ impl Device {
                 transfer_queue_family,
             )?;
 
-        let memory_allocator = unsafe {
-            vk_mem::Allocator::new(vk_mem::AllocatorCreateInfo::new(
-                instance.inner(),
-                &logical_device,
-                physical_device,
-            ))?
-        };
-
-        let logical_device = Arc::new(logical_device);
         let graphics_queue = Arc::new(graphics_queue);
         let compute_queue = Arc::new(compute_queue);
         let transfer_queue = Arc::new(transfer_queue);
@@ -100,7 +90,6 @@ impl Device {
             transfer_queue,
 
             descriptor_allocator: Arc::new(Mutex::new(descriptor_allocator)),
-            memory_allocator: Arc::new(Mutex::new(memory_allocator)),
             command_encoder_allocator,
 
             transfer: Arc::new(transfer),

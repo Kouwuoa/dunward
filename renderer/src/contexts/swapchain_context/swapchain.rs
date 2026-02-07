@@ -1,11 +1,7 @@
-use ash::prelude::VkResult;
+use crate::contexts::device_context::DeviceContext;
 use ash::vk;
 use color_eyre::Result;
-use color_eyre::eyre::OptionExt;
 use winit::dpi::PhysicalSize;
-use crate::contexts::device_context::device::Device;
-use crate::contexts::device_context::instance::Instance;
-use crate::contexts::swapchain_context::RenderSurface;
 
 pub(crate) type SwapchainImage = vk::Image;
 pub(crate) type SwapchainImageIndex = u32;
@@ -26,32 +22,10 @@ pub(crate) struct Swapchain {
 }
 
 impl Swapchain {
-    pub fn new(
-        surface: &RenderSurface,
-        size: &PhysicalSize<u32>,
-        ins: &Instance,
-        dev: &Device,
-    ) -> Result<Self> {
-        let surface_format = surface
-            .surface_formats
-            .iter()
-            .find(|format| {
-                format.format == vk::Format::B8G8R8A8_SRGB
-                    && format.color_space == vk::ColorSpaceKHR::SRGB_NONLINEAR
-            })
-            .ok_or_eyre("No suitable surface format found")?;
-
-        let surface_present_mode = surface
-            .surface_present_modes
-            .iter()
-            .find(|mode| **mode == vk::PresentModeKHR::MAILBOX)
-            .unwrap_or(&vk::PresentModeKHR::FIFO);
-
-        let surface_capabilities = unsafe {
-            surface
-                .surface_loader
-                .get_physical_device_surface_capabilities(dev.physical, surface.surface)?
-        };
+    pub fn new(size: &PhysicalSize<u32>, dvc_ctx: &DeviceContext) -> Result<Self> {
+        let surface_format = dvc_ctx.find_suitable_surface_format()?;
+        let surface_present_mode = dvc_ctx.find_suitable_surface_present_mode();
+        let surface_capabilities = dvc_ctx.get_physical_device_surface_capabilities()?;
 
         let image_extent = {
             if surface_capabilities.current_extent.width != u32::MAX {
@@ -95,7 +69,7 @@ impl Swapchain {
 
         let swapchain_loader = ash::khr::swapchain::Device::new(&ins.instance, &dev.logical);
         let swapchain_info = vk::SwapchainCreateInfoKHR::default()
-            .surface(surface.surface)
+            .surface(dvc_ctx.raw_surface_handle())
             .min_image_count(min_image_count)
             .image_format(surface_format.format)
             .image_color_space(surface_format.color_space)
@@ -104,7 +78,7 @@ impl Swapchain {
             .image_sharing_mode(image_sharing_mode)
             .pre_transform(pre_transform)
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
-            .present_mode(*surface_present_mode)
+            .present_mode(surface_present_mode)
             .clipped(true)
             .image_array_layers(1);
 
@@ -114,7 +88,7 @@ impl Swapchain {
             &swapchain,
             &swapchain_loader,
             &surface_format.format,
-            dev,
+            dvc_ctx,
         )?;
 
         let swapchain_image_count = swapchain_images.len() as u32;
@@ -122,7 +96,7 @@ impl Swapchain {
         Ok(Self {
             swapchain,
             swapchain_loader,
-            swapchain_present_mode: *surface_present_mode,
+            swapchain_present_mode: surface_present_mode,
             swapchain_images,
             swapchain_image_count,
             swapchain_image_views,
@@ -138,7 +112,7 @@ impl Swapchain {
         swapchain: &vk::SwapchainKHR,
         swapchain_loader: &ash::khr::swapchain::Device,
         swapchain_image_format: &vk::Format,
-        dev: &Device,
+        dvc_ctx: &DeviceContext,
     ) -> Result<(Vec<vk::Image>, Vec<vk::ImageView>)> {
         let swapchain_images = unsafe { swapchain_loader.get_swapchain_images(*swapchain)? };
         let swapchain_image_views = swapchain_images
@@ -161,9 +135,9 @@ impl Swapchain {
                         layer_count: 1,
                     })
                     .image(*image);
-                unsafe { dev.logical.create_image_view(&view_info, None) }
+                dvc_ctx.create_image_view(&view_info)
             })
-            .collect::<VkResult<Vec<vk::ImageView>>>()?;
+            .collect::<Result<Vec<vk::ImageView>>>()?;
 
         Ok((swapchain_images, swapchain_image_views))
     }

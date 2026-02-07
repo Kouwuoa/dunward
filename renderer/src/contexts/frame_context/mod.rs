@@ -48,68 +48,67 @@ pub(crate) struct FrameContext {
 
 impl FrameContext {
     pub fn new(
-        ctx: Arc<Mutex<DeviceContext>>,
-        vpt: Arc<Mutex<SwapchainContext>>,
-        sto: Arc<Mutex<ResourceStore>>,
+        dvc_ctx: Arc<Mutex<DeviceContext>>,
+        swc_ctx: Arc<Mutex<SwapchainContext>>,
+        rsc_sto: Arc<Mutex<ResourceStore>>,
     ) -> Result<Self> {
         log::info!("Creating RenderFrame");
 
-        let mut ctx_grd = ctx.lock().eyre()?;
-        let mut vpt_grd = vpt.lock().eyre()?;
-        let mut sto_grd = sto.lock().eyre()?;
+        let mut dvc_grd = dvc_ctx.lock().eyre()?;
+        let mut swc_grd = swc_ctx.lock().eyre()?;
+        let mut rsc_grd = rsc_sto.lock().eyre()?;
 
-        let vpt_size = vpt_grd.get_size();
+        let vpt_size = swc_grd.get_size();
         let draw_color_tex =
-            ctx_grd
-                .dev
+            dvc_grd
                 .create_color_texture(vpt_size.width, vpt_size.height, None, true)?;
-        let draw_depth_tex = ctx_grd
+        let draw_depth_tex = dvc_grd
             .dev
             .create_depth_texture(vpt_size.width, vpt_size.height)?;
 
-        let vertex_region = sto_grd
+        let vertex_region = rsc_grd
             .vertex_megabuffer
             .allocate_region(FRAME_VERTEX_BUFFER_SIZE)?;
-        let index_region = sto_grd
+        let index_region = rsc_grd
             .index_megabuffer
             .allocate_region(FRAME_INDEX_BUFFER_SIZE)?;
-        let per_frame_region = sto_grd
+        let per_frame_region = rsc_grd
             .per_frame_megabuffer
             .allocate_region(FRAME_PER_FRAME_BUFFER_SIZE)?;
-        let per_material_region = sto_grd
+        let per_material_region = rsc_grd
             .per_material_megabuffer
             .allocate_region(FRAME_PER_MATERIAL_BUFFER_SIZE)?;
-        let per_object_region = sto_grd
+        let per_object_region = rsc_grd
             .per_object_megabuffer
             .allocate_region(FRAME_PER_OBJECT_BUFFER_SIZE)?;
 
         let present_semaphore = unsafe {
-            ctx_grd
+            dvc_grd
                 .dev
                 .logical
                 .create_semaphore(&vk::SemaphoreCreateInfo::default(), None)?
         };
         let render_semaphore = unsafe {
-            ctx_grd
+            dvc_grd
                 .dev
                 .logical
                 .create_semaphore(&vk::SemaphoreCreateInfo::default(), None)?
         };
         let render_fence = unsafe {
-            ctx_grd.dev.logical.create_fence(
+            dvc_grd.dev.logical.create_fence(
                 &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
                 None,
             )?
         };
 
-        let graphics_queue = ctx_grd.dev.graphics_queue.clone();
-        let cmd_encoder = ctx_grd.dev.allocate_command_encoder(graphics_queue)?;
+        let graphics_queue = dvc_grd.dev.graphics_queue.clone();
+        let cmd_encoder = dvc_grd.dev.allocate_command_encoder(graphics_queue)?;
 
-        let bindless_material = sto_grd.bindless_material_factory.create_material()?;
+        let bindless_material = rsc_grd.bindless_material_factory.create_material()?;
 
-        drop(ctx_grd);
-        drop(vpt_grd);
-        drop(sto_grd);
+        drop(dvc_grd);
+        drop(swc_grd);
+        drop(rsc_grd);
 
         Ok(Self {
             draw_color_tex,
@@ -128,9 +127,9 @@ impl FrameContext {
             cmd_encoder,
             bindless_material,
 
-            ctx,
-            sto,
-            vpt,
+            ctx: dvc_ctx,
+            sto: rsc_sto,
+            vpt: swc_ctx,
         })
     }
 

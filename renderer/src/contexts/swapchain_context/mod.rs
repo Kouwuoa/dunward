@@ -1,18 +1,16 @@
 mod swapchain;
 
-pub(crate) use crate::contexts::device_context::surface::RenderSurface;
-
+use crate::contexts::device_context::queue::Queue;
+use crate::contexts::device_context::surface::Surface;
 use crate::resources::texture::{ColorTexture, Texture};
 use ash::vk;
 use color_eyre::Result;
-use color_eyre::eyre::{eyre, OptionExt};
+use color_eyre::eyre::{OptionExt, eyre};
 use std::sync::Arc;
 use std::time::Duration;
 use swapchain::Swapchain;
 use winit::window::Window;
-use crate::contexts::device_context::device::Device;
-use crate::contexts::device_context::instance::Instance;
-use crate::contexts::device_context::queue::Queue;
+use crate::contexts::device_context::DeviceContext;
 
 pub(crate) struct PresentTextureBundle {
     pub texture: ColorTexture,
@@ -27,18 +25,13 @@ pub(crate) enum PresentResult {
 
 /// Presentation target of the renderer, encapsulating the surface and swapchain
 pub(crate) struct SwapchainContext {
-    pub swapchain: Swapchain,
-    pub present_queue: Arc<Queue>,
+    swapchain: Swapchain,
+    present_queue: Arc<Queue>,
 }
 
 impl SwapchainContext {
-    pub fn new(
-        surface: &mut RenderSurface,
-        win: &Window,
-        ins: &Instance,
-        dev: &Device,
-    ) -> Result<Self> {
-        log::info!("Creating RenderViewport");
+    pub fn new(surface: &mut Surface, win: &Window, ins: &Instance, dev: &Device) -> Result<Self> {
+        log::info!("Creating SwapchainContext");
 
         let _ = surface.generate_surface_formats(dev)?;
         let _ = surface.generate_surface_present_modes(dev)?;
@@ -55,7 +48,7 @@ impl SwapchainContext {
         &self,
         signal_image_acquired_sem: vk::Semaphore,
         timeout: Duration,
-        dev: &Device,
+        dvc_ctx: &DeviceContext,
     ) -> Result<PresentTextureBundle> {
         let (image_index, suboptimal) = unsafe {
             self.swapchain.swapchain_loader.acquire_next_image(
@@ -68,7 +61,7 @@ impl SwapchainContext {
         if suboptimal {
             log::warn!("Acquired swapchain image is suboptimal. A resize may be necessary.");
         }
-        
+
         let image = self
             .swapchain
             .swapchain_images
@@ -93,8 +86,7 @@ impl SwapchainContext {
             format,
             extent,
             false,
-            dev.memory_allocator.clone(),
-            dev.logical.clone(),
+            dvc_ctx,
         );
 
         Ok(PresentTextureBundle {
@@ -140,12 +132,10 @@ impl SwapchainContext {
     pub fn resize(
         &mut self,
         size: winit::dpi::PhysicalSize<u32>,
-        ins: &Instance,
-        dev: &Device,
-        sfc: &mut RenderSurface,
+        dvc_ctx: &DeviceContext,
     ) -> Result<()> {
         unsafe {
-            dev.logical.device_wait_idle()?;
+            dvc_ctx.wait_device_idle()?;
         }
 
         self.swapchain = Swapchain::new(sfc, &size, ins, dev)?;

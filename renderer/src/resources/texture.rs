@@ -6,6 +6,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use vk_mem::Alloc;
 use crate::contexts::device_context::commands::TransferCommandEncoder;
+use crate::contexts::device_context::DeviceContext;
 
 #[repr(transparent)]
 pub(crate) struct ColorTexture(pub Texture);
@@ -69,8 +70,6 @@ pub(crate) struct Texture {
     destroy_view: bool,
 
     allocation: Option<vk_mem::Allocation>, // GPU-only memory block
-    memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
-    device: Arc<ash::Device>,
 }
 
 impl Texture {
@@ -203,8 +202,7 @@ impl Texture {
         format: &vk::Format,
         extent: &vk::Extent2D,
         destroy_view: bool,
-        memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
-        device: Arc<ash::Device>,
+        dvc_ctx: &DeviceContext,
     ) -> ColorTexture {
         ColorTexture(Texture {
             image: *image,
@@ -218,8 +216,7 @@ impl Texture {
             aspect: vk::ImageAspectFlags::COLOR,
             destroy_view,
             allocation: None,
-            memory_allocator,
-            device,
+            dvc_ctx,
         })
     }
 
