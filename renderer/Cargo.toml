@@ -9,7 +9,7 @@ ash-window = "0.13.0"
 bytemuck = { version = "1.23.2", features = ["derive"] }
 color-eyre = "0.6.5"
 env_logger = "0.11.8"
-glam = { version = "0.30.5", features = ["bytemuck"] }
+glam = { version = "0.31.0", features = ["bytemuck"] }
 gpu-descriptor = "0.3.2"
 gpu-descriptor-ash = "0.3.0"
 image = "0.25.6"
@@ -19,12 +19,12 @@ raw-window-handle = "0.6"
 rust-embed = "8.7.2"
 smallvec = "1.15.1"
 thiserror = "2.0.15"
-vk-mem = "0.4.0"
+vk-mem = "0.5.0"
 winit = { version = "0.30", default-features = false, features = ["rwh_06"] }
 
 [build-dependencies]
 bytemuck = "1.21.0"
 color-eyre = "0.6.3"
 log = "0.4.22"
-naga = { version = "23.1.0", features = ["wgsl-in", "spv-out"] }
-shaderc = "0.8"
+naga = { version = "28.0.0", features = ["wgsl-in", "spv-out"] }
+shaderc = "0.10.1"

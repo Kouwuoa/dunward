@@ -68,10 +68,8 @@ fn compile_shaders() -> Result<()> {
 }
 
 fn compile_glsl(filepath: &Path) -> Result<Vec<u32>> {
-    let compiler = shaderc::Compiler::new()
-        .ok_or_eyre("Failed to create shaderc compiler")?;
-    let options = shaderc::CompileOptions::new()
-        .ok_or_eyre("Failed to create shaderc compile options")?;
+    let compiler = shaderc::Compiler::new()?;
+    let options = shaderc::CompileOptions::new()?;
 
     let ext = filepath
         .extension()
