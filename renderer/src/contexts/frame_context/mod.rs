@@ -1,15 +1,21 @@
 pub(crate) mod packet;
 
-use crate::contexts::device_context::DeviceContext;
-use crate::contexts::device_context::commands::CommandEncoder;
-use crate::contexts::frame_context::packet::{FramePresentPacket, FrameRenderPacket};
-use crate::contexts::swapchain_context::{PresentResult, SwapchainContext};
-use crate::resource_store::ResourceStore;
-use crate::resources::material::Material;
-use crate::resources::megabuffer::MegabufferExt;
-use crate::resources::megabuffer::{AllocatedMegabufferRegion, Megabuffer};
-use crate::resources::texture::{ColorTexture, DepthTexture, Texture};
-use crate::utils::GuardResultExt;
+use crate::contexts::device_context::commands::CommandRecorderAllocatorExt;
+use crate::{
+    contexts::{
+        device_context::{DeviceContext, commands::CommandRecorder},
+        frame_context::packet::{FramePresentPacket, FrameRenderPacket},
+        swapchain_context::{PresentResult, SwapchainContext},
+    },
+    resource_store::{
+        ResourceStore,
+        material::Material,
+        megabuffer::MegabufferExt,
+        megabuffer::{AllocatedMegabufferRegion, Megabuffer},
+        texture::{ColorTexture, DepthTexture, Texture},
+    },
+    utils::GuardResultExt,
+};
 use ash::vk;
 use color_eyre::Result;
 use std::sync::{Arc, Mutex};
@@ -22,6 +28,12 @@ const FRAME_PER_MATERIAL_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_PER_OBJECT_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 
 pub(crate) struct FrameContext {
+    dvc_ctx: Arc<Mutex<DeviceContext>>,
+    swc_ctx: Arc<Mutex<SwapchainContext>>,
+    rsc_sto: Arc<Mutex<ResourceStore>>,
+
+    command_recorder: CommandRecorder,
+
     draw_color_tex: ColorTexture,
     draw_depth_tex: DepthTexture,
 
@@ -38,12 +50,7 @@ pub(crate) struct FrameContext {
     /// Signals when all rendering commands have finished execution.
     render_fence: vk::Fence,
 
-    cmd_encoder: CommandEncoder,
     bindless_material: Material,
-
-    ctx: Arc<Mutex<DeviceContext>>,
-    vpt: Arc<Mutex<SwapchainContext>>,
-    sto: Arc<Mutex<ResourceStore>>,
 }
 
 impl FrameContext {
@@ -52,19 +59,16 @@ impl FrameContext {
         swc_ctx: Arc<Mutex<SwapchainContext>>,
         rsc_sto: Arc<Mutex<ResourceStore>>,
     ) -> Result<Self> {
-        log::info!("Creating RenderFrame");
+        log::info!("Creating FrameContext");
 
         let mut dvc_grd = dvc_ctx.lock().eyre()?;
         let mut swc_grd = swc_ctx.lock().eyre()?;
         let mut rsc_grd = rsc_sto.lock().eyre()?;
 
-        let vpt_size = swc_grd.get_size();
+        let swc_size = swc_grd.get_size();
         let draw_color_tex =
-            dvc_grd
-                .create_color_texture(vpt_size.width, vpt_size.height, None, true)?;
-        let draw_depth_tex = dvc_grd
-            .dev
-            .create_depth_texture(vpt_size.width, vpt_size.height)?;
+            dvc_grd.create_color_texture(swc_size.width, swc_size.height, None, true)?;
+        let draw_depth_tex = dvc_grd.create_depth_texture(swc_size.width, swc_size.height)?;
 
         let vertex_region = rsc_grd
             .vertex_megabuffer
@@ -82,27 +86,16 @@ impl FrameContext {
             .per_object_megabuffer
             .allocate_region(FRAME_PER_OBJECT_BUFFER_SIZE)?;
 
-        let present_semaphore = unsafe {
-            dvc_grd
-                .dev
-                .logical
-                .create_semaphore(&vk::SemaphoreCreateInfo::default(), None)?
-        };
-        let render_semaphore = unsafe {
-            dvc_grd
-                .dev
-                .logical
-                .create_semaphore(&vk::SemaphoreCreateInfo::default(), None)?
-        };
-        let render_fence = unsafe {
-            dvc_grd.dev.logical.create_fence(
-                &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
-                None,
-            )?
-        };
+        let present_semaphore = dvc_grd.create_vk_semaphore(&vk::SemaphoreCreateInfo::default())?;
+        let render_semaphore = dvc_grd.create_vk_semaphore(&vk::SemaphoreCreateInfo::default())?;
+        let render_fence = dvc_grd.create_vk_fence(
+            &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
+        )?;
 
-        let graphics_queue = dvc_grd.dev.graphics_queue.clone();
-        let cmd_encoder = dvc_grd.dev.allocate_command_encoder(graphics_queue)?;
+        let graphics_queue = dvc_grd.get_graphics_queue();
+        let command_recorder = dvc_grd
+            .command_recorder_allocator
+            .allocate(graphics_queue)?;
 
         let bindless_material = rsc_grd.bindless_material_factory.create_material()?;
 
@@ -111,6 +104,12 @@ impl FrameContext {
         drop(rsc_grd);
 
         Ok(Self {
+            dvc_ctx,
+            rsc_sto,
+            swc_ctx,
+
+            command_recorder,
+
             draw_color_tex,
             draw_depth_tex,
 
@@ -124,32 +123,27 @@ impl FrameContext {
             render_semaphore,
             render_fence,
 
-            cmd_encoder,
             bindless_material,
-
-            ctx: dvc_ctx,
-            sto: rsc_sto,
-            vpt: swc_ctx,
         })
     }
 
     pub fn render(&mut self, pkt: FrameRenderPacket) -> Result<FramePresentPacket> {
-        let ctx = self.ctx.lock().eyre()?;
-        let vpt = self.vpt.lock().eyre()?;
+        let dvc = self.dvc_ctx.lock().eyre()?;
+        let swc = self.swc_ctx.lock().eyre()?;
 
         let timeout = Duration::from_secs(1);
 
         // Wait until the commands have finished from the last time this frame was rendered
-        ctx.wait_and_reset_fence(self.render_fence, timeout)?;
+        dvc.wait_and_reset_fence(self.render_fence, timeout)?;
 
         // Acquire the next image from the swapchain
         let mut texture =
-            vpt.acquire_next_present_texture(self.present_semaphore, timeout, &ctx.dev)?;
+            swc.acquire_next_present_texture(self.present_semaphore, timeout, &dvc)?;
 
         // Record render commands
-        self.cmd_encoder.begin_recording()?;
+        self.command_recorder.begin_recording()?;
 
-        self.cmd_encoder.transition_texture_layout(
+        self.command_recorder.transition_texture_layout(
             &mut texture.texture,
             vk::ImageLayout::UNDEFINED,
             vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
@@ -157,18 +151,18 @@ impl FrameContext {
 
         // TODO: Perform render operations here
 
-        self.cmd_encoder.transition_texture_layout(
+        self.command_recorder.transition_texture_layout(
             &mut texture.texture,
             vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
             vk::ImageLayout::PRESENT_SRC_KHR,
         );
 
-        let cmd = self.cmd_encoder.end_recording()?;
+        let cmd = self.command_recorder.end_recording()?;
 
         // Submit render commands
-        ctx.dev.submit(
+        dvc.submit(
             cmd,
-            ctx.dev.get_graphics_queue(),
+            dvc.get_graphics_queue(),
             &[self.present_semaphore],
             &[self.render_semaphore],
             self.render_fence,
@@ -178,7 +172,7 @@ impl FrameContext {
     }
 
     pub fn present(&self, pkt: FramePresentPacket) -> Result<PresentResult> {
-        let vpt = self.vpt.lock().eyre()?;
-        vpt.present(pkt.texture, self.render_semaphore)
+        let swc = self.swc_ctx.lock().eyre()?;
+        swc.present(pkt.texture, self.render_semaphore)
     }
 }

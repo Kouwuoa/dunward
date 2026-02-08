@@ -1,7 +1,7 @@
-mod cmd_encoder;
-mod cmd_encoder_alloc;
-mod transfer_cmd_encoder;
+mod command_recorder;
+mod command_recorder_allocator;
+mod transfer_command_recorder;
 
-pub(crate) use cmd_encoder::CommandEncoder;
-pub(crate) use cmd_encoder_alloc::{CommandEncoderAllocator, CommandEncoderAllocatorExt};
-pub(crate) use transfer_cmd_encoder::TransferCommandEncoder;
+pub(crate) use command_recorder::CommandRecorder;
+pub(crate) use command_recorder_allocator::{CommandRecorderAllocator, CommandRecorderAllocatorExt};
+pub(crate) use transfer_command_recorder::TransferCommandRecorder;

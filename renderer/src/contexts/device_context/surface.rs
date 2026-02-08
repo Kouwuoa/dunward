@@ -1,8 +1,8 @@
-use ash::vk;
-use color_eyre::{Result, eyre::eyre};
-use color_eyre::eyre::OptionExt;
-use crate::contexts::device_context::device::Device;
 use crate::contexts::device_context::DeviceContext;
+use crate::contexts::device_context::device::Device;
+use ash::vk;
+use color_eyre::eyre::OptionExt;
+use color_eyre::{Result, eyre::eyre};
 
 pub(crate) struct Surface {
     pub(super) surface: vk::SurfaceKHR,
@@ -77,11 +77,11 @@ impl DeviceContext {
     }
 
     pub(crate) fn find_suitable_surface_present_mode(&self) -> vk::PresentModeKHR {
-        *self.surface
+        *self
+            .surface
             .surface_present_modes
             .iter()
             .find(|mode| **mode == vk::PresentModeKHR::MAILBOX)
             .unwrap_or(&vk::PresentModeKHR::FIFO)
     }
 }
-

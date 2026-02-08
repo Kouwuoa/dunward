@@ -1,8 +1,8 @@
 mod swapchain;
 
+use crate::contexts::device_context::DeviceContext;
 use crate::contexts::device_context::queue::Queue;
-use crate::contexts::device_context::surface::Surface;
-use crate::resources::texture::{ColorTexture, Texture};
+use crate::resource_store::texture::{ColorTexture, Texture};
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
@@ -10,7 +10,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use swapchain::Swapchain;
 use winit::window::Window;
-use crate::contexts::device_context::DeviceContext;
 
 pub(crate) struct PresentTextureBundle {
     pub texture: ColorTexture,
@@ -25,22 +24,19 @@ pub(crate) enum PresentResult {
 
 /// Presentation target of the renderer, encapsulating the surface and swapchain
 pub(crate) struct SwapchainContext {
-    swapchain: Swapchain,
+    pub(crate) swapchain: Swapchain,
     present_queue: Arc<Queue>,
 }
 
 impl SwapchainContext {
-    pub fn new(surface: &mut Surface, win: &Window, ins: &Instance, dev: &Device) -> Result<Self> {
+    pub fn new(window: &Window, dvc_ctx: &DeviceContext) -> Result<Self> {
         log::info!("Creating SwapchainContext");
 
-        let _ = surface.generate_surface_formats(dev)?;
-        let _ = surface.generate_surface_present_modes(dev)?;
-
-        let swapchain = Swapchain::new(&surface, &win.inner_size(), ins, dev)?;
+        let swapchain = Swapchain::new(&window.inner_size(), dvc_ctx)?;
 
         Ok(Self {
             swapchain,
-            present_queue: dev.get_present_queue(),
+            present_queue: dvc_ctx.get_present_queue(),
         })
     }
 
@@ -80,14 +76,8 @@ impl SwapchainContext {
             ))?;
         let format = &self.swapchain.swapchain_image_format;
         let extent = &self.swapchain.swapchain_image_extent;
-        let texture = Texture::new_color_texture_from_vkimage(
-            image,
-            view,
-            format,
-            extent,
-            false,
-            dvc_ctx,
-        );
+        let texture =
+            Texture::new_color_texture_from_vkimage(image, view, format, extent, false, dvc_ctx);
 
         Ok(PresentTextureBundle {
             texture,
@@ -131,14 +121,12 @@ impl SwapchainContext {
 
     pub fn resize(
         &mut self,
-        size: winit::dpi::PhysicalSize<u32>,
+        size: &winit::dpi::PhysicalSize<u32>,
         dvc_ctx: &DeviceContext,
     ) -> Result<()> {
-        unsafe {
-            dvc_ctx.wait_device_idle()?;
-        }
+        dvc_ctx.wait_device_idle()?;
 
-        self.swapchain = Swapchain::new(sfc, &size, ins, dev)?;
+        self.swapchain = Swapchain::new(size, dvc_ctx)?;
 
         Ok(())
     }

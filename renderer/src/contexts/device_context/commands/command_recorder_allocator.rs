@@ -1,5 +1,5 @@
 use super::super::queue::{Queue, QueueFamily};
-use super::cmd_encoder::CommandEncoder;
+use super::command_recorder::CommandRecorder;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::OptionExt;
@@ -8,32 +8,32 @@ use std::collections::{HashMap, hash_map};
 use std::sync::{Arc, Mutex};
 
 #[repr(transparent)]
-pub(crate) struct CommandEncoderAllocator(Arc<Mutex<CommandEncoderAllocatorInner>>);
+pub(crate) struct CommandRecorderAllocator(Arc<Mutex<CommandRecorderAllocatorInner>>);
 
-impl Clone for CommandEncoderAllocator {
+impl Clone for CommandRecorderAllocator {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
 
-pub(crate) trait CommandEncoderAllocatorExt<A> {
+pub(crate) trait CommandRecorderAllocatorExt<A> {
     fn new(device: Arc<ash::Device>) -> Result<A>;
     /// Note that this is mutably borrowed to force the allocator to be used in a single-threaded context.
-    fn allocate(&mut self, queue: Arc<Queue>) -> Result<CommandEncoder>;
+    fn allocate(&mut self, queue: Arc<Queue>) -> Result<CommandRecorder>;
     /// Note that this is mutably borrowed to force the allocator to be used in a single-threaded context.
-    fn deallocate(&mut self, command_encoder: &CommandEncoder) -> Result<()>;
+    fn deallocate(&mut self, command_encoder: &CommandRecorder) -> Result<()>;
 }
 
-struct CommandEncoderAllocatorInner {
+struct CommandRecorderAllocatorInner {
     command_pools: HashMap<QueueFamily, vk::CommandPool>,
     allocated_command_buffers: HashMap<QueueFamily, Vec<vk::CommandBuffer>>,
     device: Arc<ash::Device>,
 }
 
-impl CommandEncoderAllocatorExt<CommandEncoderAllocator> for CommandEncoderAllocator {
-    fn new(device: Arc<ash::Device>) -> Result<CommandEncoderAllocator> {
-        Ok(CommandEncoderAllocator(Arc::new(Mutex::new(
-            CommandEncoderAllocatorInner {
+impl CommandRecorderAllocatorExt<CommandRecorderAllocator> for CommandRecorderAllocator {
+    fn new(device: Arc<ash::Device>) -> Result<CommandRecorderAllocator> {
+        Ok(CommandRecorderAllocator(Arc::new(Mutex::new(
+            CommandRecorderAllocatorInner {
                 command_pools: HashMap::new(),
                 allocated_command_buffers: HashMap::new(),
                 device,
@@ -41,7 +41,7 @@ impl CommandEncoderAllocatorExt<CommandEncoderAllocator> for CommandEncoderAlloc
         ))))
     }
 
-    fn allocate(&mut self, queue: Arc<Queue>) -> Result<CommandEncoder> {
+    fn allocate(&mut self, queue: Arc<Queue>) -> Result<CommandRecorder> {
         let (command_buffer, device) = {
             let mut guard = self.0.lock().map_err(|e| eyre!(e.to_string()))?;
 
@@ -77,12 +77,12 @@ impl CommandEncoderAllocatorExt<CommandEncoderAllocator> for CommandEncoderAlloc
             (command_buffer, device)
         };
 
-        let command_encoder = CommandEncoder::new(command_buffer, queue, device, self.clone());
+        let command_encoder = CommandRecorder::new(command_buffer, queue, device, self.clone());
 
         Ok(command_encoder)
     }
 
-    fn deallocate(&mut self, command_encoder: &CommandEncoder) -> Result<()> {
+    fn deallocate(&mut self, command_encoder: &CommandRecorder) -> Result<()> {
         let mut guard = self.0.lock().map_err(|e| eyre!(e.to_string()))?;
 
         let command_pool = guard
@@ -117,7 +117,7 @@ impl CommandEncoderAllocatorExt<CommandEncoderAllocator> for CommandEncoderAlloc
     }
 }
 
-impl Drop for CommandEncoderAllocatorInner {
+impl Drop for CommandRecorderAllocatorInner {
     fn drop(&mut self) {
         let command_pools = self.command_pools.drain().collect::<Vec<_>>();
 

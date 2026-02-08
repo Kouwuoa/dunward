@@ -1,10 +1,10 @@
-use super::megabuffer::{AllocatedMegabufferRegion, Megabuffer, MegabufferExt};
-use super::mesh::Mesh;
-use crate::resources::vertex::Vertex;
+use crate::resource_store::megabuffer::{AllocatedMegabufferRegion, Megabuffer, MegabufferExt};
+use crate::resource_store::mesh::Mesh;
+use crate::resource_store::vertex::Vertex;
 use color_eyre::eyre::{Result, eyre};
 use glam::Vec3;
 use crate::contexts::swapchain_context::SwapchainContext;
-use crate::resources::shader_data::PerVertexData;
+use crate::resource_store::shader_data::PerVertexData;
 
 pub struct FullscreenQuad {
     quad_model: Model,
@@ -33,7 +33,7 @@ impl FullscreenQuad {
 
     pub fn resize_to_swapchain(
         &mut self,
-        vpt: &SwapchainContext,
+        swc_ctx: &SwapchainContext,
         vertex_megabuffer: &Megabuffer,
     ) -> Result<()> {
         // Correct for image aspect ratio
@@ -49,7 +49,7 @@ impl FullscreenQuad {
         };
 
         // Correct for viewport aspect ratio
-        let size = vpt.swapchain.swapchain_image_extent;
+        let size = swc_ctx.swapchain.swapchain_image_extent;
         if size.width >= size.height {
             y *= size.width as f32 / size.height as f32;
         } else {

@@ -1,10 +1,10 @@
-use super::buffer::Buffer;
+use crate::resource_store::buffer::Buffer;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Mutex};
-use crate::contexts::device_context::commands::TransferCommandEncoder;
+use crate::contexts::device_context::commands::TransferCommandRecorder;
 
 static MEGABUFFER_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -35,7 +35,7 @@ pub(crate) trait MegabufferExt {
         buf_usage: vk::BufferUsageFlags,
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
-        transfer: Arc<TransferCommandEncoder>,
+        transfer: Arc<TransferCommandRecorder>,
     ) -> Result<Megabuffer>;
     fn allocate_region(&self, size: u64) -> Result<AllocatedMegabufferRegion>;
     fn deallocate_region(&self, region: &mut AllocatedMegabufferRegion) -> Result<()>;
@@ -56,10 +56,9 @@ impl MegabufferExt for Megabuffer {
         size: u64,
         alignment: u64,
         buf_usage: vk::BufferUsageFlags,
-
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
-        transfer: Arc<TransferCommandEncoder>,
+        transfer: Arc<TransferCommandRecorder>,
     ) -> Result<Megabuffer> {
         log::info!(
             "Creating Megabuffer with size: {}, alignment: {}, usage: {:?}",
@@ -265,7 +264,7 @@ struct MegabufferInner {
 
     mem_allocator: Arc<Mutex<vk_mem::Allocator>>,
     device: Arc<ash::Device>,
-    transfer: Arc<TransferCommandEncoder>,
+    transfer: Arc<TransferCommandRecorder>,
 }
 
 impl MegabufferInner {

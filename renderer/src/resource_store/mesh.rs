@@ -1,5 +1,5 @@
 use std::sync::atomic::AtomicU32;
-use crate::resources::vertex::Vertex;
+use crate::resource_store::vertex::Vertex;
 
 static MESH_ID_COUNTER: AtomicU32 = AtomicU32::new(0);
 

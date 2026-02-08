@@ -1,7 +1,6 @@
 mod camera;
 mod contexts;
 mod resource_store;
-mod resources;
 mod utils;
 
 pub use camera::Camera;
@@ -52,7 +51,8 @@ impl Renderer {
         let _ = color_eyre::install();
         let _ = env_logger::try_init();
 
-        let (dvc_ctx, swc_ctx) = DeviceContext::new(window)?;
+        let dvc_ctx = DeviceContext::new(window)?;
+        let swc_ctx = dvc_ctx.create_swapchain_context(window)?;
         let rsc_sto = ResourceStore::new(&dvc_ctx, &swc_ctx)?;
 
         let dvc_ctx = Arc::new(Mutex::new(dvc_ctx));

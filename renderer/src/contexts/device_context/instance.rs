@@ -70,15 +70,6 @@ impl Instance {
         })
     }
 
-    pub fn create_swapchain_context(
-        &self,
-        sfc: &mut Surface,
-        win: &Window,
-        dev: &Device,
-    ) -> Result<SwapchainContext> {
-        SwapchainContext::new(sfc, win, self, dev)
-    }
-
     fn create_instance(entry: &ash::Entry, window: Option<&Window>) -> Result<ash::Instance> {
         if Self::ENABLE_VALIDATION_LAYERS {
             Self::check_validation_layers_supported(entry)?;

@@ -22,7 +22,7 @@ pub(crate) struct Swapchain {
 }
 
 impl Swapchain {
-    pub fn new(size: &PhysicalSize<u32>, dvc_ctx: &DeviceContext) -> Result<Self> {
+    pub(super) fn new(size: &PhysicalSize<u32>, dvc_ctx: &DeviceContext) -> Result<Self> {
         let surface_format = dvc_ctx.find_suitable_surface_format()?;
         let surface_present_mode = dvc_ctx.find_suitable_surface_present_mode();
         let surface_capabilities = dvc_ctx.get_physical_device_surface_capabilities()?;
@@ -67,7 +67,7 @@ impl Swapchain {
         let image_usage = vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_DST;
         let image_sharing_mode = vk::SharingMode::EXCLUSIVE;
 
-        let swapchain_loader = ash::khr::swapchain::Device::new(&ins.instance, &dev.logical);
+        let swapchain_loader = dvc_ctx.create_vk_swapchain_loader();
         let swapchain_info = vk::SwapchainCreateInfoKHR::default()
             .surface(dvc_ctx.raw_surface_handle())
             .min_image_count(min_image_count)
@@ -135,7 +135,7 @@ impl Swapchain {
                         layer_count: 1,
                     })
                     .image(*image);
-                dvc_ctx.create_image_view(&view_info)
+                dvc_ctx.create_vk_image_view(&view_info)
             })
             .collect::<Result<Vec<vk::ImageView>>>()?;
 

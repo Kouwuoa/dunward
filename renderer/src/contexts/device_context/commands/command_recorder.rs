@@ -1,27 +1,27 @@
 use super::super::queue::Queue;
-use super::cmd_encoder_alloc::{CommandEncoderAllocator, CommandEncoderAllocatorExt};
-use crate::resources::texture::Texture;
+use super::command_recorder_allocator::{CommandRecorderAllocator, CommandRecorderAllocatorExt};
+use crate::resource_store::texture::Texture;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use std::sync::Arc;
 
-pub(crate) struct CommandEncoder {
+pub(crate) struct CommandRecorder {
     pub command_buffer: vk::CommandBuffer,
     pub queue: Arc<Queue>,
 
     is_recording: bool,
     device: Arc<ash::Device>,
     /// Note that this is only an `Option` to allow for the allocator to be dropped.
-    allocator: Option<CommandEncoderAllocator>,
+    allocator: Option<CommandRecorderAllocator>,
 }
 
-impl CommandEncoder {
+impl CommandRecorder {
     pub fn new(
         command_buffer: vk::CommandBuffer,
         queue: Arc<Queue>,
         device: Arc<ash::Device>,
-        allocator: CommandEncoderAllocator,
+        allocator: CommandRecorderAllocator,
     ) -> Self {
         Self {
             command_buffer,
@@ -75,7 +75,7 @@ impl CommandEncoder {
     }
 }
 
-impl Drop for CommandEncoder {
+impl Drop for CommandRecorder {
     fn drop(&mut self) {
         if self.is_recording {
             log::warn!("Dropping CommandEncoder while still recording");

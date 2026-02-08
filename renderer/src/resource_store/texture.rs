@@ -1,11 +1,11 @@
-use super::buffer::Buffer;
+use crate::resource_store::buffer::Buffer;
 use ash::vk;
 use color_eyre::eyre::Result;
 use color_eyre::eyre::eyre;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use vk_mem::Alloc;
-use crate::contexts::device_context::commands::TransferCommandEncoder;
+use crate::contexts::device_context::commands::TransferCommandRecorder;
 use crate::contexts::device_context::DeviceContext;
 
 #[repr(transparent)]
@@ -145,7 +145,7 @@ impl Texture {
         use_dedicated_memory: bool,
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
-        transfer: &TransferCommandEncoder,
+        transfer: &TransferCommandRecorder,
     ) -> Result<ColorTexture> {
         let image = {
             let create_info = TextureCreateInfo {
@@ -178,7 +178,7 @@ impl Texture {
         use_dedicated_memory: bool,
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
-        transfer: &TransferCommandEncoder,
+        transfer: &TransferCommandRecorder,
     ) -> Result<ColorTexture> {
         let data = image.to_rgba8().into_raw();
         let width = image.width();
@@ -322,7 +322,7 @@ impl Texture {
         );
     }
 
-    fn upload(&mut self, data: &[u8], transfer: &TransferCommandEncoder) -> Result<()> {
+    fn upload(&mut self, data: &[u8], transfer: &TransferCommandRecorder) -> Result<()> {
         let mut staging_buffer = Buffer::new(
             data.len() as u64,
             256,

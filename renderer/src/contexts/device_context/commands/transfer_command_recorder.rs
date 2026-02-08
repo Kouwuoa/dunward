@@ -3,9 +3,7 @@ use ash::vk;
 use color_eyre::eyre::Result;
 use std::sync::Arc;
 
-// TODO: Rename to TransferRecorder for clarity
-
-/// This is a specialized command encoder designed for performing on-off GPU transfer operations.
+/// This is a specialized command recorder designed for performing one-off GPU transfer operations.
 ///
 /// This struct manages its own Vulkan fence, command pool, and command buffer
 /// to submit immediate commands to the GPU transfer queue. It is useful for:
@@ -16,10 +14,10 @@ use std::sync::Arc;
 ///
 /// # Safety
 ///
-/// - The `TransferCommandEncoder` assumes exclusive access to its internal command buffer.
+/// - The `TransferCommandRecorder` assumes exclusive access to its internal command buffer.
 /// - It is not thread-safe to call `immediate_submit()` concurrently.
 /// - The queue passed in the constructor must support transfer operations.
-pub(crate) struct TransferCommandEncoder {
+pub(crate) struct TransferCommandRecorder {
     transfer_fence: vk::Fence,
     command_pool: vk::CommandPool,
     command_buffer: vk::CommandBuffer,
@@ -28,7 +26,7 @@ pub(crate) struct TransferCommandEncoder {
     device: Arc<ash::Device>,
 }
 
-impl TransferCommandEncoder {
+impl TransferCommandRecorder {
     pub fn new(transfer_queue: Arc<Queue>, device: Arc<ash::Device>) -> Result<Self> {
         let transfer_fence_info = vk::FenceCreateInfo::default();
         let transfer_fence = unsafe { device.create_fence(&transfer_fence_info, None)? };
@@ -103,7 +101,7 @@ impl TransferCommandEncoder {
     }
 }
 
-impl Drop for TransferCommandEncoder {
+impl Drop for TransferCommandRecorder {
     fn drop(&mut self) {
         unsafe {
             self.device.destroy_command_pool(self.command_pool, None);

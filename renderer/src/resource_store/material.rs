@@ -1,15 +1,13 @@
-use crate::resources::{
-    resource_type::RenderResourceType,
-    shader::{ComputeShader, GraphicsShader},
-    vertex::VertexInputDescription,
-};
 use ash::vk;
-use color_eyre::eyre::{OptionExt, eyre};
+use color_eyre::eyre::{eyre, OptionExt};
 use color_eyre::{Result, Section};
 use gpu_descriptor::{DescriptorAllocator, DescriptorSetLayoutCreateFlags, DescriptorTotalCount};
 use gpu_descriptor_ash::AshDescriptorDevice;
 use std::ffi::CString;
 use std::sync::{Arc, Mutex};
+use crate::resource_store::resource_type::RenderResourceType;
+use crate::resource_store::shader::{ComputeShader, GraphicsShader};
+use crate::resource_store::vertex::VertexInputDescription;
 
 /// You can think of a Material as a shader instance that you can bind resources and data to.
 /// You only need to create a Material once, and then you can use it to render multiple objects.
