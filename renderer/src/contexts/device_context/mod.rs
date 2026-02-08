@@ -15,7 +15,7 @@ use crate::contexts::{
 };
 use crate::resource_store::material::{GraphicsMaterialFactoryBuilder, MaterialFactory};
 use crate::resource_store::megabuffer::{Megabuffer, MegabufferExt};
-use crate::resource_store::resource_type::RenderResourceType;
+use crate::resource_store::resource_type::ResourceType;
 use crate::resource_store::shader::GraphicsShader;
 use crate::resource_store::shader_data::PerDrawData;
 use crate::resource_store::texture::{ColorTexture, DepthTexture, StorageTexture, Texture};
@@ -60,7 +60,7 @@ impl DeviceContext {
 
         let descriptor_allocator: DescriptorAllocator<vk::DescriptorPool, vk::DescriptorSet> =
             DescriptorAllocator::new(
-                RenderResourceType::max_update_after_bind_descriptors_in_all_pools(),
+                ResourceType::max_update_after_bind_descriptors_in_all_pools(),
             );
 
         let command_recorder_allocator = CommandRecorderAllocator::new(device.logical.clone())?;
@@ -80,15 +80,12 @@ impl DeviceContext {
         })
     }
 
-    pub fn create_swapchain_context(
-        &self,
-        window: &winit::window::Window,
-    ) -> Result<SwapchainContext> {
-        SwapchainContext::new(window, self)
-    }
-
     pub fn raw_device_handle(&self) -> vk::Device {
         self.device.logical.handle()
+    }
+
+    pub fn ash_device_handle(&self) -> Arc<ash::Device> {
+        self.device.logical.clone()
     }
 
     pub fn get_graphics_queue(&self) -> Arc<Queue> {
@@ -112,6 +109,13 @@ impl DeviceContext {
 
     pub fn wait_device_idle(&self) -> Result<()> {
         Ok(unsafe { self.device.logical.device_wait_idle()? })
+    }
+
+    pub fn create_swapchain_context(
+        &self,
+        window: &winit::window::Window,
+    ) -> Result<SwapchainContext> {
+        SwapchainContext::new(window, self)
     }
 
     pub fn create_color_texture(
@@ -194,46 +198,46 @@ impl DeviceContext {
             .add_binding(
                 // Per-frame
                 0,
-                RenderResourceType::UniformBuffer.descriptor_type(),
-                RenderResourceType::UniformBuffer.descriptor_count(),
+                ResourceType::UniformBuffer.descriptor_type(),
+                ResourceType::UniformBuffer.descriptor_count(),
                 vk::ShaderStageFlags::ALL,
-                RenderResourceType::UniformBuffer.descriptor_binding_flags(),
+                ResourceType::UniformBuffer.descriptor_binding_flags(),
                 None,
             )
             .add_binding(
                 // Per-material
                 1,
-                RenderResourceType::StorageBuffer.descriptor_type(),
-                RenderResourceType::StorageBuffer.descriptor_count(),
+                ResourceType::StorageBuffer.descriptor_type(),
+                ResourceType::StorageBuffer.descriptor_count(),
                 vk::ShaderStageFlags::ALL,
-                RenderResourceType::StorageBuffer.descriptor_binding_flags(),
+                ResourceType::StorageBuffer.descriptor_binding_flags(),
                 None,
             )
             .add_binding(
                 // Per-object
                 2,
-                RenderResourceType::StorageBuffer.descriptor_type(),
-                RenderResourceType::StorageBuffer.descriptor_count(),
+                ResourceType::StorageBuffer.descriptor_type(),
+                ResourceType::StorageBuffer.descriptor_count(),
                 vk::ShaderStageFlags::ALL,
-                RenderResourceType::StorageBuffer.descriptor_binding_flags(),
+                ResourceType::StorageBuffer.descriptor_binding_flags(),
                 None,
             )
             .add_binding(
                 // Samplers
                 3,
-                RenderResourceType::Sampler.descriptor_type(),
-                RenderResourceType::Sampler.descriptor_count(),
+                ResourceType::Sampler.descriptor_type(),
+                ResourceType::Sampler.descriptor_count(),
                 vk::ShaderStageFlags::ALL,
-                RenderResourceType::Sampler.descriptor_binding_flags(),
+                ResourceType::Sampler.descriptor_binding_flags(),
                 None,
             )
             .add_binding(
                 // Textures
                 4,
-                RenderResourceType::SampledImage.descriptor_type(),
-                RenderResourceType::SampledImage.descriptor_count(),
+                ResourceType::SampledImage.descriptor_type(),
+                ResourceType::SampledImage.descriptor_count(),
                 vk::ShaderStageFlags::ALL,
-                RenderResourceType::SampledImage.descriptor_binding_flags(),
+                ResourceType::SampledImage.descriptor_binding_flags(),
                 None,
             )
             .build(

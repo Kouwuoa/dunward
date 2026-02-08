@@ -16,24 +16,6 @@ use color_eyre::Result;
 use contexts::device_context::DeviceContext;
 use std::sync::{Arc, Mutex};
 
-/// We split up the Renderer by lifetimes:
-/// * Tier 1 - Device lifetime (lives until app shutdown)
-///   * Instance
-///   * Physical Device
-///   * Logical Device
-///   * Queues
-///   * Descriptor pool(s)
-/// * Tier 2 - Swapchain lifetime (recreated on resize)
-///   * Swapchain
-///   * Swapchain images/views
-///   * Framebuffers
-///   * Render passes
-///   * Viewport/extent
-/// * Tier 3 - Per-frame lifetime (frames in flight)
-///   * Command buffers
-///   * Semaphores
-///   * Fences
-///   * Per-frame descriptor sets
 pub struct Renderer {
     dvc_ctx: Arc<Mutex<DeviceContext>>,
     swc_ctx: Arc<Mutex<SwapchainContext>>,
@@ -122,14 +104,6 @@ impl Renderer {
 
 impl Drop for Renderer {
     fn drop(&mut self) {
-        unsafe {
-            self.dvc_ctx
-                .lock()
-                .unwrap()
-                .dev
-                .logical
-                .device_wait_idle()
-                .unwrap();
-        }
+        self.dvc_ctx.lock().unwrap().wait_device_idle().unwrap();
     }
 }

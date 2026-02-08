@@ -1,7 +1,7 @@
 mod camera;
 mod schedules;
 
-use bevy::{ecs::system::SystemState, prelude::*, window::PrimaryWindow, winit::{WINIT_WINDOWS, WinitWindows}};
+use bevy::{prelude::*, window::PrimaryWindow, winit::WINIT_WINDOWS};
 
 pub(super) struct DunwardRenderPlugin;
 impl Plugin for DunwardRenderPlugin {

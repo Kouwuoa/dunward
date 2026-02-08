@@ -11,7 +11,7 @@ use std::ffi::{c_char, CStr};
 use std::str::Utf8Error;
 use std::sync::Arc;
 use crate::resource_store::megabuffer::MegabufferExt;
-use crate::resource_store::resource_type::RenderResourceType;
+use crate::resource_store::resource_type::ResourceType;
 use crate::resource_store::shader::GraphicsShader;
 use crate::resource_store::shader_data::PerDrawData;
 use crate::resource_store::texture::{ColorTexture, DepthTexture, StorageTexture};
@@ -297,6 +297,9 @@ impl Device {
                 .synchronization2(true)
                 .dynamic_rendering(true);
 
+            let mut descriptor_buffer_features = vk::PhysicalDeviceDescriptorBufferFeaturesEXT::default()
+                .descriptor_buffer(true);
+
             let mut shader_object_features =
                 vk::PhysicalDeviceShaderObjectFeaturesEXT::default().shader_object(true);
 
@@ -305,6 +308,7 @@ impl Device {
                 .push_next(&mut features11)
                 .push_next(&mut features12)
                 .push_next(&mut features13)
+                .push_next(&mut descriptor_buffer_features)
                 .push_next(&mut shader_object_features)
                 .queue_create_infos(&queue_create_infos)
                 .enabled_extension_names(&enabled_extension_names);
@@ -335,8 +339,11 @@ impl Device {
             ash::khr::buffer_device_address::NAME,
             ash::khr::synchronization2::NAME,
             ash::khr::maintenance3::NAME,
-            ash::ext::descriptor_indexing::NAME,
             ash::ext::shader_object::NAME,
+            // Descriptors
+            ash::ext::descriptor_buffer::NAME,
+            ash::ext::descriptor_indexing::NAME,
+
             #[cfg(target_os = "macos")]
             ash::khr::portability_subset::NAME,
         ]

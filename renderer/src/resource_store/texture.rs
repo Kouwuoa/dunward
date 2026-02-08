@@ -1,3 +1,5 @@
+use crate::contexts::device_context::DeviceContext;
+use crate::contexts::device_context::commands::TransferCommandRecorder;
 use crate::resource_store::buffer::Buffer;
 use ash::vk;
 use color_eyre::eyre::Result;
@@ -5,8 +7,6 @@ use color_eyre::eyre::eyre;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use vk_mem::Alloc;
-use crate::contexts::device_context::commands::TransferCommandRecorder;
-use crate::contexts::device_context::DeviceContext;
 
 #[repr(transparent)]
 pub(crate) struct ColorTexture(pub Texture);
@@ -70,6 +70,8 @@ pub(crate) struct Texture {
     destroy_view: bool,
 
     allocation: Option<vk_mem::Allocation>, // GPU-only memory block
+    memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
+    device: Arc<ash::Device>,
 }
 
 impl Texture {
@@ -216,7 +218,8 @@ impl Texture {
             aspect: vk::ImageAspectFlags::COLOR,
             destroy_view,
             allocation: None,
-            dvc_ctx,
+            memory_allocator: dvc_ctx.memory_allocator.clone(),
+            device: dvc_ctx.ash_device_handle(),
         })
     }
 

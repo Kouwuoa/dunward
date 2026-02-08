@@ -5,7 +5,7 @@ use gpu_descriptor::{DescriptorAllocator, DescriptorSetLayoutCreateFlags, Descri
 use gpu_descriptor_ash::AshDescriptorDevice;
 use std::ffi::CString;
 use std::sync::{Arc, Mutex};
-use crate::resource_store::resource_type::RenderResourceType;
+use crate::resource_store::resource_type::ResourceType;
 use crate::resource_store::shader::{ComputeShader, GraphicsShader};
 use crate::resource_store::vertex::VertexInputDescription;
 
@@ -105,14 +105,14 @@ impl MaterialFactory {
                     &self.descriptor_set_layout,
                     DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND,
                     &DescriptorTotalCount {
-                        sampler: RenderResourceType::Sampler.descriptor_count(),
+                        sampler: ResourceType::Sampler.descriptor_count(),
                         combined_image_sampler: 0,
-                        sampled_image: RenderResourceType::SampledImage.descriptor_count(),
-                        storage_image: RenderResourceType::StorageImage.descriptor_count(),
+                        sampled_image: ResourceType::SampledImage.descriptor_count(),
+                        storage_image: ResourceType::StorageImage.descriptor_count(),
                         uniform_texel_buffer: 0,
                         storage_texel_buffer: 0,
-                        uniform_buffer: RenderResourceType::UniformBuffer.descriptor_count(),
-                        storage_buffer: RenderResourceType::StorageBuffer.descriptor_count(),
+                        uniform_buffer: ResourceType::UniformBuffer.descriptor_count(),
+                        storage_buffer: ResourceType::StorageBuffer.descriptor_count(),
                         uniform_buffer_dynamic: 0,
                         storage_buffer_dynamic: 0,
                         input_attachment: 0,

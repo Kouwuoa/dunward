@@ -1,13 +1,13 @@
 use ash::vk;
 
-const UNIFORM_BUFFER_DESCRIPTOR_COUNT: u32 = 4;
-const STORAGE_BUFFER_DESCRIPTOR_COUNT: u32 = 4;
-const STORAGE_IMAGE_DESCRIPTOR_COUNT: u32 = 4;
-const SAMPLER_DESCRIPTOR_COUNT: u32 = 16;
+const UNIFORM_BUFFER_DESCRIPTOR_COUNT: u32 = 32;
+const STORAGE_BUFFER_DESCRIPTOR_COUNT: u32 = 32;
+const STORAGE_IMAGE_DESCRIPTOR_COUNT: u32 = 32;
+const SAMPLER_DESCRIPTOR_COUNT: u32 = 32;
 const SAMPLED_IMAGE_DESCRIPTOR_COUNT: u32 = 1024;
 
 #[derive(PartialEq)]
-pub enum RenderResourceType {
+pub enum ResourceType {
     UniformBuffer,
     StorageBuffer,
     StorageImage,
@@ -15,7 +15,7 @@ pub enum RenderResourceType {
     SampledImage,
 }
 
-impl RenderResourceType {
+impl ResourceType {
     const ALL: &'static [Self] = &[
         Self::UniformBuffer,
         Self::StorageBuffer,

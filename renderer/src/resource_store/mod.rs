@@ -6,7 +6,7 @@ use gpu_descriptor::DescriptorAllocator;
 use material::{GraphicsMaterialFactoryBuilder, MaterialFactory};
 use megabuffer::Megabuffer;
 use model::FullscreenQuad;
-use resource_type::RenderResourceType;
+use resource_type::ResourceType;
 use shader::GraphicsShader;
 use std::sync::{Arc, Mutex};
 use texture::{ColorTexture, StorageTexture};
