@@ -2349,17 +2349,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gpu-descriptor-ash"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07097b02f959399b4dbdf9a548c16a80e5d0579ec073a262d666dcf948068154"
-dependencies = [
- "ash",
- "gpu-descriptor-types",
- "smallvec",
-]
-
-[[package]]
 name = "gpu-descriptor-types"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3919,8 +3908,6 @@ dependencies = [
  "color-eyre",
  "env_logger",
  "glam 0.31.0",
- "gpu-descriptor",
- "gpu-descriptor-ash",
  "image",
  "log",
  "naga 28.0.0",

@@ -1,9 +1,9 @@
 use ash::vk;
 
-const UNIFORM_BUFFER_DESCRIPTOR_COUNT: u32 = 32;
-const STORAGE_BUFFER_DESCRIPTOR_COUNT: u32 = 32;
-const STORAGE_IMAGE_DESCRIPTOR_COUNT: u32 = 32;
-const SAMPLER_DESCRIPTOR_COUNT: u32 = 32;
+const UNIFORM_BUFFER_DESCRIPTOR_COUNT: u32 = 4;
+const STORAGE_BUFFER_DESCRIPTOR_COUNT: u32 = 4;
+const STORAGE_IMAGE_DESCRIPTOR_COUNT: u32 = 4;
+const SAMPLER_DESCRIPTOR_COUNT: u32 = 16;
 const SAMPLED_IMAGE_DESCRIPTOR_COUNT: u32 = 1024;
 
 #[derive(PartialEq)]
@@ -24,7 +24,7 @@ impl ResourceType {
         Self::SampledImage,
     ];
 
-    pub fn max_update_after_bind_descriptors_in_all_pools() -> u32 {
+    pub fn total_descriptor_count() -> u32 {
         Self::ALL.iter().map(|ty| ty.descriptor_count()).sum()
     }
 

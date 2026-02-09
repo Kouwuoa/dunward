@@ -2,7 +2,6 @@ use crate::contexts::device_context::DeviceContext;
 use crate::contexts::swapchain_context::SwapchainContext;
 use ash::vk;
 use color_eyre::Result;
-use gpu_descriptor::DescriptorAllocator;
 use material::{GraphicsMaterialFactoryBuilder, MaterialFactory};
 use megabuffer::Megabuffer;
 use model::FullscreenQuad;

@@ -297,9 +297,6 @@ impl Device {
                 .synchronization2(true)
                 .dynamic_rendering(true);
 
-            let mut descriptor_buffer_features = vk::PhysicalDeviceDescriptorBufferFeaturesEXT::default()
-                .descriptor_buffer(true);
-
             let mut shader_object_features =
                 vk::PhysicalDeviceShaderObjectFeaturesEXT::default().shader_object(true);
 
@@ -308,7 +305,6 @@ impl Device {
                 .push_next(&mut features11)
                 .push_next(&mut features12)
                 .push_next(&mut features13)
-                .push_next(&mut descriptor_buffer_features)
                 .push_next(&mut shader_object_features)
                 .queue_create_infos(&queue_create_infos)
                 .enabled_extension_names(&enabled_extension_names);

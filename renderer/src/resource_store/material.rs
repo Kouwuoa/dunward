@@ -1,10 +1,9 @@
 use ash::vk;
 use color_eyre::eyre::{eyre, OptionExt};
 use color_eyre::{Result, Section};
-use gpu_descriptor::{DescriptorAllocator, DescriptorSetLayoutCreateFlags, DescriptorTotalCount};
-use gpu_descriptor_ash::AshDescriptorDevice;
 use std::ffi::CString;
 use std::sync::{Arc, Mutex};
+use crate::contexts::device_context::descriptors::descriptor_allocator::DescriptorAllocator;
 use crate::resource_store::resource_type::ResourceType;
 use crate::resource_store::shader::{ComputeShader, GraphicsShader};
 use crate::resource_store::vertex::VertexInputDescription;
@@ -16,10 +15,10 @@ pub(crate) struct Material {
     pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
     pipeline_bind_point: vk::PipelineBindPoint,
-    descriptor_set: Option<gpu_descriptor::DescriptorSet<vk::DescriptorSet>>, // Option used for cleanup in the dtor
+    descriptor_set: vk::DescriptorSet,
 
     device: Arc<ash::Device>,
-    descriptor_allocator: Arc<Mutex<DescriptorAllocator<vk::DescriptorPool, vk::DescriptorSet>>>,
+    descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
 }
 
 impl Material {
@@ -43,7 +42,7 @@ impl Material {
     }
 
     pub fn bind_descriptor_sets(&self, command_buffer: vk::CommandBuffer) {
-        let descriptor_sets = [*self.descriptor_set.as_ref().unwrap().raw()];
+        let descriptor_sets = [self.descriptor_set];
         unsafe {
             self.device.cmd_bind_descriptor_sets(
                 command_buffer,
@@ -57,19 +56,6 @@ impl Material {
     }
 }
 
-impl Drop for Material {
-    fn drop(&mut self) {
-        let device = AshDescriptorDevice::wrap(&self.device);
-        let desc_set = self.descriptor_set.take().unwrap();
-        unsafe {
-            self.descriptor_allocator
-                .lock()
-                .unwrap()
-                .free(device, [desc_set]);
-        }
-    }
-}
-
 pub(crate) struct MaterialFactory {
     pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
@@ -77,7 +63,7 @@ pub(crate) struct MaterialFactory {
     descriptor_set_layout: vk::DescriptorSetLayout,
 
     device: Arc<ash::Device>,
-    descriptor_allocator: Arc<Mutex<DescriptorAllocator<vk::DescriptorPool, vk::DescriptorSet>>>,
+    descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
 }
 
 impl MaterialFactory {

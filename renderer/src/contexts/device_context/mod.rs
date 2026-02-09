@@ -1,11 +1,12 @@
 pub(crate) mod commands;
+pub(crate) mod descriptors;
 pub(crate) mod queue;
 
-mod descriptors;
 mod device;
 mod instance;
 mod surface;
 
+use crate::contexts::device_context::descriptors::descriptor_allocator::DescriptorAllocator;
 use crate::contexts::device_context::queue::Queue;
 use crate::contexts::{
     device_context::commands::{
@@ -22,8 +23,6 @@ use crate::resource_store::texture::{ColorTexture, DepthTexture, StorageTexture,
 use ash::vk;
 use color_eyre::Result;
 use descriptors::descriptor_set_layout_builder::DescriptorSetLayoutBuilder;
-use gpu_descriptor::DescriptorAllocator;
-use gpu_descriptor_ash::AshDescriptorDevice;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -34,8 +33,7 @@ pub(crate) struct DeviceContext {
     surface: surface::Surface,
 
     pub(crate) memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
-    pub(crate) descriptor_allocator:
-        Arc<Mutex<DescriptorAllocator<vk::DescriptorPool, vk::DescriptorSet>>>,
+    pub(crate) descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
     pub(crate) command_recorder_allocator: CommandRecorderAllocator,
     pub(crate) transfer_command_recorder: Arc<TransferCommandRecorder>,
 }
@@ -58,11 +56,10 @@ impl DeviceContext {
             ))?
         };
 
-        let descriptor_allocator: DescriptorAllocator<vk::DescriptorPool, vk::DescriptorSet> =
-            DescriptorAllocator::new(
-                ResourceType::max_update_after_bind_descriptors_in_all_pools(),
-            );
-
+        let descriptor_allocator = Arc::new(Mutex::new(DescriptorAllocator::new(
+            device.logical.clone(),
+            1000,
+        )?));
         let command_recorder_allocator = CommandRecorderAllocator::new(device.logical.clone())?;
         let transfer_command_recorder = Arc::new(TransferCommandRecorder::new(
             device.get_transfer_queue().clone(),
@@ -74,7 +71,7 @@ impl DeviceContext {
             device,
             surface,
             memory_allocator: Arc::new(Mutex::new(memory_allocator)),
-            descriptor_allocator: Arc::new(Mutex::new(descriptor_allocator)),
+            descriptor_allocator,
             command_recorder_allocator,
             transfer_command_recorder,
         })
@@ -300,14 +297,5 @@ impl DeviceContext {
 
     pub fn create_vk_swapchain_loader(&self) -> ash::khr::swapchain::Device {
         ash::khr::swapchain::Device::new(self.instance.inner(), &self.device.logical)
-    }
-}
-impl Drop for DeviceContext {
-    fn drop(&mut self) {
-        // Clean up descriptor sets
-        let device = AshDescriptorDevice::wrap(&self.device.logical);
-        unsafe {
-            self.descriptor_allocator.lock().unwrap().cleanup(device);
-        }
     }
 }
