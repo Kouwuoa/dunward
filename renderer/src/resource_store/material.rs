@@ -1,12 +1,12 @@
-use ash::vk;
-use color_eyre::eyre::{eyre, OptionExt};
-use color_eyre::{Result, Section};
-use std::ffi::CString;
-use std::sync::{Arc, Mutex};
 use crate::contexts::device_context::descriptors::descriptor_allocator::DescriptorAllocator;
 use crate::resource_store::resource_type::ResourceType;
 use crate::resource_store::shader::{ComputeShader, GraphicsShader};
 use crate::resource_store::vertex::VertexInputDescription;
+use ash::vk;
+use color_eyre::eyre::{OptionExt, eyre};
+use color_eyre::{Result, Section};
+use std::ffi::CString;
+use std::sync::{Arc, Mutex};
 
 /// You can think of a Material as a shader instance that you can bind resources and data to.
 /// You only need to create a Material once, and then you can use it to render multiple objects.
@@ -73,52 +73,17 @@ impl MaterialFactory {
             pipeline: self.pipeline,
             pipeline_layout: self.pipeline_layout,
             pipeline_bind_point: self.pipeline_bind_point,
-            descriptor_set: Some(descriptor_set),
+            descriptor_set,
             device: self.device.clone(),
             descriptor_allocator: self.descriptor_allocator.clone(),
         })
     }
 
-    fn allocate_descriptor_set(
-        &mut self,
-    ) -> Result<gpu_descriptor::DescriptorSet<vk::DescriptorSet>> {
-        unsafe {
-            self.descriptor_allocator
-                .lock()
-                .map_err(|e| eyre!(e.to_string()))?
-                .allocate(
-                    AshDescriptorDevice::wrap(self.device.as_ref()),
-                    &self.descriptor_set_layout,
-                    DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND,
-                    &DescriptorTotalCount {
-                        sampler: ResourceType::Sampler.descriptor_count(),
-                        combined_image_sampler: 0,
-                        sampled_image: ResourceType::SampledImage.descriptor_count(),
-                        storage_image: ResourceType::StorageImage.descriptor_count(),
-                        uniform_texel_buffer: 0,
-                        storage_texel_buffer: 0,
-                        uniform_buffer: ResourceType::UniformBuffer.descriptor_count(),
-                        storage_buffer: ResourceType::StorageBuffer.descriptor_count(),
-                        uniform_buffer_dynamic: 0,
-                        storage_buffer_dynamic: 0,
-                        input_attachment: 0,
-                        acceleration_structure: 0,
-                        inline_uniform_block_bytes: 0,
-                        inline_uniform_block_bindings: 0,
-                    },
-                    1,
-                )
-                .map_err(|e| match e {
-                    gpu_descriptor::AllocationError::Fragmentation => {
-                        eyre!("Failed to allocate descriptor set: {}", e.to_string())
-                            .suggestion("Try increasing the layout_descriptor_count")
-                    }
-                    _ => eyre!(e.to_string()),
-                })?
-                .drain(..)
-                .next()
-                .ok_or_eyre("Failed to allocate descriptor set")
-        }
+    fn allocate_descriptor_set(&mut self) -> Result<vk::DescriptorSet> {
+        self.descriptor_allocator
+            .lock()
+            .map_err(|e| eyre!(e.to_string()))?
+            .allocate(self.descriptor_set_layout)
     }
 }
 
@@ -136,15 +101,13 @@ pub(crate) struct GraphicsMaterialFactoryBuilder<'a> {
     descriptor_set_layout: Option<vk::DescriptorSetLayout>,
 
     device: Arc<ash::Device>,
-    descriptor_allocator: Arc<Mutex<DescriptorAllocator<vk::DescriptorPool, vk::DescriptorSet>>>,
+    descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
 }
 
 impl<'a> GraphicsMaterialFactoryBuilder<'a> {
     pub fn new(
         device: Arc<ash::Device>,
-        descriptor_allocator: Arc<
-            Mutex<DescriptorAllocator<vk::DescriptorPool, vk::DescriptorSet>>,
-        >,
+        descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
     ) -> Self {
         let vertex_input_description = VertexInputDescription::default();
         let input_assembly = Self::default_input_assembly_info();
@@ -445,15 +408,13 @@ pub(crate) struct ComputeMaterialFactoryBuilder {
     descriptor_set_layout: Option<vk::DescriptorSetLayout>,
 
     device: Arc<ash::Device>,
-    descriptor_allocator: Arc<Mutex<DescriptorAllocator<vk::DescriptorPool, vk::DescriptorSet>>>,
+    descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
 }
 
 impl ComputeMaterialFactoryBuilder {
     pub fn new(
         device: Arc<ash::Device>,
-        descriptor_allocator: Arc<
-            Mutex<DescriptorAllocator<vk::DescriptorPool, vk::DescriptorSet>>,
-        >,
+        descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
     ) -> Self {
         Self {
             shader: None,

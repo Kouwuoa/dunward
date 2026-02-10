@@ -155,7 +155,8 @@ impl DescriptorAllocator {
 
         let pool_info = vk::DescriptorPoolCreateInfo::default()
             .max_sets(set_count)
-            .pool_sizes(&pool_sizes);
+            .pool_sizes(&pool_sizes)
+            .flags(vk::DescriptorPoolCreateFlags::UPDATE_AFTER_BIND);
 
         Ok(unsafe { device.create_descriptor_pool(&pool_info, None)? })
     }
