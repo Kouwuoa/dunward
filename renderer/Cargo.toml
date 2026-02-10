@@ -3,14 +3,6 @@ name = "renderer"
 version = "0.1.0"
 edition = "2024"
 
-#[dependencies.ash]
-#git = "https://github.com/ash-rs/ash.git"
-#rev = "c9292cf1b3fb70e4416fe9c47d6d938bd80d52b4"
-
-#[dependencies.ash-window]
-#git = "https://github.com/ash-rs/ash.git"
-#rev = "c9292cf1b3fb70e4416fe9c47d6d938bd80d52b4"
-
 [dependencies]
 ash = "0.38.0"
 ash-window = "0.13.0"

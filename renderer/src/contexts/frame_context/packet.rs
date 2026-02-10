@@ -26,7 +26,6 @@ pub(crate) struct FrameRenderPayload<'a> {
 pub(crate) struct FrameRenderMetadata {
     pub frame_index: usize,
     pub target_size: winit::dpi::PhysicalSize<u32>,
-    pub resize_requested: bool,
 }
 
 pub(crate) struct FramePresentPacket {

@@ -5,16 +5,27 @@ mod utils;
 
 pub use camera::Camera;
 
-use crate::contexts::frame_context::FrameContext;
 use crate::contexts::frame_context::packet::{
-    FrameRenderMetadata, FrameRenderPacket, FrameRenderPayload,
+    FramePresentPacket, FrameRenderMetadata, FrameRenderPacket, FrameRenderPayload,
 };
-use crate::contexts::swapchain_context::{PresentResult, SwapchainContext};
+use crate::contexts::frame_context::{FrameContext, FrameRenderError};
+use crate::contexts::swapchain_context::{SwapchainContext, SwapchainPresentError};
 use crate::resource_store::ResourceStore;
 use crate::utils::GuardResultExt;
+use ash::vk;
 use color_eyre::Result;
 use contexts::device_context::DeviceContext;
 use std::sync::{Arc, Mutex};
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum RendererError {
+    #[error("Swapchain is suboptimal and needs to be resized")]
+    SwapchainSuboptimal,
+
+    #[error("Vulkan error: {0}")]
+    Vulkan(#[from] vk::Result),
+}
 
 pub struct Renderer {
     dvc_ctx: Arc<Mutex<DeviceContext>>,
@@ -23,7 +34,6 @@ pub struct Renderer {
     rsc_sto: Arc<Mutex<ResourceStore>>,
 
     frame_number: u64,
-    resize_requested: bool,
 }
 
 impl Renderer {
@@ -50,24 +60,28 @@ impl Renderer {
             frm_ctxs,
             rsc_sto,
             frame_number: 0,
-            resize_requested: false,
         })
     }
 
-    pub fn render_frame(&mut self, cam: &Camera) -> Result<()> {
+    pub fn render_frame(&mut self, cam: &Camera) -> core::result::Result<(), RendererError> {
         // Update the scene and prepare the frame packet
-        let render_pkt = self.update_scene(cam)?;
+        let render_pkt = self.update_scene(cam);
 
         // Record and submit the commands for the current frame
-        let present_pkt = self.get_current_frame().render(render_pkt)?;
+        let present_pkt = match self.get_current_frame().render(render_pkt) {
+            Ok(pkt) => Ok(pkt),
+            Err(FrameRenderError::SwapchainSuboptimal) => Err(RendererError::SwapchainSuboptimal),
+            Err(FrameRenderError::Vulkan(err)) => Err(err.into()),
+        }?;
 
         // Present the frame
-        match self.get_current_frame().present(present_pkt)? {
-            PresentResult::ResizeRequested => {
-                self.request_resize();
+        match self.get_current_frame().present(present_pkt) {
+            Ok(()) => Ok(()),
+            Err(SwapchainPresentError::SwapchainSuboptimal) => {
+                Err(RendererError::SwapchainSuboptimal)
             }
-            PresentResult::Success => {}
-        }
+            Err(SwapchainPresentError::Vulkan(err)) => Err(err.into()),
+        }?;
 
         // Increment the frame counter
         self.frame_number += 1;
@@ -75,21 +89,21 @@ impl Renderer {
         Ok(())
     }
 
-    pub fn request_resize(&mut self) {
-        self.resize_requested = true;
+    pub fn resize(&mut self, size: winit::dpi::PhysicalSize<u32>) -> Result<()> {
+        let dvc_ctx = self.dvc_ctx.lock().eyre()?;
+        self.swc_ctx.lock().eyre()?.resize(&size, &dvc_ctx)
     }
 
-    fn update_scene<'a>(&mut self, cam: &'a Camera) -> Result<FrameRenderPacket<'a>> {
-        let target_size = self.swc_ctx.lock().eyre()?.get_size();
+    fn update_scene<'a>(&mut self, cam: &'a Camera) -> FrameRenderPacket<'a> {
+        let target_size = self.swc_ctx.lock().eyre().unwrap().get_size();
         let frame_metadata = FrameRenderMetadata {
             frame_index: self.get_current_frame_index(),
             target_size,
-            resize_requested: self.resize_requested,
         };
-        Ok(FrameRenderPacket {
+        FrameRenderPacket {
             payload: FrameRenderPayload { cam },
             metadata: frame_metadata,
-        })
+        }
     }
 
     fn get_current_frame(&mut self) -> &mut FrameContext {

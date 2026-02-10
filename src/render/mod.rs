@@ -2,6 +2,7 @@ mod camera;
 mod schedules;
 
 use bevy::{prelude::*, window::PrimaryWindow, winit::WINIT_WINDOWS};
+use renderer::RendererError;
 
 pub(super) struct DunwardRenderPlugin;
 impl Plugin for DunwardRenderPlugin {
@@ -13,10 +14,7 @@ impl Plugin for DunwardRenderPlugin {
     }
 }
 
-fn create_renderer(
-    world: &mut World,
-    window_qry: &mut QueryState<Entity, With<PrimaryWindow>>,
-) {
+fn create_renderer(world: &mut World, window_qry: &mut QueryState<Entity, With<PrimaryWindow>>) {
     let window_ent = window_qry.single(world).unwrap();
     WINIT_WINDOWS.with_borrow(|winit_windows| {
         let winit_window = winit_windows.get_window(window_ent).unwrap();
@@ -25,7 +23,20 @@ fn create_renderer(
     });
 }
 
-fn render_frame(mut renderer: NonSendMut<renderer::Renderer>, camera_qry: Query<&camera::Camera>) {
+fn render_frame(
+    mut renderer: NonSendMut<renderer::Renderer>,
+    world: &mut World,
+    camera_qry: Query<&camera::Camera>,
+    window_qry: &mut QueryState<Entity, With<PrimaryWindow>>,
+) {
     let camera = camera_qry.single().unwrap();
-    renderer.render_frame(&camera.0).unwrap();
+    let result = renderer.render_frame(&camera.0);
+    if let Err(RendererError::SwapchainSuboptimal) = result {
+        WINIT_WINDOWS.with_borrow(|winit_windows| {
+            let window_ent = window_qry.single(world).unwrap();
+            let winit_window = winit_windows.get_window(window_ent).unwrap();
+            let window_size = winit_window.inner_size();
+            renderer.resize(window_size).unwrap();
+        });
+    }
 }

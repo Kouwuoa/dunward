@@ -1,11 +1,12 @@
 pub(crate) mod packet;
 
 use crate::contexts::device_context::commands::CommandRecorderAllocatorExt;
+use crate::contexts::swapchain_context::SwapchainPresentError;
 use crate::{
     contexts::{
         device_context::{DeviceContext, commands::CommandRecorder},
         frame_context::packet::{FramePresentPacket, FrameRenderPacket},
-        swapchain_context::{PresentResult, SwapchainContext},
+        swapchain_context::SwapchainContext,
     },
     resource_store::{
         ResourceStore,
@@ -17,15 +18,25 @@ use crate::{
     utils::GuardResultExt,
 };
 use ash::vk;
-use color_eyre::Result;
+use color_eyre::eyre::Result;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use thiserror::Error;
 
 const FRAME_VERTEX_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_INDEX_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_PER_FRAME_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_PER_MATERIAL_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_PER_OBJECT_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
+
+#[derive(Debug, Error)]
+pub enum FrameRenderError {
+    #[error("Swapchain is suboptimal and needs to be resized")]
+    SwapchainSuboptimal,
+
+    #[error("Vulkan error: {0}")]
+    Vulkan(#[from] vk::Result),
+}
 
 pub(crate) struct FrameContext {
     dvc_ctx: Arc<Mutex<DeviceContext>>,
@@ -127,21 +138,31 @@ impl FrameContext {
         })
     }
 
-    pub fn render(&mut self, pkt: FrameRenderPacket) -> Result<FramePresentPacket> {
-        let dvc = self.dvc_ctx.lock().eyre()?;
-        let swc = self.swc_ctx.lock().eyre()?;
+    pub fn render(
+        &mut self,
+        pkt: FrameRenderPacket,
+    ) -> core::result::Result<FramePresentPacket, FrameRenderError> {
+        let dvc = self.dvc_ctx.lock().unwrap();
+        let swc = self.swc_ctx.lock().unwrap();
 
         let timeout = Duration::from_secs(1);
 
         // Wait until the commands have finished from the last time this frame was rendered
-        dvc.wait_and_reset_fence(self.render_fence, timeout)?;
+        dvc.wait_and_reset_fence(self.render_fence, timeout)
+            .unwrap();
 
         // Acquire the next image from the swapchain
-        let mut texture =
-            swc.acquire_next_present_texture(self.present_semaphore, timeout, &dvc)?;
+        let mut texture = swc
+            .acquire_next_present_texture(self.present_semaphore, timeout, &dvc)
+            .unwrap();
+
+        // Request swapchain resize if suboptimal
+        if texture.suboptimal {
+            return Err(FrameRenderError::SwapchainSuboptimal);
+        }
 
         // Record render commands
-        self.command_recorder.begin_recording()?;
+        self.command_recorder.begin_recording().unwrap();
 
         self.command_recorder.transition_texture_layout(
             &mut texture.texture,
@@ -157,7 +178,7 @@ impl FrameContext {
             vk::ImageLayout::PRESENT_SRC_KHR,
         );
 
-        let cmd = self.command_recorder.end_recording()?;
+        let cmd = self.command_recorder.end_recording().unwrap();
 
         // Submit render commands
         dvc.submit(
@@ -166,13 +187,17 @@ impl FrameContext {
             &[self.present_semaphore],
             &[self.render_semaphore],
             self.render_fence,
-        )?;
+        )
+        .unwrap();
 
         Ok(FramePresentPacket { texture })
     }
 
-    pub fn present(&self, pkt: FramePresentPacket) -> Result<PresentResult> {
-        let swc = self.swc_ctx.lock().eyre()?;
+    pub fn present(
+        &self,
+        pkt: FramePresentPacket,
+    ) -> core::result::Result<(), SwapchainPresentError> {
+        let swc = self.swc_ctx.lock().unwrap();
         swc.present(pkt.texture, self.render_semaphore)
     }
 }

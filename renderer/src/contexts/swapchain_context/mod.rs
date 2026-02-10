@@ -9,6 +9,7 @@ use color_eyre::eyre::{OptionExt, eyre};
 use std::sync::Arc;
 use std::time::Duration;
 use swapchain::Swapchain;
+use thiserror::Error;
 use winit::window::Window;
 
 pub(crate) struct PresentTextureBundle {
@@ -17,9 +18,13 @@ pub(crate) struct PresentTextureBundle {
     pub suboptimal: bool,
 }
 
-pub(crate) enum PresentResult {
-    Success,
-    ResizeRequested,
+#[derive(Debug, Error)]
+pub(crate) enum SwapchainPresentError {
+    #[error("Swapchain is suboptimal and needs to be resized")]
+    SwapchainSuboptimal,
+
+    #[error("Vulkan error: {0}")]
+    Vulkan(#[from] vk::Result),
 }
 
 /// Presentation target of the renderer, encapsulating the surface and swapchain
@@ -90,7 +95,7 @@ impl SwapchainContext {
         &self,
         texture: PresentTextureBundle,
         wait_render_finished_sem: vk::Semaphore,
-    ) -> Result<PresentResult> {
+    ) -> core::result::Result<(), SwapchainPresentError> {
         let swapchain_image_index = texture.index;
         let present_info = vk::PresentInfoKHR {
             p_swapchains: &self.swapchain.swapchain,
@@ -110,12 +115,9 @@ impl SwapchainContext {
                 .queue_present(present_queue.handle, &present_info)
         };
         match present_result {
-            Ok(true) => Ok(PresentResult::ResizeRequested),
-            Ok(false) => Ok(PresentResult::Success),
-            Err(err_code) => Err(eyre!(
-                "Failed to present frame. VkResult error code: {}",
-                err_code
-            )),
+            Ok(false) => Ok(()),
+            Ok(true) => Err(SwapchainPresentError::SwapchainSuboptimal),
+            Err(err) => Err(SwapchainPresentError::Vulkan(err)),
         }
     }
 
