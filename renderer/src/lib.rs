@@ -1,3 +1,6 @@
+pub use glam;
+pub use winit;
+
 mod camera;
 mod contexts;
 mod resource_store;
@@ -8,7 +11,7 @@ pub use camera::Camera;
 use crate::contexts::frame_context::packet::{
     FramePresentPacket, FrameRenderMetadata, FrameRenderPacket, FrameRenderPayload,
 };
-use crate::contexts::frame_context::{FrameContext, FrameRenderError};
+use crate::contexts::frame_context::{FrameContext};
 use crate::contexts::swapchain_context::{SwapchainContext, SwapchainPresentError};
 use crate::resource_store::ResourceStore;
 use crate::utils::GuardResultExt;
@@ -68,25 +71,28 @@ impl Renderer {
         let render_pkt = self.update_scene(cam);
 
         // Record and submit the commands for the current frame
-        let present_pkt = match self.get_current_frame().render(render_pkt) {
-            Ok(pkt) => Ok(pkt),
-            Err(FrameRenderError::SwapchainSuboptimal) => Err(RendererError::SwapchainSuboptimal),
-            Err(FrameRenderError::Vulkan(err)) => Err(err.into()),
-        }?;
+        let present_pkt = self.get_current_frame().render(render_pkt).unwrap();
+        let swapchain_suboptimal = present_pkt.texture.suboptimal;
 
         // Present the frame
-        match self.get_current_frame().present(present_pkt) {
-            Ok(()) => Ok(()),
+        let result = match self.get_current_frame().present(present_pkt) {
             Err(SwapchainPresentError::SwapchainSuboptimal) => {
                 Err(RendererError::SwapchainSuboptimal)
             }
-            Err(SwapchainPresentError::Vulkan(err)) => Err(err.into()),
-        }?;
+            Err(SwapchainPresentError::Vulkan(err)) => Err(RendererError::Vulkan(err)),
+            Ok(()) => {
+                if swapchain_suboptimal {
+                    Err(RendererError::SwapchainSuboptimal)
+                } else {
+                    Ok(())
+                }
+            }
+        };
 
         // Increment the frame counter
         self.frame_number += 1;
 
-        Ok(())
+        result
     }
 
     pub fn resize(&mut self, size: winit::dpi::PhysicalSize<u32>) -> Result<()> {

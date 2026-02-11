@@ -21,8 +21,16 @@ pub(crate) struct Swapchain {
     pub swapchain_image_sharing_mode: vk::SharingMode,
 }
 
+impl Drop for Swapchain {
+    fn drop(&mut self) {
+        unsafe {
+            self.swapchain_loader.destroy_swapchain(self.swapchain, None);
+        }
+    }
+}
+
 impl Swapchain {
-    pub(super) fn new(size: &PhysicalSize<u32>, dvc_ctx: &DeviceContext) -> Result<Self> {
+    pub(super) fn new(size: &PhysicalSize<u32>, dvc_ctx: &DeviceContext, old_swapchain: Option<&Self>) -> Result<Self> {
         let surface_format = dvc_ctx.find_suitable_surface_format()?;
         let surface_present_mode = dvc_ctx.find_suitable_surface_present_mode();
         let surface_capabilities = dvc_ctx.get_physical_device_surface_capabilities()?;
@@ -68,6 +76,12 @@ impl Swapchain {
         let image_sharing_mode = vk::SharingMode::EXCLUSIVE;
 
         let swapchain_loader = dvc_ctx.create_vk_swapchain_loader();
+
+        let old_vk_swapchain = if let Some(old_swapchain) = old_swapchain {
+            old_swapchain.swapchain
+        } else {
+            vk::SwapchainKHR::null()
+        };
         let swapchain_info = vk::SwapchainCreateInfoKHR::default()
             .surface(dvc_ctx.raw_surface_handle())
             .min_image_count(min_image_count)
@@ -80,7 +94,8 @@ impl Swapchain {
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
             .present_mode(surface_present_mode)
             .clipped(true)
-            .image_array_layers(1);
+            .image_array_layers(1)
+            .old_swapchain(old_vk_swapchain);
 
         let swapchain = unsafe { swapchain_loader.create_swapchain(&swapchain_info, None)? };
 

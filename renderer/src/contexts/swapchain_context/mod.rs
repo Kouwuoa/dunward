@@ -37,7 +37,7 @@ impl SwapchainContext {
     pub fn new(window: &Window, dvc_ctx: &DeviceContext) -> Result<Self> {
         log::info!("Creating SwapchainContext");
 
-        let swapchain = Swapchain::new(&window.inner_size(), dvc_ctx)?;
+        let swapchain = Swapchain::new(&window.inner_size(), dvc_ctx, None)?;
 
         Ok(Self {
             swapchain,
@@ -128,7 +128,7 @@ impl SwapchainContext {
     ) -> Result<()> {
         dvc_ctx.wait_device_idle()?;
 
-        self.swapchain = Swapchain::new(size, dvc_ctx)?;
+        self.swapchain = Swapchain::new(size, dvc_ctx, Some(&self.swapchain))?;
 
         Ok(())
     }
