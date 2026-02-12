@@ -6,6 +6,7 @@ use color_eyre::eyre::OptionExt;
 use color_eyre::eyre::eyre;
 use std::collections::{HashMap, hash_map};
 use std::sync::{Arc, Mutex};
+use crate::contexts::device_context::commands::Idle;
 
 #[repr(transparent)]
 pub(crate) struct CommandRecorderAllocator(Arc<Mutex<CommandRecorderAllocatorInner>>);
@@ -19,9 +20,9 @@ impl Clone for CommandRecorderAllocator {
 pub(crate) trait CommandRecorderAllocatorExt<A> {
     fn new(device: Arc<ash::Device>) -> Result<A>;
     /// Note that this is mutably borrowed to force the allocator to be used in a single-threaded context.
-    fn allocate(&mut self, queue: Arc<Queue>) -> Result<CommandRecorder>;
+    fn allocate(&mut self, queue: Arc<Queue>) -> Result<CommandRecorder<Idle>>;
     /// Note that this is mutably borrowed to force the allocator to be used in a single-threaded context.
-    fn deallocate(&mut self, command_encoder: &CommandRecorder) -> Result<()>;
+    fn deallocate(&mut self, command_encoder: &CommandRecorder<Idle>) -> Result<()>;
 }
 
 struct CommandRecorderAllocatorInner {
@@ -41,7 +42,7 @@ impl CommandRecorderAllocatorExt<CommandRecorderAllocator> for CommandRecorderAl
         ))))
     }
 
-    fn allocate(&mut self, queue: Arc<Queue>) -> Result<CommandRecorder> {
+    fn allocate(&mut self, queue: Arc<Queue>) -> Result<CommandRecorder<Idle>> {
         let (command_buffer, device) = {
             let mut guard = self.0.lock().map_err(|e| eyre!(e.to_string()))?;
 
@@ -82,7 +83,7 @@ impl CommandRecorderAllocatorExt<CommandRecorderAllocator> for CommandRecorderAl
         Ok(command_encoder)
     }
 
-    fn deallocate(&mut self, command_encoder: &CommandRecorder) -> Result<()> {
+    fn deallocate(&mut self, command_encoder: &CommandRecorder<Idle>) -> Result<()> {
         let mut guard = self.0.lock().map_err(|e| eyre!(e.to_string()))?;
 
         let command_pool = guard

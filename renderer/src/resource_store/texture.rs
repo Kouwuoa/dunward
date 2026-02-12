@@ -21,7 +21,6 @@ impl DerefMut for ColorTexture {
         &mut self.0
     }
 }
-
 #[repr(transparent)]
 pub(crate) struct DepthTexture(pub Texture);
 impl Deref for DepthTexture {

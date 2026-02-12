@@ -6,6 +6,7 @@ mod device;
 mod instance;
 mod surface;
 
+use crate::contexts::device_context::commands::{CommandRecorder, Executable, Idle};
 use crate::contexts::device_context::descriptors::descriptor_allocator::DescriptorAllocator;
 use crate::contexts::device_context::queue::Queue;
 use crate::contexts::{
@@ -270,14 +271,23 @@ impl DeviceContext {
 
     pub fn submit(
         &self,
-        cmd: vk::CommandBuffer,
-        queue: Arc<Queue>,
+        cmd_recorder: CommandRecorder<Executable>,
         wait_semaphores: &[vk::Semaphore],
         signal_semaphores: &[vk::Semaphore],
         fence: vk::Fence,
-    ) -> Result<()> {
-        self.device
-            .submit(cmd, queue, wait_semaphores, signal_semaphores, fence)
+    ) -> Result<CommandRecorder<Idle>> {
+        let cmd = cmd_recorder.command_buffer;
+        let queue = cmd_recorder.queue.clone();
+
+        self.device.submit(
+            cmd,
+            queue,
+            wait_semaphores,
+            signal_semaphores,
+            fence,
+        )?;
+
+        Ok(CommandRecorder::<Idle>::new_from_old(cmd_recorder))
     }
     pub fn create_vk_image_view(&self, info: &vk::ImageViewCreateInfo) -> Result<vk::ImageView> {
         Ok(unsafe { self.device.logical.create_image_view(info, None)? })

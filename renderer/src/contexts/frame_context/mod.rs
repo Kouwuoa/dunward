@@ -1,6 +1,6 @@
 pub(crate) mod packet;
 
-use crate::contexts::device_context::commands::CommandRecorderAllocatorExt;
+use crate::contexts::device_context::commands::{CommandRecorderAllocatorExt, Idle};
 use crate::contexts::swapchain_context::SwapchainPresentError;
 use crate::{
     contexts::{
@@ -21,7 +21,6 @@ use ash::vk;
 use color_eyre::eyre::Result;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use thiserror::Error;
 
 const FRAME_VERTEX_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_INDEX_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
@@ -34,7 +33,7 @@ pub(crate) struct FrameContext {
     swc_ctx: Arc<Mutex<SwapchainContext>>,
     rsc_sto: Arc<Mutex<ResourceStore>>,
 
-    command_recorder: CommandRecorder,
+    graphics_recorder: Option<CommandRecorder<Idle>>,
 
     draw_color_tex: ColorTexture,
     draw_depth_tex: DepthTexture,
@@ -95,9 +94,11 @@ impl FrameContext {
         )?;
 
         let graphics_queue = dvc_grd.get_graphics_queue();
-        let command_recorder = dvc_grd
-            .command_recorder_allocator
-            .allocate(graphics_queue)?;
+        let command_recorder = Some(
+            dvc_grd
+                .command_recorder_allocator
+                .allocate(graphics_queue)?,
+        );
 
         let bindless_material = rsc_grd.bindless_material_factory.create_material()?;
 
@@ -110,7 +111,7 @@ impl FrameContext {
             rsc_sto,
             swc_ctx,
 
-            command_recorder,
+            graphics_recorder: command_recorder,
 
             draw_color_tex,
             draw_depth_tex,
@@ -139,36 +140,35 @@ impl FrameContext {
         dvc.wait_and_reset_fence(self.render_fence, timeout)?;
 
         // Acquire the next image from the swapchain
-        let mut texture = swc
-            .acquire_next_present_texture(self.present_semaphore, timeout, &dvc)?;
+        let mut texture =
+            swc.acquire_next_present_texture(self.present_semaphore, timeout, &dvc)?;
 
         // Record render commands
-        self.command_recorder.begin_recording()?;
+        let recorder = self.graphics_recorder.take().unwrap();
+        let recorder = recorder.record(|recorder| {
+            recorder.transition_texture_layout(
+                &mut texture.texture,
+                vk::ImageLayout::UNDEFINED,
+                vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+            )?;
 
-        self.command_recorder.transition_texture_layout(
-            &mut texture.texture,
-            vk::ImageLayout::UNDEFINED,
-            vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-        );
+            // TODO: Perform render operations here
 
-        // TODO: Perform render operations here
+            recorder.transition_texture_layout(
+                &mut texture.texture,
+                vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                vk::ImageLayout::PRESENT_SRC_KHR,
+            )?;
 
-        self.command_recorder.transition_texture_layout(
-            &mut texture.texture,
-            vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-            vk::ImageLayout::PRESENT_SRC_KHR,
-        );
+            Ok(())
+        })?;
 
-        let cmd = self.command_recorder.end_recording()?;
-
-        // Submit render commands
-        dvc.submit(
-            cmd,
-            dvc.get_graphics_queue(),
+        self.graphics_recorder = Some(dvc.submit(
+            recorder,
             &[self.present_semaphore],
             &[self.render_semaphore],
             self.render_fence,
-        )?;
+        )?);
 
         Ok(FramePresentPacket { texture })
     }
