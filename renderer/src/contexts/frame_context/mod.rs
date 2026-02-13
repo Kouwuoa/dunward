@@ -181,3 +181,16 @@ impl FrameContext {
         swc.present(pkt.texture, self.render_semaphore)
     }
 }
+
+impl Drop for FrameContext {
+    fn drop(&mut self) {
+        if let Some(graphics_recorder) = self.graphics_recorder.take() {
+            self.dvc_ctx
+                .lock()
+                .unwrap()
+                .command_recorder_allocator
+                .deallocate(&graphics_recorder)
+                .unwrap();
+        }
+    }
+}

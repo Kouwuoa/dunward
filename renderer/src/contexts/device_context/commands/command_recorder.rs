@@ -83,7 +83,6 @@ impl CommandRecorder<Idle> {
             _state: PhantomData,
         })
     }
-
 }
 
 impl CommandRecorder<Recording> {
@@ -187,16 +186,5 @@ impl CommandRecorder<Recording> {
             allocator: self.allocator,
             _state: PhantomData,
         })
-    }
-}
-
-// TODO: Do not deallocate on drop because drop gets called whenever CommandRecorder gets consumed to transition between states
-impl<State> Drop for CommandRecorder<State> {
-    fn drop(&mut self) {
-        self.allocator
-            .take()
-            .expect("CommandEncoderAllocator not found for CommandEncoder")
-            .deallocate(self)
-            .unwrap();
     }
 }
