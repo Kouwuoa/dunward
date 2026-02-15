@@ -1,25 +1,15 @@
 pub(crate) mod packet;
 
-use crate::contexts::device_context::commands::{CommandRecorderAllocatorExt, Idle};
-use crate::contexts::swapchain_context::SwapchainPresentError;
-use crate::{
-    contexts::{
-        device_context::{DeviceContext, commands::CommandRecorder},
-        frame_context::packet::{FramePresentPacket, FrameRenderPacket},
-        swapchain_context::SwapchainContext,
-    },
-    resource_store::{
-        ResourceStore,
-        material::Material,
-        megabuffer::MegabufferExt,
-        megabuffer::{AllocatedMegabufferRegion, Megabuffer},
-        texture::{ColorTexture, DepthTexture, Texture},
-    },
-    utils::GuardResultExt,
-};
+use crate::renderer::contexts::device_context::DeviceContext;
+use crate::renderer::contexts::device_context::commands::{CommandRecorder, Idle};
+use crate::renderer::contexts::frame_context::packet::{FramePresentPacket, FrameRenderPacket};
+use crate::renderer::contexts::swapchain_context::{SwapchainContext, SwapchainPresentError};
+use crate::renderer::resource_store::ResourceStore;
+use crate::renderer::resource_store::material::Material;
+use crate::renderer::resource_store::megabuffer::{AllocatedMegabufferRegion, MegabufferExt};
+use crate::renderer::resource_store::texture::{ColorTexture, DepthTexture};
 use ash::vk;
 use color_eyre::eyre::Result;
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 const FRAME_VERTEX_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
@@ -29,10 +19,6 @@ const FRAME_PER_MATERIAL_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_PER_OBJECT_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 
 pub(crate) struct FrameContext {
-    dvc_ctx: Arc<Mutex<DeviceContext>>,
-    swc_ctx: Arc<Mutex<SwapchainContext>>,
-    rsc_sto: Arc<Mutex<ResourceStore>>,
-
     graphics_recorder: Option<CommandRecorder<Idle>>,
 
     draw_color_tex: ColorTexture,
@@ -56,61 +42,49 @@ pub(crate) struct FrameContext {
 
 impl FrameContext {
     pub fn new(
-        dvc_ctx: Arc<Mutex<DeviceContext>>,
-        swc_ctx: Arc<Mutex<SwapchainContext>>,
-        rsc_sto: Arc<Mutex<ResourceStore>>,
+        dvc_ctx: &DeviceContext,
+        swc_ctx: &SwapchainContext,
+        rsc_sto: &mut ResourceStore,
     ) -> Result<Self> {
         log::info!("Creating FrameContext");
 
-        let mut dvc_grd = dvc_ctx.lock().eyre()?;
-        let mut swc_grd = swc_ctx.lock().eyre()?;
-        let mut rsc_grd = rsc_sto.lock().eyre()?;
-
-        let swc_size = swc_grd.get_size();
+        let swc_size = swc_ctx.get_size();
         let draw_color_tex =
-            dvc_grd.create_color_texture(swc_size.width, swc_size.height, None, true)?;
-        let draw_depth_tex = dvc_grd.create_depth_texture(swc_size.width, swc_size.height)?;
+            dvc_ctx.create_color_texture(swc_size.width, swc_size.height, None, true)?;
+        let draw_depth_tex = dvc_ctx.create_depth_texture(swc_size.width, swc_size.height)?;
 
-        let vertex_region = rsc_grd
+        let vertex_region = rsc_sto
             .vertex_megabuffer
             .allocate_region(FRAME_VERTEX_BUFFER_SIZE)?;
-        let index_region = rsc_grd
+        let index_region = rsc_sto
             .index_megabuffer
             .allocate_region(FRAME_INDEX_BUFFER_SIZE)?;
-        let per_frame_region = rsc_grd
+        let per_frame_region = rsc_sto
             .per_frame_megabuffer
             .allocate_region(FRAME_PER_FRAME_BUFFER_SIZE)?;
-        let per_material_region = rsc_grd
+        let per_material_region = rsc_sto
             .per_material_megabuffer
             .allocate_region(FRAME_PER_MATERIAL_BUFFER_SIZE)?;
-        let per_object_region = rsc_grd
+        let per_object_region = rsc_sto
             .per_object_megabuffer
             .allocate_region(FRAME_PER_OBJECT_BUFFER_SIZE)?;
 
-        let present_semaphore = dvc_grd.create_vk_semaphore(&vk::SemaphoreCreateInfo::default())?;
-        let render_semaphore = dvc_grd.create_vk_semaphore(&vk::SemaphoreCreateInfo::default())?;
-        let render_fence = dvc_grd.create_vk_fence(
+        let present_semaphore = dvc_ctx.create_vk_semaphore(&vk::SemaphoreCreateInfo::default())?;
+        let render_semaphore = dvc_ctx.create_vk_semaphore(&vk::SemaphoreCreateInfo::default())?;
+        let render_fence = dvc_ctx.create_vk_fence(
             &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
         )?;
 
-        let graphics_queue = dvc_grd.get_graphics_queue();
+        let graphics_queue = dvc_ctx.get_graphics_queue();
         let command_recorder = Some(
-            dvc_grd
+            dvc_ctx
                 .command_recorder_allocator
                 .allocate(graphics_queue)?,
         );
 
-        let bindless_material = rsc_grd.bindless_material_factory.create_material()?;
-
-        drop(dvc_grd);
-        drop(swc_grd);
-        drop(rsc_grd);
+        let bindless_material = rsc_sto.bindless_material_factory.create_material()?;
 
         Ok(Self {
-            dvc_ctx,
-            rsc_sto,
-            swc_ctx,
-
             graphics_recorder: command_recorder,
 
             draw_color_tex,
@@ -130,18 +104,20 @@ impl FrameContext {
         })
     }
 
-    pub fn render(&mut self, pkt: FrameRenderPacket) -> Result<FramePresentPacket> {
-        let dvc = self.dvc_ctx.lock().eyre()?;
-        let swc = self.swc_ctx.lock().eyre()?;
-
+    pub fn render(
+        &mut self,
+        pkt: FrameRenderPacket,
+        dvc: &DeviceContext,
+        swc: &SwapchainContext,
+        rsc: &ResourceStore,
+    ) -> Result<FramePresentPacket> {
         let timeout = Duration::from_secs(1);
 
         // Wait until the commands have finished from the last time this frame was rendered
         dvc.wait_and_reset_fence(self.render_fence, timeout)?;
 
         // Acquire the next image from the swapchain
-        let mut texture =
-            swc.acquire_next_present_texture(self.present_semaphore, timeout, &dvc)?;
+        let mut texture = swc.acquire_next_present_texture(self.present_semaphore, timeout, dvc)?;
 
         // Record render commands
         let recorder = self.graphics_recorder.take().unwrap();
@@ -176,21 +152,17 @@ impl FrameContext {
     pub fn present(
         &self,
         pkt: FramePresentPacket,
+        swc: &SwapchainContext,
     ) -> core::result::Result<(), SwapchainPresentError> {
-        let swc = self.swc_ctx.lock().unwrap();
         swc.present(pkt.texture, self.render_semaphore)
     }
-}
 
-impl Drop for FrameContext {
-    fn drop(&mut self) {
+    pub fn destroy(mut self, dvc_ctx: &mut DeviceContext) -> Result<()> {
         if let Some(graphics_recorder) = self.graphics_recorder.take() {
-            self.dvc_ctx
-                .lock()
-                .unwrap()
+            dvc_ctx
                 .command_recorder_allocator
-                .deallocate(&graphics_recorder)
-                .unwrap();
+                .deallocate(&graphics_recorder)?;
         }
+        Ok(())
     }
 }
