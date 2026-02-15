@@ -1,12 +1,11 @@
 use super::device::Device;
-use crate::contexts::swapchain_context::SwapchainContext;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use std::ffi::{CStr, FromBytesUntilNulError, c_char, c_void};
 use winit::window::Window;
-use crate::contexts::device_context::surface::Surface;
+use crate::renderer::contexts::device_context::surface::Surface;
 
 /// Initializes Vulkan and keeps the Vulkan instance alive
 pub(crate) struct Instance {

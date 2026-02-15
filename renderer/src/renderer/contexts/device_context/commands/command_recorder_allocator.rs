@@ -1,12 +1,12 @@
 use super::super::queue::{Queue, QueueFamily};
 use super::command_recorder::CommandRecorder;
+use crate::renderer::contexts::device_context::commands::Idle;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::OptionExt;
 use color_eyre::eyre::eyre;
 use std::collections::{HashMap, hash_map};
 use std::sync::{Arc, Mutex};
-use crate::contexts::device_context::commands::Idle;
 
 #[repr(transparent)]
 pub(crate) struct CommandRecorderAllocator(Arc<Mutex<CommandRecorderAllocatorInner>>);

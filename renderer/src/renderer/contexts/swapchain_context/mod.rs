@@ -1,8 +1,8 @@
 mod swapchain;
 
-use crate::contexts::device_context::DeviceContext;
-use crate::contexts::device_context::queue::Queue;
-use crate::resource_store::texture::{ColorTexture, Texture};
+use crate::renderer::contexts::device_context::DeviceContext;
+use crate::renderer::contexts::device_context::queue::Queue;
+use crate::renderer::resource_store::texture::{ColorTexture, Texture};
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};

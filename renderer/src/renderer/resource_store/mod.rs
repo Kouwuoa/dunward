@@ -1,13 +1,10 @@
-use crate::contexts::device_context::DeviceContext;
-use crate::contexts::swapchain_context::SwapchainContext;
+use crate::renderer::contexts::device_context::DeviceContext;
+use crate::renderer::contexts::swapchain_context::SwapchainContext;
 use ash::vk;
 use color_eyre::Result;
-use material::{GraphicsMaterialFactoryBuilder, MaterialFactory};
+use material::MaterialFactory;
 use megabuffer::Megabuffer;
 use model::FullscreenQuad;
-use resource_type::ResourceType;
-use shader::GraphicsShader;
-use std::sync::{Arc, Mutex};
 use texture::{ColorTexture, StorageTexture};
 
 pub(crate) mod buffer;

@@ -1,9 +1,8 @@
 use super::super::queue::Queue;
 use super::command_recorder_allocator::{CommandRecorderAllocator, CommandRecorderAllocatorExt};
-use crate::resource_store::texture::{ColorTexture, DepthTexture, Texture};
+use crate::renderer::resource_store::texture::{ColorTexture, DepthTexture, Texture};
 use ash::vk;
 use color_eyre::Result;
-use color_eyre::eyre::eyre;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
@@ -15,8 +14,8 @@ pub(crate) struct Recording;
 pub(crate) struct Executable;
 
 pub(crate) struct CommandRecorder<State> {
-    pub(in crate::contexts::device_context) command_buffer: vk::CommandBuffer,
-    pub(in crate::contexts::device_context) queue: Arc<Queue>,
+    pub(in crate::renderer::contexts::device_context) command_buffer: vk::CommandBuffer,
+    pub(in crate::renderer::contexts::device_context) queue: Arc<Queue>,
 
     device: Arc<ash::Device>,
     /// Note that this is only an `Option` to allow for the allocator to be dropped.

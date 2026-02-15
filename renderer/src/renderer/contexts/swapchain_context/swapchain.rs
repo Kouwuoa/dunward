@@ -1,4 +1,4 @@
-use crate::contexts::device_context::DeviceContext;
+use crate::renderer::contexts::device_context::DeviceContext;
 use ash::vk;
 use color_eyre::Result;
 use winit::dpi::PhysicalSize;
@@ -24,13 +24,18 @@ pub(crate) struct Swapchain {
 impl Drop for Swapchain {
     fn drop(&mut self) {
         unsafe {
-            self.swapchain_loader.destroy_swapchain(self.swapchain, None);
+            self.swapchain_loader
+                .destroy_swapchain(self.swapchain, None);
         }
     }
 }
 
 impl Swapchain {
-    pub(super) fn new(size: &PhysicalSize<u32>, dvc_ctx: &DeviceContext, old_swapchain: Option<&Self>) -> Result<Self> {
+    pub(super) fn new(
+        size: &PhysicalSize<u32>,
+        dvc_ctx: &DeviceContext,
+        old_swapchain: Option<&Self>,
+    ) -> Result<Self> {
         let surface_format = dvc_ctx.find_suitable_surface_format()?;
         let surface_present_mode = dvc_ctx.find_suitable_surface_present_mode();
         let surface_capabilities = dvc_ctx.get_physical_device_surface_capabilities()?;

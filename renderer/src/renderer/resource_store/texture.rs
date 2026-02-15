@@ -1,6 +1,6 @@
-use crate::contexts::device_context::DeviceContext;
-use crate::contexts::device_context::commands::TransferCommandRecorder;
-use crate::resource_store::buffer::Buffer;
+use crate::renderer::contexts::device_context::DeviceContext;
+use crate::renderer::contexts::device_context::commands::TransferCommandRecorder;
+use crate::renderer::resource_store::buffer::Buffer;
 use ash::vk;
 use color_eyre::eyre::Result;
 use color_eyre::eyre::eyre;

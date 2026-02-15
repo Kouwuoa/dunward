@@ -1,21 +1,13 @@
-use super::commands::CommandRecorder;
-use super::{
-    commands::CommandRecorderAllocator,
-    commands::{CommandRecorderAllocatorExt, TransferCommandRecorder},
-    instance::Instance,
-    queue::{Queue, QueueFamily},
-};
+use super::commands::CommandRecorderAllocatorExt;
+use super::commands::TransferCommandRecorder;
+use super::instance::Instance;
+use super::queue::Queue;
+use super::queue::QueueFamily;
 use ash::vk;
 use color_eyre::{eyre::OptionExt, Result};
 use std::ffi::{c_char, CStr};
 use std::str::Utf8Error;
 use std::sync::Arc;
-use crate::resource_store::megabuffer::MegabufferExt;
-use crate::resource_store::resource_type::ResourceType;
-use crate::resource_store::shader::GraphicsShader;
-use crate::resource_store::shader_data::PerDrawData;
-use crate::resource_store::texture::{ColorTexture, DepthTexture, StorageTexture};
-use crate::resource_store::texture::Texture;
 
 /// Main way to submit rendering commands to the GPU.
 pub(crate) struct Device {

@@ -1,5 +1,5 @@
-use crate::contexts::device_context::DeviceContext;
-use crate::contexts::device_context::device::Device;
+use crate::renderer::contexts::device_context::DeviceContext;
+use crate::renderer::contexts::device_context::device::Device;
 use ash::vk;
 use color_eyre::eyre::OptionExt;
 use color_eyre::{Result, eyre::eyre};

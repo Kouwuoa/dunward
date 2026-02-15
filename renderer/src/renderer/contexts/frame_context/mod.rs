@@ -1,7 +1,9 @@
 pub(crate) mod packet;
 
 use crate::renderer::contexts::device_context::DeviceContext;
-use crate::renderer::contexts::device_context::commands::{CommandRecorder, Idle};
+use crate::renderer::contexts::device_context::commands::{
+    CommandRecorder, CommandRecorderAllocatorExt, Idle,
+};
 use crate::renderer::contexts::frame_context::packet::{FramePresentPacket, FrameRenderPacket};
 use crate::renderer::contexts::swapchain_context::{SwapchainContext, SwapchainPresentError};
 use crate::renderer::resource_store::ResourceStore;
@@ -42,7 +44,7 @@ pub(crate) struct FrameContext {
 
 impl FrameContext {
     pub fn new(
-        dvc_ctx: &DeviceContext,
+        dvc_ctx: &mut DeviceContext,
         swc_ctx: &SwapchainContext,
         rsc_sto: &mut ResourceStore,
     ) -> Result<Self> {

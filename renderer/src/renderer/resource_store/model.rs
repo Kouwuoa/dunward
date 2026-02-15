@@ -1,10 +1,12 @@
-use crate::resource_store::megabuffer::{AllocatedMegabufferRegion, Megabuffer, MegabufferExt};
-use crate::resource_store::mesh::Mesh;
-use crate::resource_store::vertex::Vertex;
+use crate::renderer::contexts::swapchain_context::SwapchainContext;
+use crate::renderer::resource_store::megabuffer::{
+    AllocatedMegabufferRegion, Megabuffer, MegabufferExt,
+};
+use crate::renderer::resource_store::mesh::Mesh;
+use crate::renderer::resource_store::shader_data::PerVertexData;
+use crate::renderer::resource_store::vertex::Vertex;
 use color_eyre::eyre::{Result, eyre};
 use glam::Vec3;
-use crate::contexts::swapchain_context::SwapchainContext;
-use crate::resource_store::shader_data::PerVertexData;
 
 pub struct FullscreenQuad {
     quad_model: Model,

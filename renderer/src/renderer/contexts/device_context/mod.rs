@@ -6,21 +6,21 @@ mod device;
 mod instance;
 mod surface;
 
-use crate::contexts::device_context::commands::{CommandRecorder, Executable, Idle};
-use crate::contexts::device_context::descriptors::descriptor_allocator::DescriptorAllocator;
-use crate::contexts::device_context::queue::Queue;
-use crate::contexts::{
-    device_context::commands::{
-        CommandRecorderAllocator, CommandRecorderAllocatorExt, TransferCommandRecorder,
-    },
-    swapchain_context::SwapchainContext,
+use crate::renderer::contexts::device_context::commands::{
+    CommandRecorder, CommandRecorderAllocator, CommandRecorderAllocatorExt, Executable, Idle,
+    TransferCommandRecorder,
 };
-use crate::resource_store::material::{GraphicsMaterialFactoryBuilder, MaterialFactory};
-use crate::resource_store::megabuffer::{Megabuffer, MegabufferExt};
-use crate::resource_store::resource_type::ResourceType;
-use crate::resource_store::shader::GraphicsShader;
-use crate::resource_store::shader_data::PerDrawData;
-use crate::resource_store::texture::{ColorTexture, DepthTexture, StorageTexture, Texture};
+use crate::renderer::contexts::device_context::descriptors::descriptor_allocator::DescriptorAllocator;
+use crate::renderer::contexts::device_context::queue::Queue;
+use crate::renderer::contexts::swapchain_context::SwapchainContext;
+use crate::renderer::resource_store::material::{GraphicsMaterialFactoryBuilder, MaterialFactory};
+use crate::renderer::resource_store::megabuffer::{Megabuffer, MegabufferExt};
+use crate::renderer::resource_store::resource_type::ResourceType;
+use crate::renderer::resource_store::shader::GraphicsShader;
+use crate::renderer::resource_store::shader_data::PerDrawData;
+use crate::renderer::resource_store::texture::{
+    ColorTexture, DepthTexture, StorageTexture, Texture,
+};
 use ash::vk;
 use color_eyre::Result;
 use descriptors::descriptor_set_layout_builder::DescriptorSetLayoutBuilder;
@@ -279,13 +279,8 @@ impl DeviceContext {
         let cmd = cmd_recorder.command_buffer;
         let queue = cmd_recorder.queue.clone();
 
-        self.device.submit(
-            cmd,
-            queue,
-            wait_semaphores,
-            signal_semaphores,
-            fence,
-        )?;
+        self.device
+            .submit(cmd, queue, wait_semaphores, signal_semaphores, fence)?;
 
         Ok(CommandRecorder::<Idle>::new_from_old(cmd_recorder))
     }

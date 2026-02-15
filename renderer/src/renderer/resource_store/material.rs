@@ -1,10 +1,9 @@
-use crate::contexts::device_context::descriptors::descriptor_allocator::DescriptorAllocator;
-use crate::resource_store::resource_type::ResourceType;
-use crate::resource_store::shader::{ComputeShader, GraphicsShader};
-use crate::resource_store::vertex::VertexInputDescription;
+use crate::renderer::contexts::device_context::descriptors::descriptor_allocator::DescriptorAllocator;
+use crate::renderer::resource_store::shader::{ComputeShader, GraphicsShader};
+use crate::renderer::resource_store::vertex::VertexInputDescription;
 use ash::vk;
+use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
-use color_eyre::{Result, Section};
 use std::ffi::CString;
 use std::sync::{Arc, Mutex};
 

@@ -1,10 +1,10 @@
-use crate::resource_store::buffer::Buffer;
+use crate::renderer::contexts::device_context::commands::TransferCommandRecorder;
+use crate::renderer::resource_store::buffer::Buffer;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Mutex};
-use crate::contexts::device_context::commands::TransferCommandRecorder;
 
 static MEGABUFFER_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -280,9 +280,7 @@ impl MegabufferInner {
             .iter_mut()
             .enumerate()
             // Find the first free region that can fit the allocation
-            .find(|(_, region)| {
-                region.size >= alloc_size
-            })
+            .find(|(_, region)| region.size >= alloc_size)
             .map(|(i, region)| {
                 // Split the free region into 2 regions:
                 // 1. A free region that fits the allocation exactly
