@@ -144,6 +144,7 @@ impl Texture {
         height: u32,
         data: Option<&[u8]>,
         use_dedicated_memory: bool,
+        usage: vk::ImageUsageFlags,
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
         transfer: &TransferCommandRecorder,
@@ -156,9 +157,7 @@ impl Texture {
                     height,
                     depth: 1,
                 },
-                usage: vk::ImageUsageFlags::SAMPLED
-                    | vk::ImageUsageFlags::TRANSFER_DST
-                    | vk::ImageUsageFlags::TRANSFER_SRC,
+                usage,
                 aspect: vk::ImageAspectFlags::COLOR,
                 use_dedicated_memory,
             };
@@ -177,6 +176,7 @@ impl Texture {
     pub fn new_color_texture_from_image(
         image: &image::DynamicImage,
         use_dedicated_memory: bool,
+        usage: vk::ImageUsageFlags,
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
         transfer: &TransferCommandRecorder,
@@ -189,6 +189,7 @@ impl Texture {
             height,
             Some(&data),
             use_dedicated_memory,
+            usage,
             memory_allocator,
             device,
             transfer,

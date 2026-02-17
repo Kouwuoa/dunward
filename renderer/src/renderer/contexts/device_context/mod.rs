@@ -122,12 +122,14 @@ impl DeviceContext {
         height: u32,
         data: Option<&[u8]>,
         use_dedicated_memory: bool,
+        usage: vk::ImageUsageFlags,
     ) -> Result<ColorTexture> {
         Texture::new_color_texture_from_bytes(
             width,
             height,
             data,
             use_dedicated_memory,
+            usage,
             self.memory_allocator.clone(),
             self.device.logical.clone(),
             &self.transfer_command_recorder,

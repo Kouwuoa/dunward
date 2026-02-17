@@ -127,17 +127,17 @@ impl CommandRecorder<Recording> {
     pub fn clear_color_texture(
         &self,
         texture: &ColorTexture,
-        layout: vk::ImageLayout,
+        current_layout: vk::ImageLayout,
         color: &vk::ClearColorValue,
     ) -> Result<()> {
         unsafe {
             self.device.cmd_clear_color_image(
                 self.command_buffer,
                 texture.image,
-                layout,
+                current_layout,
                 color,
                 &[vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    aspect_mask: texture.aspect,
                     base_mip_level: 0,
                     level_count: 1,
                     base_array_layer: 0,
@@ -164,7 +164,7 @@ impl CommandRecorder<Recording> {
                     stencil: 0,
                 },
                 &[vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::DEPTH,
+                    aspect_mask: texture.aspect,
                     base_mip_level: 0,
                     level_count: 1,
                     base_array_layer: 0,

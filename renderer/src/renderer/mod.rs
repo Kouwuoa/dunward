@@ -34,7 +34,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    const FRAMES_IN_FLIGHT: u64 = 2;
+    const FRAMES_IN_FLIGHT: u64 = 3;
 
     pub fn new(window: &winit::window::Window) -> Result<Self> {
         let _ = color_eyre::install();

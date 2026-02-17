@@ -51,8 +51,15 @@ impl FrameContext {
         log::info!("Creating FrameContext");
 
         let swc_size = swc_ctx.get_size();
-        let draw_color_tex =
-            dvc_ctx.create_color_texture(swc_size.width, swc_size.height, None, true)?;
+        let draw_color_tex = dvc_ctx.create_color_texture(
+            swc_size.width,
+            swc_size.height,
+            None,
+            true,
+            vk::ImageUsageFlags::COLOR_ATTACHMENT
+                | vk::ImageUsageFlags::TRANSFER_SRC
+                | vk::ImageUsageFlags::TRANSFER_DST,
+        )?;
         let draw_depth_tex = dvc_ctx.create_depth_texture(swc_size.width, swc_size.height)?;
 
         let vertex_region = rsc_sto
@@ -119,22 +126,55 @@ impl FrameContext {
         dvc.wait_and_reset_fence(self.render_fence, timeout)?;
 
         // Acquire the next image from the swapchain
-        let mut texture = swc.acquire_next_present_texture(self.present_semaphore, timeout, dvc)?;
+        let mut present_tex =
+            swc.acquire_next_present_texture(self.present_semaphore, timeout, dvc)?;
 
         // Record render commands
         let recorder = self.graphics_recorder.take().unwrap();
         let recorder = recorder.record(|recorder| {
             recorder.transition_texture_layout(
-                &mut texture.texture,
+                &mut self.draw_color_tex,
                 vk::ImageLayout::UNDEFINED,
+                vk::ImageLayout::GENERAL,
+            )?;
+            recorder.clear_color_texture(
+                &self.draw_color_tex,
+                vk::ImageLayout::GENERAL,
+                &vk::ClearColorValue {
+                    float32: [1.0f32, 0.0f32, 0.0f32, 1.0f32],
+                },
+            )?;
+
+            recorder.transition_texture_layout(
+                &mut self.draw_color_tex,
+                vk::ImageLayout::GENERAL,
                 vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+            )?;
+            recorder.transition_texture_layout(
+                &mut self.draw_depth_tex,
+                vk::ImageLayout::UNDEFINED,
+                vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL,
             )?;
 
             // TODO: Perform render operations here
 
+            // Copy draw_color_tex onto swapchain texture
             recorder.transition_texture_layout(
-                &mut texture.texture,
+                &mut self.draw_color_tex,
                 vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+            )?;
+            recorder.transition_texture_layout(
+                &mut present_tex.texture,
+                vk::ImageLayout::UNDEFINED,
+                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+            )?;
+            recorder.copy_texture_to_texture(&self.draw_color_tex, &mut present_tex.texture)?;
+
+            // Prepare swapchain texture for presentation
+            recorder.transition_texture_layout(
+                &mut present_tex.texture,
+                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
                 vk::ImageLayout::PRESENT_SRC_KHR,
             )?;
 
@@ -148,7 +188,9 @@ impl FrameContext {
             self.render_fence,
         )?);
 
-        Ok(FramePresentPacket { texture })
+        Ok(FramePresentPacket {
+            texture: present_tex,
+        })
     }
 
     pub fn present(

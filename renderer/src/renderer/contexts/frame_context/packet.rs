@@ -1,4 +1,5 @@
 use crate::renderer::contexts::swapchain_context::PresentTextureBundle;
+use crate::renderer::resource_store::texture::{ColorTexture, DepthTexture};
 
 /// This struct is used to pass all necessary data for rendering a single frame.
 /// It contains a payload with data about the objects to render
