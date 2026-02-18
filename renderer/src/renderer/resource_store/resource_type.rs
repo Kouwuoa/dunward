@@ -1,11 +1,5 @@
 use ash::vk;
 
-const UNIFORM_BUFFER_DESCRIPTOR_COUNT: u32 = 4;
-const STORAGE_BUFFER_DESCRIPTOR_COUNT: u32 = 4;
-const STORAGE_IMAGE_DESCRIPTOR_COUNT: u32 = 4;
-const SAMPLER_DESCRIPTOR_COUNT: u32 = 16;
-const SAMPLED_IMAGE_DESCRIPTOR_COUNT: u32 = 1024;
-
 #[derive(PartialEq)]
 pub enum ResourceType {
     UniformBuffer,
@@ -24,10 +18,6 @@ impl ResourceType {
         Self::SampledImage,
     ];
 
-    pub fn total_descriptor_count() -> u32 {
-        Self::ALL.iter().map(|ty| ty.descriptor_count()).sum()
-    }
-
     pub fn descriptor_type(&self) -> vk::DescriptorType {
         match self {
             Self::UniformBuffer => vk::DescriptorType::UNIFORM_BUFFER,
@@ -35,16 +25,6 @@ impl ResourceType {
             Self::StorageImage => vk::DescriptorType::STORAGE_IMAGE,
             Self::Sampler => vk::DescriptorType::SAMPLER,
             Self::SampledImage => vk::DescriptorType::SAMPLED_IMAGE,
-        }
-    }
-
-    pub fn descriptor_count(&self) -> u32 {
-        match self {
-            Self::UniformBuffer => UNIFORM_BUFFER_DESCRIPTOR_COUNT,
-            Self::StorageBuffer => STORAGE_BUFFER_DESCRIPTOR_COUNT,
-            Self::StorageImage => STORAGE_IMAGE_DESCRIPTOR_COUNT,
-            Self::Sampler => SAMPLER_DESCRIPTOR_COUNT,
-            Self::SampledImage => SAMPLED_IMAGE_DESCRIPTOR_COUNT,
         }
     }
 

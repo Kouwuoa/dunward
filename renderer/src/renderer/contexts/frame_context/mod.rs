@@ -9,7 +9,8 @@ use crate::renderer::contexts::swapchain_context::{SwapchainContext, SwapchainPr
 use crate::renderer::resource_store::ResourceStore;
 use crate::renderer::resource_store::material::Material;
 use crate::renderer::resource_store::megabuffer::{AllocatedMegabufferRegion, MegabufferExt};
-use crate::renderer::resource_store::texture::{ColorTexture, DepthTexture};
+use crate::renderer::resource_store::shader_data::PerDrawData;
+use crate::renderer::resource_store::texture::{ColorTexture, DepthTexture, StorageTexture};
 use ash::vk;
 use color_eyre::eyre::Result;
 use std::time::Duration;
@@ -21,10 +22,8 @@ const FRAME_PER_MATERIAL_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_PER_OBJECT_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 
 pub(crate) struct FrameContext {
-    graphics_recorder: Option<CommandRecorder<Idle>>,
-
-    draw_color_tex: ColorTexture,
-    draw_depth_tex: DepthTexture,
+    compute_recorder: Option<CommandRecorder<Idle>>,
+    draw_tex: StorageTexture,
 
     vertex_region: AllocatedMegabufferRegion,
     index_region: AllocatedMegabufferRegion,
@@ -51,16 +50,7 @@ impl FrameContext {
         log::info!("Creating FrameContext");
 
         let swc_size = swc_ctx.get_size();
-        let draw_color_tex = dvc_ctx.create_color_texture(
-            swc_size.width,
-            swc_size.height,
-            None,
-            true,
-            vk::ImageUsageFlags::COLOR_ATTACHMENT
-                | vk::ImageUsageFlags::TRANSFER_SRC
-                | vk::ImageUsageFlags::TRANSFER_DST,
-        )?;
-        let draw_depth_tex = dvc_ctx.create_depth_texture(swc_size.width, swc_size.height)?;
+        let draw_tex = dvc_ctx.create_storage_texture(swc_size.width, swc_size.height, true)?;
 
         let vertex_region = rsc_sto
             .vertex_megabuffer
@@ -84,20 +74,14 @@ impl FrameContext {
             &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
         )?;
 
-        let graphics_queue = dvc_ctx.get_graphics_queue();
-        let command_recorder = Some(
-            dvc_ctx
-                .command_recorder_allocator
-                .allocate(graphics_queue)?,
-        );
+        let compute_queue = dvc_ctx.get_compute_queue();
+        let compute_recorder = Some(dvc_ctx.command_recorder_allocator.allocate(compute_queue)?);
 
         let bindless_material = rsc_sto.bindless_material_factory.create_material()?;
 
         Ok(Self {
-            graphics_recorder: command_recorder,
-
-            draw_color_tex,
-            draw_depth_tex,
+            compute_recorder,
+            draw_tex,
 
             vertex_region,
             index_region,
@@ -130,38 +114,41 @@ impl FrameContext {
             swc.acquire_next_present_texture(self.present_semaphore, timeout, dvc)?;
 
         // Record render commands
-        let recorder = self.graphics_recorder.take().unwrap();
+        let recorder = self.compute_recorder.take().unwrap();
         let recorder = recorder.record(|recorder| {
             recorder.transition_texture_layout(
-                &mut self.draw_color_tex,
+                &mut self.draw_tex,
                 vk::ImageLayout::UNDEFINED,
                 vk::ImageLayout::GENERAL,
             )?;
-            recorder.clear_color_texture(
-                &self.draw_color_tex,
+            recorder.clear_storage_texture(
+                &self.draw_tex,
                 vk::ImageLayout::GENERAL,
                 &vk::ClearColorValue {
                     float32: [1.0f32, 0.0f32, 0.0f32, 1.0f32],
                 },
             )?;
 
+            // Compute render operations
+            recorder.bind_material(&self.bindless_material);
+            recorder
+                .update_push_constants(&self.bindless_material, PerDrawData::default().as_bytes());
+            recorder.dispatch(16, 16, 0);
+
+            /*
             recorder.transition_texture_layout(
-                &mut self.draw_color_tex,
+                &mut self.draw_tex,
                 vk::ImageLayout::GENERAL,
                 vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
             )?;
-            recorder.transition_texture_layout(
-                &mut self.draw_depth_tex,
-                vk::ImageLayout::UNDEFINED,
-                vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL,
-            )?;
+             */
 
             // TODO: Perform render operations here
 
             // Copy draw_color_tex onto swapchain texture
             recorder.transition_texture_layout(
-                &mut self.draw_color_tex,
-                vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                &mut self.draw_tex,
+                vk::ImageLayout::GENERAL,
                 vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             )?;
             recorder.transition_texture_layout(
@@ -169,7 +156,7 @@ impl FrameContext {
                 vk::ImageLayout::UNDEFINED,
                 vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             )?;
-            recorder.copy_texture_to_texture(&self.draw_color_tex, &mut present_tex.texture)?;
+            recorder.copy_texture_to_texture(&self.draw_tex, &mut present_tex.texture)?;
 
             // Prepare swapchain texture for presentation
             recorder.transition_texture_layout(
@@ -181,7 +168,7 @@ impl FrameContext {
             Ok(())
         })?;
 
-        self.graphics_recorder = Some(dvc.submit(
+        self.compute_recorder = Some(dvc.submit(
             recorder,
             &[self.present_semaphore],
             &[self.render_semaphore],
@@ -202,7 +189,7 @@ impl FrameContext {
     }
 
     pub fn destroy(mut self, dvc_ctx: &mut DeviceContext) -> Result<()> {
-        if let Some(graphics_recorder) = self.graphics_recorder.take() {
+        if let Some(graphics_recorder) = self.compute_recorder.take() {
             dvc_ctx
                 .command_recorder_allocator
                 .deallocate(&graphics_recorder)?;

@@ -1,6 +1,9 @@
 use super::super::queue::Queue;
 use super::command_recorder_allocator::{CommandRecorderAllocator, CommandRecorderAllocatorExt};
-use crate::renderer::resource_store::texture::{ColorTexture, DepthTexture, Texture};
+use crate::renderer::resource_store::material::Material;
+use crate::renderer::resource_store::texture::{
+    ColorTexture, DepthTexture, StorageTexture, Texture,
+};
 use ash::vk;
 use color_eyre::Result;
 use std::marker::PhantomData;
@@ -124,6 +127,31 @@ impl CommandRecorder<Recording> {
         Ok(())
     }
 
+    pub fn clear_storage_texture(
+        &self,
+        texture: &StorageTexture,
+        current_layout: vk::ImageLayout,
+        color: &vk::ClearColorValue,
+    ) -> Result<()> {
+        unsafe {
+            self.device.cmd_clear_color_image(
+                self.command_buffer,
+                texture.image,
+                current_layout,
+                color,
+                &[vk::ImageSubresourceRange {
+                    aspect_mask: texture.aspect,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                }],
+            );
+        }
+
+        Ok(())
+    }
+
     pub fn clear_color_texture(
         &self,
         texture: &ColorTexture,
@@ -174,6 +202,26 @@ impl CommandRecorder<Recording> {
         }
 
         Ok(())
+    }
+
+    pub fn bind_material(&self, material: &Material) {
+        material.bind_pipeline(self.command_buffer);
+        material.bind_descriptor_sets(self.command_buffer);
+    }
+
+    pub fn update_push_constants(&self, material: &Material, data: &[u8]) {
+        material.update_push_constants(self.command_buffer, data);
+    }
+
+    pub fn dispatch(&self, group_count_x: u32, group_count_y: u32, group_count_z: u32) {
+        unsafe {
+            self.device.cmd_dispatch(
+                self.command_buffer,
+                group_count_x,
+                group_count_y,
+                group_count_z,
+            )
+        }
     }
 
     fn end_recording(self) -> Result<CommandRecorder<Executable>> {

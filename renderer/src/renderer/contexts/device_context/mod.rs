@@ -13,10 +13,12 @@ use crate::renderer::contexts::device_context::commands::{
 use crate::renderer::contexts::device_context::descriptors::descriptor_allocator::DescriptorAllocator;
 use crate::renderer::contexts::device_context::queue::Queue;
 use crate::renderer::contexts::swapchain_context::SwapchainContext;
-use crate::renderer::resource_store::material::{GraphicsMaterialFactoryBuilder, MaterialFactory};
+use crate::renderer::resource_store::material::{
+    ComputeMaterialFactoryBuilder, GraphicsMaterialFactoryBuilder, MaterialFactory,
+};
 use crate::renderer::resource_store::megabuffer::{Megabuffer, MegabufferExt};
 use crate::renderer::resource_store::resource_type::ResourceType;
-use crate::renderer::resource_store::shader::GraphicsShader;
+use crate::renderer::resource_store::shader::{ComputeShader, GraphicsShader};
 use crate::renderer::resource_store::shader_data::PerDrawData;
 use crate::renderer::resource_store::texture::{
     ColorTexture, DepthTexture, StorageTexture, Texture,
@@ -92,6 +94,10 @@ impl DeviceContext {
 
     pub fn get_present_queue(&self) -> Arc<Queue> {
         self.device.get_present_queue()
+    }
+
+    pub fn get_compute_queue(&self) -> Arc<Queue> {
+        self.device.get_compute_queue()
     }
 
     pub fn wait_and_reset_fence(&self, fence: vk::Fence, timeout: Duration) -> Result<()> {
@@ -180,63 +186,70 @@ impl DeviceContext {
         let bindless_descriptor_set_layout = self.create_bindless_descriptor_set_layout()?;
         let bindless_pipeline_layout =
             self.create_bindless_pipeline_layout(bindless_descriptor_set_layout)?;
-        let default_shader = GraphicsShader::new("default", self.device.logical.clone())?;
-        GraphicsMaterialFactoryBuilder::new(
+        let default_shader = ComputeShader::new("sky", self.device.logical.clone())?;
+        ComputeMaterialFactoryBuilder::new(
             self.device.logical.clone(),
             self.descriptor_allocator.clone(),
         )
         .with_shader(default_shader)
         .with_pipeline_layout(bindless_pipeline_layout)
         .with_descriptor_set_layout(bindless_descriptor_set_layout)
-        .with_color_attachment_format(vk::Format::R8G8B8A8_SRGB)
-        .with_depth_attachment_format(vk::Format::D32_SFLOAT)
         .build()
     }
 
     pub fn create_bindless_descriptor_set_layout(&self) -> Result<vk::DescriptorSetLayout> {
         DescriptorSetLayoutBuilder::new()
             .add_binding(
-                // Per-frame
+                // Image to render to
                 0,
+                ResourceType::StorageImage.descriptor_type(),
+                1,
+                vk::ShaderStageFlags::COMPUTE,
+                ResourceType::StorageImage.descriptor_binding_flags(),
+                None,
+            )
+            .add_binding(
+                // Per-frame
+                1,
                 ResourceType::UniformBuffer.descriptor_type(),
-                ResourceType::UniformBuffer.descriptor_count(),
-                vk::ShaderStageFlags::ALL,
+                1,
+                vk::ShaderStageFlags::COMPUTE,
                 ResourceType::UniformBuffer.descriptor_binding_flags(),
                 None,
             )
             .add_binding(
                 // Per-material
-                1,
+                2,
                 ResourceType::StorageBuffer.descriptor_type(),
-                ResourceType::StorageBuffer.descriptor_count(),
-                vk::ShaderStageFlags::ALL,
+                1,
+                vk::ShaderStageFlags::COMPUTE,
                 ResourceType::StorageBuffer.descriptor_binding_flags(),
                 None,
             )
             .add_binding(
                 // Per-object
-                2,
+                3,
                 ResourceType::StorageBuffer.descriptor_type(),
-                ResourceType::StorageBuffer.descriptor_count(),
-                vk::ShaderStageFlags::ALL,
+                1,
+                vk::ShaderStageFlags::COMPUTE,
                 ResourceType::StorageBuffer.descriptor_binding_flags(),
                 None,
             )
             .add_binding(
                 // Samplers
-                3,
+                4,
                 ResourceType::Sampler.descriptor_type(),
-                ResourceType::Sampler.descriptor_count(),
-                vk::ShaderStageFlags::ALL,
+                4,
+                vk::ShaderStageFlags::COMPUTE,
                 ResourceType::Sampler.descriptor_binding_flags(),
                 None,
             )
             .add_binding(
-                // Textures
-                4,
+                // Sampled Textures
+                5,
                 ResourceType::SampledImage.descriptor_type(),
-                ResourceType::SampledImage.descriptor_count(),
-                vk::ShaderStageFlags::ALL,
+                4,
+                vk::ShaderStageFlags::COMPUTE,
                 ResourceType::SampledImage.descriptor_binding_flags(),
                 None,
             )
@@ -252,7 +265,7 @@ impl DeviceContext {
     ) -> Result<vk::PipelineLayout> {
         let push_constant_size = size_of::<PerDrawData>() as u32;
         let push_constant_range = vk::PushConstantRange::default()
-            .stage_flags(vk::ShaderStageFlags::ALL)
+            .stage_flags(vk::ShaderStageFlags::COMPUTE)
             .offset(0)
             .size(push_constant_size);
         let push_constant_ranges = [push_constant_range];

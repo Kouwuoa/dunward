@@ -253,7 +253,6 @@ impl Texture {
         width: u32,
         height: u32,
         use_dedicated_memory: bool,
-
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
     ) -> Result<StorageTexture> {

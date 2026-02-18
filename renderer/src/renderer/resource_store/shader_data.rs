@@ -42,3 +42,9 @@ pub(crate) struct PerDrawData {
     pub material_index: u32,
     pub vertex_offset: u32,
 }
+
+impl PerDrawData {
+    pub fn as_bytes(&self) -> &[u8] {
+        bytemuck::bytes_of(self)
+    }
+}
