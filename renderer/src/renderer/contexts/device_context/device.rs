@@ -63,7 +63,7 @@ impl Device {
         signal_semaphores: &[vk::Semaphore],
         fence: vk::Fence,
     ) -> Result<()> {
-        let wait_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
+        let wait_stages = [vk::PipelineStageFlags::COMPUTE_SHADER];
         let command_buffers = [cmd];
         let submit = vk::SubmitInfo::default()
             .wait_dst_stage_mask(&wait_stages)

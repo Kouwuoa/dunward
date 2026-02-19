@@ -26,7 +26,7 @@ impl Material {
             self.device.cmd_push_constants(
                 command_buffer,
                 self.pipeline_layout,
-                vk::ShaderStageFlags::ALL,
+                vk::ShaderStageFlags::COMPUTE,
                 0,
                 data,
             );

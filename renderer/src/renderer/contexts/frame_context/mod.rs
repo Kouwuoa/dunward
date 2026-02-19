@@ -22,7 +22,7 @@ const FRAME_PER_MATERIAL_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_PER_OBJECT_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 
 pub(crate) struct FrameContext {
-    compute_recorder: Option<CommandRecorder<Idle>>,
+    graphics_recorder: Option<CommandRecorder<Idle>>,
     draw_tex: StorageTexture,
 
     vertex_region: AllocatedMegabufferRegion,
@@ -74,13 +74,21 @@ impl FrameContext {
             &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
         )?;
 
-        let compute_queue = dvc_ctx.get_compute_queue();
-        let compute_recorder = Some(dvc_ctx.command_recorder_allocator.allocate(compute_queue)?);
+        // Note: Even though we're using compute shaders,
+        // we'll still use the graphics queue to avoid queue family ownership transfers and semaphore complexity.
+        // The graphics queue should support compute operations.
+        let graphics_queue = dvc_ctx.get_graphics_queue();
+        assert!(graphics_queue.family.supports_compute());
+        let graphics_recorder = Some(
+            dvc_ctx
+                .command_recorder_allocator
+                .allocate(graphics_queue)?,
+        );
 
         let bindless_material = rsc_sto.bindless_material_factory.create_material()?;
 
         Ok(Self {
-            compute_recorder,
+            graphics_recorder,
             draw_tex,
 
             vertex_region,
@@ -114,7 +122,7 @@ impl FrameContext {
             swc.acquire_next_present_texture(self.present_semaphore, timeout, dvc)?;
 
         // Record render commands
-        let recorder = self.compute_recorder.take().unwrap();
+        let recorder = self.graphics_recorder.take().unwrap();
         let recorder = recorder.record(|recorder| {
             recorder.transition_texture_layout(
                 &mut self.draw_tex,
@@ -168,7 +176,7 @@ impl FrameContext {
             Ok(())
         })?;
 
-        self.compute_recorder = Some(dvc.submit(
+        self.graphics_recorder = Some(dvc.submit(
             recorder,
             &[self.present_semaphore],
             &[self.render_semaphore],
@@ -189,7 +197,7 @@ impl FrameContext {
     }
 
     pub fn destroy(mut self, dvc_ctx: &mut DeviceContext) -> Result<()> {
-        if let Some(graphics_recorder) = self.compute_recorder.take() {
+        if let Some(graphics_recorder) = self.graphics_recorder.take() {
             dvc_ctx
                 .command_recorder_allocator
                 .deallocate(&graphics_recorder)?;
