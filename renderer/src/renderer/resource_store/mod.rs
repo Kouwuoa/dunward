@@ -28,6 +28,7 @@ const INDEX_BUFFER_ALIGNMENT: u64 = 4;
 const STORAGE_BUFFER_ALIGNMENT: u64 = 16;
 const UNIFORM_BUFFER_ALIGNMENT: u64 = 256;
 
+/// Owns resource lifetimes/data
 pub(crate) struct ResourceStore {
     pub storage_textures: Vec<StorageTexture>,
     pub sampled_textures: Vec<ColorTexture>,

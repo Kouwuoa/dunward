@@ -5,6 +5,7 @@ pub use winit;
 mod contexts;
 mod resource_store;
 mod utils;
+mod resource_binder;
 
 use crate::Camera;
 use crate::renderer::contexts::frame_context::FrameContext;
@@ -29,6 +30,8 @@ pub struct Renderer {
     swc_ctx: SwapchainContext,
     frm_ctxs: Vec<FrameContext>,
     rsc_sto: ResourceStore,
+    // Owns binding state/policy
+    rsc_binder: ResourceBinder,
 
     frame_number: u64,
 }
@@ -47,6 +50,14 @@ impl Renderer {
         let frm_ctxs = (0..Self::FRAMES_IN_FLIGHT)
             .map(|_| FrameContext::new(&mut dvc_ctx, &swc_ctx, &mut rsc_sto))
             .collect::<Result<Vec<FrameContext>>>()?;
+
+        let rsc_binder = ResourceBinder::new(&dvc_ctx)?;
+
+        // Bind initial global textures and samplers
+        // Note: We'll only need to rebind global resources if we import or remove assets while the renderer is running
+        rsc_binder.bind_global_textures(&self.rsc_sto.textures);
+        rsc_binder.bind_global_samplers(&self.rsc_sto.samplers);
+
 
         Ok(Self {
             dvc_ctx,

@@ -6,28 +6,31 @@ mod device;
 mod instance;
 mod surface;
 
-use crate::renderer::contexts::device_context::commands::{
-    CommandRecorder, CommandRecorderAllocator, CommandRecorderAllocatorExt, Executable, Idle,
-    TransferCommandRecorder,
-};
-use crate::renderer::contexts::device_context::descriptors::descriptor_allocator::DescriptorAllocator;
-use crate::renderer::contexts::device_context::queue::Queue;
-use crate::renderer::contexts::swapchain_context::SwapchainContext;
-use crate::renderer::resource_store::material::{
-    ComputeMaterialFactoryBuilder, GraphicsMaterialFactoryBuilder, MaterialFactory,
-};
-use crate::renderer::resource_store::megabuffer::{Megabuffer, MegabufferExt};
-use crate::renderer::resource_store::resource_type::ResourceType;
-use crate::renderer::resource_store::shader::{ComputeShader, GraphicsShader};
-use crate::renderer::resource_store::shader_data::PerDrawData;
-use crate::renderer::resource_store::texture::{
-    ColorTexture, DepthTexture, StorageTexture, Texture,
+use crate::renderer::{
+    contexts::{
+        device_context::commands::{
+            CommandRecorder, CommandRecorderAllocator, CommandRecorderAllocatorExt, Executable,
+            Idle, TransferCommandRecorder,
+        },
+        device_context::descriptors::descriptor_allocator::DescriptorAllocator,
+        device_context::queue::Queue,
+        swapchain_context::SwapchainContext,
+    },
+    resource_store::{
+        material::{ComputeMaterialFactoryBuilder, MaterialFactory},
+        megabuffer::{Megabuffer, MegabufferExt},
+        resource_type::ResourceType,
+        shader::ComputeShader,
+        shader_data::PerDrawData,
+        texture::{ColorTexture, DepthTexture, StorageTexture, Texture},
+    },
 };
 use ash::vk;
 use color_eyre::Result;
 use descriptors::descriptor_set_layout_builder::DescriptorSetLayoutBuilder;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use crate::renderer::contexts::device_context::descriptors::descriptor_writer::DescriptorWriter;
 
 /// Main abstraction around the graphics API context for rendering.
 pub(crate) struct DeviceContext {
@@ -39,6 +42,8 @@ pub(crate) struct DeviceContext {
     pub(crate) descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
     pub(crate) command_recorder_allocator: CommandRecorderAllocator,
     pub(crate) transfer_command_recorder: Arc<TransferCommandRecorder>,
+
+    descriptor_writer: DescriptorWriter<'static>,
 }
 
 impl DeviceContext {
@@ -69,6 +74,8 @@ impl DeviceContext {
             device.logical.clone(),
         )?);
 
+        let descriptor_writer = DescriptorWriter::default();
+
         Ok(Self {
             instance,
             device,
@@ -77,6 +84,7 @@ impl DeviceContext {
             descriptor_allocator,
             command_recorder_allocator,
             transfer_command_recorder,
+            descriptor_writer,
         })
     }
 

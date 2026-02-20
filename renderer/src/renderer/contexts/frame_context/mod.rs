@@ -9,7 +9,7 @@ use crate::renderer::contexts::swapchain_context::{SwapchainContext, SwapchainPr
 use crate::renderer::resource_store::ResourceStore;
 use crate::renderer::resource_store::material::Material;
 use crate::renderer::resource_store::megabuffer::{AllocatedMegabufferRegion, MegabufferExt};
-use crate::renderer::resource_store::shader_data::PerDrawData;
+use crate::renderer::resource_store::shader_data::{PerDrawData, PerFrameData, PerMaterialData, PerObjectData};
 use crate::renderer::resource_store::texture::{ColorTexture, DepthTexture, StorageTexture};
 use ash::vk;
 use color_eyre::eyre::Result;
@@ -23,7 +23,7 @@ const FRAME_PER_OBJECT_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 
 pub(crate) struct FrameContext {
     graphics_recorder: Option<CommandRecorder<Idle>>,
-    draw_tex: StorageTexture,
+    render_target_tex: StorageTexture,
 
     vertex_region: AllocatedMegabufferRegion,
     index_region: AllocatedMegabufferRegion,
@@ -121,16 +121,33 @@ impl FrameContext {
         let mut present_tex =
             swc.acquire_next_present_texture(self.present_semaphore, timeout, dvc)?;
 
+        // Update frame resources (one per frame or when dirty)
+        let frame_resource_set = self.resource_binder.bind_per_frame_buffer(pkt.frame_index, &self.rsc_sto.per_frame_buffer);
+
+        // Update material resources (when material changes)
+        let tex_index = resource_binder.bind_per_material_buffer(material_id)
+
+        // Bind the target texture (do this each frame)
+        resource_binder.bind_render_target_texture()
+
+
+
+        let frame_resource_set = self.resource_binder.bind_frame(PerFrameData::default());
+        let material_resource_set = self.resource_binder.bind_material(PerMaterialData::default());
+        let object_resource_set = self.resource_binder.bind_object(PerObjectData::default());
+        let draw_resource_set = self.resource_binder.bind_object(PerDrawData::default());
+
+
         // Record render commands
         let recorder = self.graphics_recorder.take().unwrap();
         let recorder = recorder.record(|recorder| {
             recorder.transition_texture_layout(
-                &mut self.draw_tex,
+                &mut self.render_target_tex,
                 vk::ImageLayout::UNDEFINED,
                 vk::ImageLayout::GENERAL,
             )?;
             recorder.clear_storage_texture(
-                &self.draw_tex,
+                &self.render_target_tex,
                 vk::ImageLayout::GENERAL,
                 &vk::ClearColorValue {
                     float32: [1.0f32, 0.0f32, 0.0f32, 1.0f32],
@@ -155,7 +172,7 @@ impl FrameContext {
 
             // Copy draw_color_tex onto swapchain texture
             recorder.transition_texture_layout(
-                &mut self.draw_tex,
+                &mut self.render_target_tex,
                 vk::ImageLayout::GENERAL,
                 vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             )?;
@@ -164,7 +181,7 @@ impl FrameContext {
                 vk::ImageLayout::UNDEFINED,
                 vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             )?;
-            recorder.copy_texture_to_texture(&self.draw_tex, &mut present_tex.texture)?;
+            recorder.copy_texture_to_texture(&self.render_target_tex, &mut present_tex.texture)?;
 
             // Prepare swapchain texture for presentation
             recorder.transition_texture_layout(
