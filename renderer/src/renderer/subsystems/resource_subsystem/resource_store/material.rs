@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 /// You can think of a Material as a shader instance that you can bind resources and data to.
 /// You only need to create a Material once, and then you can use it to render multiple objects.
 /// You only need to switch the Material when you want to change the shader or pipeline.
-pub(crate) struct Material {
+pub struct Material {
     pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
     pipeline_bind_point: vk::PipelineBindPoint,
@@ -55,7 +55,7 @@ impl Material {
     }
 }
 
-pub(crate) struct MaterialFactory {
+pub struct MaterialFactory {
     pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
     pipeline_bind_point: vk::PipelineBindPoint,
@@ -86,7 +86,7 @@ impl MaterialFactory {
     }
 }
 
-pub(crate) struct GraphicsMaterialFactoryBuilder<'a> {
+pub struct GraphicsMaterialFactoryBuilder<'a> {
     vertex_input_description: VertexInputDescription,
     input_assembly: vk::PipelineInputAssemblyStateCreateInfo<'a>,
     rasterization: vk::PipelineRasterizationStateCreateInfo<'a>,
@@ -401,7 +401,7 @@ impl<'a> GraphicsMaterialFactoryBuilder<'a> {
     }
 }
 
-pub(crate) struct ComputeMaterialFactoryBuilder {
+pub struct ComputeMaterialFactoryBuilder {
     shader: Option<ComputeShader>,
     pipeline_layout: Option<vk::PipelineLayout>,
     descriptor_set_layout: Option<vk::DescriptorSetLayout>,

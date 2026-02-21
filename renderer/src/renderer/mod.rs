@@ -3,9 +3,8 @@ pub use glam;
 pub use winit;
 
 mod contexts;
-mod resource_store;
 mod utils;
-mod resource_binder;
+mod subsystems;
 
 use crate::Camera;
 use crate::renderer::contexts::frame_context::FrameContext;
@@ -26,12 +25,15 @@ pub enum RendererError {
 }
 
 pub struct Renderer {
+    // Contexts
     dvc_ctx: DeviceContext,
     swc_ctx: SwapchainContext,
     frm_ctxs: Vec<FrameContext>,
-    rsc_sto: ResourceStore,
-    // Owns binding state/policy
-    rsc_binder: ResourceBinder,
+
+    // Subsystems
+    cmd_sys: CommandSubsystem,
+    dsc_sys: DescriptorSubsystem,
+    rsc_sys: ResourceSubsystem,
 
     frame_number: u64,
 }

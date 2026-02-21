@@ -1,49 +1,19 @@
-pub(crate) mod commands;
-pub(crate) mod descriptors;
 pub(crate) mod queue;
 
 mod device;
 mod instance;
 mod surface;
 
-use crate::renderer::{
-    contexts::{
-        device_context::commands::{
-            CommandRecorder, CommandRecorderAllocator, CommandRecorderAllocatorExt, Executable,
-            Idle, TransferCommandRecorder,
-        },
-        device_context::descriptors::descriptor_allocator::DescriptorAllocator,
-        device_context::queue::Queue,
-        swapchain_context::SwapchainContext,
-    },
-    resource_store::{
-        material::{ComputeMaterialFactoryBuilder, MaterialFactory},
-        megabuffer::{Megabuffer, MegabufferExt},
-        resource_type::ResourceType,
-        shader::ComputeShader,
-        shader_data::PerDrawData,
-        texture::{ColorTexture, DepthTexture, StorageTexture, Texture},
-    },
-};
 use ash::vk;
 use color_eyre::Result;
-use descriptors::descriptor_set_layout_builder::DescriptorSetLayoutBuilder;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use crate::renderer::contexts::device_context::descriptors::descriptor_writer::DescriptorWriter;
 
 /// Main abstraction around the graphics API context for rendering.
 pub(crate) struct DeviceContext {
     instance: instance::Instance,
     device: device::Device,
     surface: surface::Surface,
-
-    pub(crate) memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
-    pub(crate) descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
-    pub(crate) command_recorder_allocator: CommandRecorderAllocator,
-    pub(crate) transfer_command_recorder: Arc<TransferCommandRecorder>,
-
-    descriptor_writer: DescriptorWriter<'static>,
 }
 
 impl DeviceContext {
@@ -88,12 +58,16 @@ impl DeviceContext {
         })
     }
 
-    pub fn raw_device_handle(&self) -> vk::Device {
-        self.device.logical.handle()
+    pub fn instance_handle(&self) -> ash::Instance {
+        self.instance.inner().clone()
     }
 
-    pub fn ash_device_handle(&self) -> Arc<ash::Device> {
+    pub fn logical_device_handle(&self) -> Arc<ash::Device> {
         self.device.logical.clone()
+    }
+
+    pub fn physical_device_handle(&self) -> vk::PhysicalDevice {
+        self.device.physical
     }
 
     pub fn get_graphics_queue(&self) -> Arc<Queue> {

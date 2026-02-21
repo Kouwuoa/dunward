@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 
 static MEGABUFFER_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-pub(crate) struct Megabuffer {
+pub struct Megabuffer {
     inner: Arc<Mutex<MegabufferInner>>,
     id: usize,
 }
@@ -28,7 +28,7 @@ impl PartialEq for Megabuffer {
     }
 }
 
-pub(crate) trait MegabufferExt {
+pub trait MegabufferExt {
     fn new(
         size: u64,
         alignment: u64,
@@ -318,12 +318,12 @@ impl PartialEq for MegabufferInner {
 }
 
 #[derive(Debug)]
-pub(crate) struct FreeMegabufferRegion {
+pub struct FreeMegabufferRegion {
     offset: u64,
     size: u64,
 }
 
-pub(crate) struct AllocatedMegabufferRegion {
+pub struct AllocatedMegabufferRegion {
     offset: u64,
     /// Size of the allocated region. This is 0 when the region is deallocated.
     size: u64,

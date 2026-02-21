@@ -7,16 +7,16 @@ use megabuffer::Megabuffer;
 use model::FullscreenQuad;
 use texture::{ColorTexture, StorageTexture};
 
-pub(crate) mod buffer;
-pub(crate) mod material;
-pub(crate) mod megabuffer;
-pub(crate) mod mesh;
-pub(crate) mod model;
-pub(crate) mod resource_type;
-pub(crate) mod shader;
-pub(crate) mod shader_data;
-pub(crate) mod texture;
-pub(crate) mod vertex;
+pub mod buffer;
+pub mod material;
+pub mod megabuffer;
+pub mod mesh;
+pub mod model;
+pub mod resource_type;
+pub mod shader;
+pub mod shader_data;
+pub mod texture;
+pub mod vertex;
 
 const VERTEX_BUFFER_SIZE: u64 = 1024 * 1024 * 256; // 256 MB
 const INDEX_BUFFER_SIZE: u64 = 1024 * 1024 * 64; // 64 MB
@@ -29,7 +29,7 @@ const STORAGE_BUFFER_ALIGNMENT: u64 = 16;
 const UNIFORM_BUFFER_ALIGNMENT: u64 = 256;
 
 /// Owns resource lifetimes/data
-pub(crate) struct ResourceStore {
+pub struct ResourceStore {
     pub storage_textures: Vec<StorageTexture>,
     pub sampled_textures: Vec<ColorTexture>,
     pub samplers: Vec<vk::Sampler>,

@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use vk_mem::Alloc;
 
 #[repr(transparent)]
-pub(crate) struct ColorTexture(pub Texture);
+pub struct ColorTexture(pub Texture);
 impl Deref for ColorTexture {
     type Target = Texture;
     fn deref(&self) -> &Self::Target {
@@ -22,7 +22,7 @@ impl DerefMut for ColorTexture {
     }
 }
 #[repr(transparent)]
-pub(crate) struct DepthTexture(pub Texture);
+pub struct DepthTexture(pub Texture);
 impl Deref for DepthTexture {
     type Target = Texture;
     fn deref(&self) -> &Self::Target {
@@ -36,7 +36,7 @@ impl DerefMut for DepthTexture {
 }
 
 #[repr(transparent)]
-pub(crate) struct StorageTexture(pub Texture);
+pub struct StorageTexture(pub Texture);
 impl Deref for StorageTexture {
     type Target = Texture;
     fn deref(&self) -> &Self::Target {
@@ -49,7 +49,7 @@ impl DerefMut for StorageTexture {
     }
 }
 
-pub(crate) struct TextureCreateInfo {
+pub struct TextureCreateInfo {
     pub format: vk::Format,
     pub extent: vk::Extent3D,
     pub usage: vk::ImageUsageFlags,
@@ -58,7 +58,7 @@ pub(crate) struct TextureCreateInfo {
     pub use_dedicated_memory: bool,
 }
 
-pub(crate) struct Texture {
+pub struct Texture {
     pub image: vk::Image,
     pub view: vk::ImageView,
     pub format: vk::Format,
