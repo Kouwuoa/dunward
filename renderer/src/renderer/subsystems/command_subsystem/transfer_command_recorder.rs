@@ -1,7 +1,7 @@
-use super::super::queue::Queue;
 use ash::vk;
 use color_eyre::eyre::Result;
 use std::sync::Arc;
+use crate::renderer::contexts::device_context::queue::Queue;
 
 /// This is a specialized command recorder designed for performing one-off GPU transfer operations.
 ///
@@ -28,6 +28,8 @@ pub(crate) struct TransferCommandRecorder {
 
 impl TransferCommandRecorder {
     pub fn new(transfer_queue: Arc<Queue>, device: Arc<ash::Device>) -> Result<Self> {
+        assert!(transfer_queue.family.supports_transfer());
+
         let transfer_fence_info = vk::FenceCreateInfo::default();
         let transfer_fence = unsafe { device.create_fence(&transfer_fence_info, None)? };
 

@@ -1,7 +1,7 @@
-use super::super::queue::Queue;
-use super::command_recorder_allocator::{CommandRecorderAllocator, CommandRecorderAllocatorExt};
-use crate::renderer::resource_store::material::Material;
-use crate::renderer::resource_store::texture::{
+use super::command_recorder_allocator::CommandRecorderAllocator;
+use crate::renderer::contexts::device_context::queue::Queue;
+use crate::renderer::subsystems::resource_subsystem::resource_store::material::Material;
+use crate::renderer::subsystems::resource_subsystem::resource_store::texture::{
     ColorTexture, DepthTexture, StorageTexture, Texture,
 };
 use ash::vk;
@@ -17,14 +17,18 @@ pub(crate) struct Recording;
 pub(crate) struct Executable;
 
 pub(crate) struct CommandRecorder<State> {
-    pub(in crate::renderer::contexts::device_context) command_buffer: vk::CommandBuffer,
-    pub(in crate::renderer::contexts::device_context) queue: Arc<Queue>,
-
+    pub(super) command_buffer: vk::CommandBuffer,
+    queue: Arc<Queue>,
     device: Arc<ash::Device>,
     /// Note that this is only an `Option` to allow for the allocator to be dropped.
     allocator: Option<CommandRecorderAllocator>,
-
     _state: PhantomData<State>,
+}
+
+impl<State> CommandRecorder<State> {
+    pub fn get_queue(&self) -> Arc<Queue> {
+        self.queue.clone()
+    }
 }
 
 impl CommandRecorder<Idle> {

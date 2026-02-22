@@ -1,6 +1,5 @@
-use super::super::queue::{Queue, QueueFamily};
-use super::command_recorder::CommandRecorder;
-use crate::renderer::contexts::device_context::commands::Idle;
+use crate::renderer::contexts::device_context::queue::{Queue, QueueFamily};
+use crate::renderer::subsystems::command_subsystem::command_recorder::{CommandRecorder, Idle};
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::OptionExt;
@@ -22,7 +21,7 @@ pub(crate) trait CommandRecorderAllocatorExt<A> {
     /// Note that this is mutably borrowed to force the allocator to be used in a single-threaded context.
     fn allocate(&mut self, queue: Arc<Queue>) -> Result<CommandRecorder<Idle>>;
     /// Note that this is mutably borrowed to force the allocator to be used in a single-threaded context.
-    fn deallocate(&mut self, command_encoder: &CommandRecorder<Idle>) -> Result<()>;
+    fn deallocate(&mut self, command_encoder: CommandRecorder<Idle>) -> Result<()>;
 }
 
 struct CommandRecorderAllocatorInner {
@@ -83,17 +82,17 @@ impl CommandRecorderAllocatorExt<CommandRecorderAllocator> for CommandRecorderAl
         Ok(command_encoder)
     }
 
-    fn deallocate(&mut self, command_encoder: &CommandRecorder<Idle>) -> Result<()> {
+    fn deallocate(&mut self, command_recorder: CommandRecorder<Idle>) -> Result<()> {
         let mut guard = self.0.lock().map_err(|e| eyre!(e.to_string()))?;
 
         let command_pool = guard
             .command_pools
-            .get(&command_encoder.queue.family)
+            .get(&command_recorder.get_queue().family)
             .ok_or_eyre(format!(
                 "Failed to get command pool for queue family: {}",
-                command_encoder.queue.family.index
+                command_recorder.get_queue().family.index
             ))?;
-        let command_buffer = command_encoder.command_buffer;
+        let command_buffer = command_recorder.command_buffer;
         unsafe {
             guard
                 .device
@@ -101,17 +100,17 @@ impl CommandRecorderAllocatorExt<CommandRecorderAllocator> for CommandRecorderAl
         }
         let command_buffers = guard
             .allocated_command_buffers
-            .get_mut(&command_encoder.queue.family)
+            .get_mut(&command_recorder.get_queue().family)
             .ok_or_eyre(format!(
                 "Failed to get command buffers for queue family: {}",
-                command_encoder.queue.family.index
+                command_recorder.get_queue().family.index
             ))?;
         let index = command_buffers
             .iter()
             .position(|&cb| cb == command_buffer)
             .ok_or_eyre(format!(
                 "Failed to find command buffer in vec for queue family: {}",
-                command_encoder.queue.family.index
+                command_recorder.get_queue().family.index
             ))?;
         let _ = command_buffers.swap_remove(index);
         Ok(())

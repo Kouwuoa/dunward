@@ -8,6 +8,8 @@ use ash::vk;
 use color_eyre::Result;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use crate::renderer::contexts::device_context::queue::Queue;
+use crate::renderer::contexts::swapchain_context::SwapchainContext;
 
 /// Main abstraction around the graphics API context for rendering.
 pub(crate) struct DeviceContext {
@@ -26,35 +28,10 @@ impl DeviceContext {
         let _ = surface.generate_surface_formats(&device)?;
         let _ = surface.generate_surface_present_modes(&device)?;
 
-        let memory_allocator = unsafe {
-            vk_mem::Allocator::new(vk_mem::AllocatorCreateInfo::new(
-                instance.inner(),
-                &device.logical,
-                device.physical,
-            ))?
-        };
-
-        let descriptor_allocator = Arc::new(Mutex::new(DescriptorAllocator::new(
-            device.logical.clone(),
-            1000,
-        )?));
-        let command_recorder_allocator = CommandRecorderAllocator::new(device.logical.clone())?;
-        let transfer_command_recorder = Arc::new(TransferCommandRecorder::new(
-            device.get_transfer_queue().clone(),
-            device.logical.clone(),
-        )?);
-
-        let descriptor_writer = DescriptorWriter::default();
-
         Ok(Self {
             instance,
             device,
             surface,
-            memory_allocator: Arc::new(Mutex::new(memory_allocator)),
-            descriptor_allocator,
-            command_recorder_allocator,
-            transfer_command_recorder,
-            descriptor_writer,
         })
     }
 
@@ -82,6 +59,10 @@ impl DeviceContext {
         self.device.get_compute_queue()
     }
 
+    pub fn get_transfer_queue(&self) -> Arc<Queue> {
+        self.device.get_transfer_queue()
+    }
+
     pub fn wait_and_reset_fence(&self, fence: vk::Fence, timeout: Duration) -> Result<()> {
         unsafe {
             let fences = [fence];
@@ -102,81 +83,6 @@ impl DeviceContext {
         window: &winit::window::Window,
     ) -> Result<SwapchainContext> {
         SwapchainContext::new(window, self)
-    }
-
-    pub fn create_color_texture(
-        &self,
-        width: u32,
-        height: u32,
-        data: Option<&[u8]>,
-        use_dedicated_memory: bool,
-        usage: vk::ImageUsageFlags,
-    ) -> Result<ColorTexture> {
-        Texture::new_color_texture_from_bytes(
-            width,
-            height,
-            data,
-            use_dedicated_memory,
-            usage,
-            self.memory_allocator.clone(),
-            self.device.logical.clone(),
-            &self.transfer_command_recorder,
-        )
-    }
-
-    pub fn create_depth_texture(&self, width: u32, height: u32) -> Result<DepthTexture> {
-        Texture::new_depth_texture(
-            width,
-            height,
-            self.memory_allocator.clone(),
-            self.device.logical.clone(),
-        )
-    }
-
-    pub fn create_megabuffer(
-        &self,
-        size: u64,
-        alignment: u64,
-        buf_usage: vk::BufferUsageFlags,
-    ) -> Result<Megabuffer> {
-        Megabuffer::new(
-            size,
-            alignment,
-            buf_usage,
-            self.memory_allocator.clone(),
-            self.device.logical.clone(),
-            self.transfer_command_recorder.clone(),
-        )
-    }
-
-    pub fn create_storage_texture(
-        &self,
-        width: u32,
-        height: u32,
-        use_dedicated_memory: bool,
-    ) -> Result<StorageTexture> {
-        Texture::new_storage_texture(
-            width,
-            height,
-            use_dedicated_memory,
-            self.memory_allocator.clone(),
-            self.device.logical.clone(),
-        )
-    }
-
-    pub fn create_bindless_material_factory(&self) -> Result<MaterialFactory> {
-        let bindless_descriptor_set_layout = self.create_bindless_descriptor_set_layout()?;
-        let bindless_pipeline_layout =
-            self.create_bindless_pipeline_layout(bindless_descriptor_set_layout)?;
-        let default_shader = ComputeShader::new("sky", self.device.logical.clone())?;
-        ComputeMaterialFactoryBuilder::new(
-            self.device.logical.clone(),
-            self.descriptor_allocator.clone(),
-        )
-        .with_shader(default_shader)
-        .with_pipeline_layout(bindless_pipeline_layout)
-        .with_descriptor_set_layout(bindless_descriptor_set_layout)
-        .build()
     }
 
     pub fn create_bindless_descriptor_set_layout(&self) -> Result<vk::DescriptorSetLayout> {

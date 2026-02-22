@@ -1,7 +1,4 @@
 use ash::vk;
-use crate::renderer::contexts::device_context::DeviceContext;
-use crate::renderer::resource_store::megabuffer::Megabuffer;
-use crate::renderer::resource_store::texture::Texture;
 
 #[derive(Default)]
 pub struct DescriptorWriter<'a> {
@@ -72,12 +69,5 @@ impl<'a> DescriptorWriter<'a> {
         unsafe {
             device.update_descriptor_sets(&writes, &[]);
         }
-    }
-}
-
-impl DeviceContext {
-    pub fn write_texture(&self, tex: &Texture) {
-        self.descriptor_writer.write_image
-
     }
 }
