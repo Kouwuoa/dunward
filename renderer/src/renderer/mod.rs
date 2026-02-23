@@ -47,8 +47,6 @@ impl Renderer {
 
         let mut dvc_ctx = DeviceContext::new(window)?;
         let swc_ctx = dvc_ctx.create_swapchain_context(window)?;
-        let mut rsc_sto = ResourceStore::new(&dvc_ctx, &swc_ctx)?;
-
         let frm_ctxs = (0..Self::FRAMES_IN_FLIGHT)
             .map(|_| FrameContext::new(&mut dvc_ctx, &swc_ctx, &mut rsc_sto))
             .collect::<Result<Vec<FrameContext>>>()?;

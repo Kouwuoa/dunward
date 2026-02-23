@@ -1,5 +1,15 @@
 use ash::vk;
 
+pub mod buffer;
+pub mod material;
+pub mod megabuffer;
+pub mod mesh;
+pub mod model;
+pub mod shader;
+pub mod shader_data;
+pub mod texture;
+pub mod vertex;
+
 #[derive(PartialEq)]
 pub enum ResourceType {
     UniformBuffer,

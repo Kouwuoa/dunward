@@ -1,105 +1,68 @@
-use crate::renderer::contexts::device_context::DeviceContext;
-use crate::renderer::subsystems::resource_subsystem::resource_binder::ResourceBinder;
-use crate::renderer::subsystems::resource_subsystem::resource_store::ResourceStore;
+use crate::renderer::{
+    contexts::device_context::DeviceContext,
+    contexts::swapchain_context::SwapchainContext,
+    subsystems::{
+        command_subsystem::CommandSubsystem,
+        command_subsystem::transfer_command_recorder::TransferCommandRecorder,
+        resource_subsystem::resource_binder::ResourceBinder,
+        resource_subsystem::resource_store::ResourceStore,
+        resource_subsystem::resource_types::megabuffer::MegabufferExt,
+    },
+};
 use color_eyre::eyre::Result;
 use std::sync::{Arc, Mutex};
 
-pub(crate) mod resource_binder;
+mod resource_binder;
+mod resource_factory;
 pub(crate) mod resource_store;
+mod resource_types;
 
 pub(crate) struct ResourceSubsystem {
     resource_store: ResourceStore,
     resource_binder: ResourceBinder,
     memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
+    transfer_command_recorder: Arc<TransferCommandRecorder>,
+    device: Arc<ash::Device>,
 }
 
 impl ResourceSubsystem {
-    pub fn new(dvc: &DeviceContext) -> Result<Self> {
+    pub fn new(
+        dvc_ctx: &DeviceContext,
+        swc_ctx: &SwapchainContext,
+        cmd_sys: &CommandSubsystem,
+    ) -> Result<Self> {
+        let resource_store = ResourceStore::new();
+        let resource_binder = ResourceBinder::new();
         let memory_allocator = unsafe {
             vk_mem::Allocator::new(vk_mem::AllocatorCreateInfo::new(
-                &dvc.instance_handle(),
-                &dvc.logical_device_handle(),
-                dvc.physical_device_handle(),
+                &dvc_ctx.instance_handle(),
+                &dvc_ctx.logical_device_handle(),
+                dvc_ctx.physical_device_handle(),
             ))?
         };
+        let transfer_command_recorder = cmd_sys.transfer_command_recorder.clone();
 
-        Ok(Self {
+        let mut result = Self {
+            resource_store,
+            resource_binder,
             memory_allocator: Arc::new(Mutex::new(memory_allocator)),
-        })
-    }
+            transfer_command_recorder,
+            device: dvc_ctx.logical_device_handle(),
+        };
 
-    pub fn create_color_texture(
-        &self,
-        width: u32,
-        height: u32,
-        data: Option<&[u8]>,
-        use_dedicated_memory: bool,
-        usage: vk::ImageUsageFlags,
-    ) -> Result<ColorTexture> {
-        Texture::new_color_texture_from_bytes(
-            width,
-            height,
-            data,
-            use_dedicated_memory,
-            usage,
-            self.memory_allocator.clone(),
-            self.device.logical.clone(),
-            &self.transfer_command_recorder,
-        )
-    }
+        let resource_store = &mut result.resource_store;
+        resource_store.init(&result)?;
 
-    pub fn create_depth_texture(&self, width: u32, height: u32) -> Result<DepthTexture> {
-        Texture::new_depth_texture(
-            width,
-            height,
-            self.memory_allocator.clone(),
-            self.device.logical.clone(),
-        )
-    }
+        let nearest_sampler = factory.create_vk_sampler(
+            &vk::SamplerCreateInfo::default()
+                .mag_filter(vk::Filter::NEAREST)
+                .min_filter(vk::Filter::NEAREST)
+                .mipmap_mode(vk::SamplerMipmapMode::NEAREST)
+                .address_mode_u(vk::SamplerAddressMode::REPEAT)
+                .address_mode_v(vk::SamplerAddressMode::REPEAT)
+                .address_mode_w(vk::SamplerAddressMode::REPEAT),
+        )?;
 
-    pub fn create_megabuffer(
-        &self,
-        size: u64,
-        alignment: u64,
-        buf_usage: vk::BufferUsageFlags,
-    ) -> Result<Megabuffer> {
-        Megabuffer::new(
-            size,
-            alignment,
-            buf_usage,
-            self.memory_allocator.clone(),
-            self.device.logical.clone(),
-            self.transfer_command_recorder.clone(),
-        )
-    }
-
-    pub fn create_storage_texture(
-        &self,
-        width: u32,
-        height: u32,
-        use_dedicated_memory: bool,
-    ) -> Result<StorageTexture> {
-        Texture::new_storage_texture(
-            width,
-            height,
-            use_dedicated_memory,
-            self.memory_allocator.clone(),
-            self.device.logical.clone(),
-        )
-    }
-
-    pub fn create_bindless_material_factory(&self) -> Result<MaterialFactory> {
-        let bindless_descriptor_set_layout = self.create_bindless_descriptor_set_layout()?;
-        let bindless_pipeline_layout =
-            self.create_bindless_pipeline_layout(bindless_descriptor_set_layout)?;
-        let default_shader = ComputeShader::new("sky", self.device.logical.clone())?;
-        ComputeMaterialFactoryBuilder::new(
-            self.device.logical.clone(),
-            self.descriptor_allocator.clone(),
-        )
-        .with_shader(default_shader)
-        .with_pipeline_layout(bindless_pipeline_layout)
-        .with_descriptor_set_layout(bindless_descriptor_set_layout)
-        .build()
+        Ok(result)
     }
 }

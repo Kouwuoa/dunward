@@ -1,22 +1,14 @@
 use crate::renderer::contexts::device_context::DeviceContext;
 use crate::renderer::contexts::swapchain_context::SwapchainContext;
+use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
+use crate::renderer::subsystems::resource_subsystem::resource_factory::ResourceFactory;
+use crate::renderer::subsystems::resource_subsystem::resource_types::material::MaterialFactory;
+use crate::renderer::subsystems::resource_subsystem::resource_types::megabuffer::Megabuffer;
+use crate::renderer::subsystems::resource_subsystem::resource_types::texture::{
+    ColorTexture, StorageTexture,
+};
 use ash::vk;
 use color_eyre::Result;
-use material::MaterialFactory;
-use megabuffer::Megabuffer;
-use model::FullscreenQuad;
-use texture::{ColorTexture, StorageTexture};
-
-pub mod buffer;
-pub mod material;
-pub mod megabuffer;
-pub mod mesh;
-pub mod model;
-pub mod resource_type;
-pub mod shader;
-pub mod shader_data;
-pub mod texture;
-pub mod vertex;
 
 const VERTEX_BUFFER_SIZE: u64 = 1024 * 1024 * 256; // 256 MB
 const INDEX_BUFFER_SIZE: u64 = 1024 * 1024 * 64; // 64 MB
@@ -39,66 +31,50 @@ pub struct ResourceStore {
     pub per_frame_megabuffer: Megabuffer,
     pub per_material_megabuffer: Megabuffer,
     pub per_object_megabuffer: Megabuffer,
-    pub bindless_material_factory: MaterialFactory,
 
-    pub fullscreen_quad: FullscreenQuad,
+    pub bindless_material_factory: MaterialFactory,
 }
 
 impl ResourceStore {
-    pub fn new(dvc_ctx: &DeviceContext, swc_ctx: &SwapchainContext) -> Result<Self> {
+    pub fn new(factory: &ResourceFactory) -> Result<Self> {
         log::info!("Creating ResourceStore");
 
-        let vertex_megabuffer = dvc_ctx.create_megabuffer(
+        let vertex_megabuffer = factory.create_megabuffer(
             VERTEX_BUFFER_SIZE,
             VERTEX_BUFFER_ALIGNMENT,
             vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
         )?;
 
-        let index_megabuffer = dvc_ctx.create_megabuffer(
+        let index_megabuffer = factory.create_megabuffer(
             INDEX_BUFFER_SIZE,
             INDEX_BUFFER_ALIGNMENT,
             vk::BufferUsageFlags::INDEX_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
         )?;
 
-        let per_frame_megabuffer = dvc_ctx.create_megabuffer(
+        let per_frame_megabuffer = factory.create_megabuffer(
             PER_FRAME_BUFFER_SIZE,
             UNIFORM_BUFFER_ALIGNMENT,
             vk::BufferUsageFlags::UNIFORM_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
         )?;
 
-        let per_material_megabuffer = dvc_ctx.create_megabuffer(
+        let per_material_megabuffer = factory.create_megabuffer(
             PER_MATERIAL_BUFFER_SIZE,
             STORAGE_BUFFER_ALIGNMENT,
             vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
         )?;
 
-        let per_object_megabuffer = dvc_ctx.create_megabuffer(
+        let per_object_megabuffer = factory.create_megabuffer(
             PER_OBJECT_BUFFER_SIZE,
             STORAGE_BUFFER_ALIGNMENT,
             vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
         )?;
 
-        let bindless_material_factory = dvc_ctx.create_bindless_material_factory()?;
-
-        let fullscreen_quad = FullscreenQuad::new(&vertex_megabuffer, &index_megabuffer, swc_ctx)?;
-
-        let mut samplers = Vec::new();
-        samplers.push(
-            dvc_ctx.create_vk_sampler(
-                &vk::SamplerCreateInfo::default()
-                    .mag_filter(vk::Filter::NEAREST)
-                    .min_filter(vk::Filter::NEAREST)
-                    .mipmap_mode(vk::SamplerMipmapMode::NEAREST)
-                    .address_mode_u(vk::SamplerAddressMode::REPEAT)
-                    .address_mode_v(vk::SamplerAddressMode::REPEAT)
-                    .address_mode_w(vk::SamplerAddressMode::REPEAT),
-            )?,
-        );
+        let bindless_material_factory = factory.create_bindless_material_factory()?;
 
         Ok(Self {
             storage_textures: Vec::new(),
             sampled_textures: Vec::new(),
-            samplers,
+            samplers: Vec::new(),
 
             vertex_megabuffer,
             index_megabuffer,
@@ -106,8 +82,10 @@ impl ResourceStore {
             per_material_megabuffer,
             per_object_megabuffer,
             bindless_material_factory,
-
-            fullscreen_quad,
         })
+    }
+
+    pub fn add_sampler(&mut self, sampler: vk::Sampler) {
+        self.samplers.push(sampler);
     }
 }

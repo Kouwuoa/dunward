@@ -1,0 +1,190 @@
+use crate::renderer::subsystems::command_subsystem::transfer_command_recorder::TransferCommandRecorder;
+use crate::renderer::subsystems::descriptor_subsystem::descriptor_allocator::DescriptorAllocator;
+use crate::renderer::subsystems::descriptor_subsystem::descriptor_set_layout_builder::DescriptorSetLayoutBuilder;
+use crate::renderer::subsystems::resource_subsystem::resource_types::ResourceType;
+use crate::renderer::subsystems::resource_subsystem::resource_types::material::{
+    ComputeMaterialFactoryBuilder, MaterialFactory,
+};
+use crate::renderer::subsystems::resource_subsystem::resource_types::megabuffer::{
+    Megabuffer, MegabufferExt,
+};
+use crate::renderer::subsystems::resource_subsystem::resource_types::shader::ComputeShader;
+use crate::renderer::subsystems::resource_subsystem::resource_types::shader_data::PerDrawData;
+use crate::renderer::subsystems::resource_subsystem::resource_types::texture::{
+    ColorTexture, DepthTexture, StorageTexture, Texture,
+};
+use ash::vk;
+use color_eyre::Result;
+use std::sync::{Arc, Mutex};
+
+/// `ResourceFactory` is responsible only for construction (`create_*` APIs)
+/// such as buffers, textures, and materials as needed.
+/// It does not own long-lived storage, caching, or lookup tables.
+pub struct ResourceFactory {
+    memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
+    transfer_command_recorder: Arc<TransferCommandRecorder>,
+    device: Arc<ash::Device>,
+}
+
+impl ResourceFactory {
+    pub fn create_color_texture(
+        &self,
+        width: u32,
+        height: u32,
+        data: Option<&[u8]>,
+        use_dedicated_memory: bool,
+        usage: vk::ImageUsageFlags,
+    ) -> Result<ColorTexture> {
+        Texture::new_color_texture_from_bytes(
+            width,
+            height,
+            data,
+            use_dedicated_memory,
+            usage,
+            self.memory_allocator.clone(),
+            self.device.clone(),
+            &self.transfer_command_recorder,
+        )
+    }
+
+    pub fn create_depth_texture(&self, width: u32, height: u32) -> Result<DepthTexture> {
+        Texture::new_depth_texture(
+            width,
+            height,
+            self.memory_allocator.clone(),
+            self.device.clone(),
+        )
+    }
+
+    pub fn create_megabuffer(
+        &self,
+        size: u64,
+        alignment: u64,
+        buf_usage: vk::BufferUsageFlags,
+    ) -> Result<Megabuffer> {
+        Megabuffer::new(
+            size,
+            alignment,
+            buf_usage,
+            self.memory_allocator.clone(),
+            self.device.clone(),
+            self.transfer_command_recorder,
+        )
+    }
+
+    pub fn create_storage_texture(
+        &self,
+        width: u32,
+        height: u32,
+        use_dedicated_memory: bool,
+    ) -> Result<StorageTexture> {
+        Texture::new_storage_texture(
+            width,
+            height,
+            use_dedicated_memory,
+            self.memory_allocator.clone(),
+            self.device.clone(),
+        )
+    }
+
+    pub fn create_bindless_material_factory(
+        &self,
+        descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
+    ) -> Result<MaterialFactory> {
+        let bindless_descriptor_set_layout = self.create_bindless_descriptor_set_layout()?;
+        let bindless_pipeline_layout =
+            self.create_bindless_pipeline_layout(bindless_descriptor_set_layout)?;
+        let default_shader = ComputeShader::new("sky", self.device.clone())?;
+        ComputeMaterialFactoryBuilder::new(self.device.clone(), descriptor_allocator.clone())
+            .with_shader(default_shader)
+            .with_pipeline_layout(bindless_pipeline_layout)
+            .with_descriptor_set_layout(bindless_descriptor_set_layout)
+            .build()
+    }
+
+    pub fn create_bindless_descriptor_set_layout(&self) -> Result<vk::DescriptorSetLayout> {
+        DescriptorSetLayoutBuilder::new()
+            .add_binding(
+                // Image to render to
+                0,
+                ResourceType::StorageImage.descriptor_type(),
+                1,
+                vk::ShaderStageFlags::COMPUTE,
+                ResourceType::StorageImage.descriptor_binding_flags(),
+                None,
+            )
+            .add_binding(
+                // Per-frame
+                1,
+                ResourceType::UniformBuffer.descriptor_type(),
+                1,
+                vk::ShaderStageFlags::COMPUTE,
+                ResourceType::UniformBuffer.descriptor_binding_flags(),
+                None,
+            )
+            .add_binding(
+                // Per-material
+                2,
+                ResourceType::StorageBuffer.descriptor_type(),
+                1,
+                vk::ShaderStageFlags::COMPUTE,
+                ResourceType::StorageBuffer.descriptor_binding_flags(),
+                None,
+            )
+            .add_binding(
+                // Per-object
+                3,
+                ResourceType::StorageBuffer.descriptor_type(),
+                1,
+                vk::ShaderStageFlags::COMPUTE,
+                ResourceType::StorageBuffer.descriptor_binding_flags(),
+                None,
+            )
+            .add_binding(
+                // Samplers
+                4,
+                ResourceType::Sampler.descriptor_type(),
+                4,
+                vk::ShaderStageFlags::COMPUTE,
+                ResourceType::Sampler.descriptor_binding_flags(),
+                None,
+            )
+            .add_binding(
+                // Sampled Textures
+                5,
+                ResourceType::SampledImage.descriptor_type(),
+                4,
+                vk::ShaderStageFlags::COMPUTE,
+                ResourceType::SampledImage.descriptor_binding_flags(),
+                None,
+            )
+            .build(
+                vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
+                &self.device,
+            )
+    }
+
+    pub fn create_bindless_pipeline_layout(
+        &self,
+        bindless_descriptor_set_layout: vk::DescriptorSetLayout,
+    ) -> Result<vk::PipelineLayout> {
+        let push_constant_size = size_of::<PerDrawData>() as u32;
+        let push_constant_range = vk::PushConstantRange::default()
+            .stage_flags(vk::ShaderStageFlags::COMPUTE)
+            .offset(0)
+            .size(push_constant_size);
+        let push_constant_ranges = [push_constant_range];
+
+        let set_layouts = [bindless_descriptor_set_layout];
+        let pipeline_layout_create_info = vk::PipelineLayoutCreateInfo::default()
+            .set_layouts(&set_layouts)
+            .push_constant_ranges(&push_constant_ranges);
+
+        let pipeline_layout = unsafe {
+            self.device
+                .create_pipeline_layout(&pipeline_layout_create_info, None)?
+        };
+
+        Ok(pipeline_layout)
+    }
+}

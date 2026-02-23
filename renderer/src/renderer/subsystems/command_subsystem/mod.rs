@@ -1,6 +1,6 @@
-mod command_recorder;
-mod command_recorder_allocator;
-mod transfer_command_recorder;
+pub(crate) mod command_recorder;
+pub(crate) mod command_recorder_allocator;
+pub(crate) mod transfer_command_recorder;
 
 use crate::renderer::contexts::device_context::DeviceContext;
 use crate::renderer::subsystems::command_subsystem::command_recorder_allocator::{
@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 pub struct CommandSubsystem {
     command_recorder_allocator: CommandRecorderAllocator,
-    transfer_command_recorder: Arc<TransferCommandRecorder>,
+    pub(super) transfer_command_recorder: Arc<TransferCommandRecorder>,
 }
 
 impl CommandSubsystem {

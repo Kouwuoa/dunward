@@ -1,12 +1,11 @@
-mod descriptor_allocator;
-mod descriptor_set_layout_builder;
-mod descriptor_writer;
+pub(super) mod descriptor_allocator;
+pub(super) mod descriptor_set_layout_builder;
+pub(super) mod descriptor_writer;
 
 use crate::renderer::contexts::device_context::DeviceContext;
+use crate::renderer::subsystems::descriptor_subsystem::descriptor_writer::DescriptorWriter;
 use color_eyre::Result;
 use descriptor_allocator::DescriptorAllocator;
-use descriptor_set_layout_builder::DescriptorSetLayoutBuilder;
-use descriptor_writer::DescriptorWriter;
 use std::sync::{Arc, Mutex};
 
 pub struct DescriptorSubsystem {
