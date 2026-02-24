@@ -1,4 +1,4 @@
-use crate::renderer::resource_store::shader_data::PerVertexData;
+use crate::renderer::subsystems::resource_subsystem::resource_types::shader_data::PerVertexData;
 use ash::vk;
 use glam::{Vec2, Vec3};
 use std::mem::offset_of;

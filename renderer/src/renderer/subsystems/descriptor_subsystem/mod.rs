@@ -9,8 +9,8 @@ use descriptor_allocator::DescriptorAllocator;
 use std::sync::{Arc, Mutex};
 
 pub struct DescriptorSubsystem {
-    descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
-    descriptor_writer: DescriptorWriter<'static>,
+    pub descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
+    pub descriptor_writer: DescriptorWriter<'static>,
 }
 
 impl DescriptorSubsystem {

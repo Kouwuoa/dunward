@@ -1,5 +1,5 @@
-use crate::renderer::contexts::device_context::commands::TransferCommandRecorder;
-use crate::renderer::resource_store::buffer::Buffer;
+use crate::renderer::subsystems::command_subsystem::transfer_command_recorder::TransferCommandRecorder;
+use crate::renderer::subsystems::resource_subsystem::resource_types::buffer::Buffer;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};

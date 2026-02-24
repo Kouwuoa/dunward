@@ -1,5 +1,5 @@
+use crate::renderer::subsystems::resource_subsystem::resource_types::vertex::Vertex;
 use std::sync::atomic::AtomicU32;
-use crate::renderer::resource_store::vertex::Vertex;
 
 static MESH_ID_COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -23,19 +23,22 @@ impl Mesh {
 
     pub fn new_triangle() -> Self {
         let vertices = vec![
-            Vertex { // Bottom left
+            Vertex {
+                // Bottom left
                 position: [-0.5, -0.5, 0.0].into(),
                 normal: [0.0, 0.0, 1.0].into(),
                 color: [1.0, 0.0, 0.0].into(),
                 texcoord: [0.0, 1.0].into(),
             },
-            Vertex { // Bottom right
+            Vertex {
+                // Bottom right
                 position: [0.5, -0.5, 0.0].into(),
                 normal: [0.0, 0.0, 1.0].into(),
                 color: [0.0, 1.0, 0.0].into(),
                 texcoord: [1.0, 1.0].into(),
             },
-            Vertex { // Top
+            Vertex {
+                // Top
                 position: [0.0, 0.5, 0.0].into(),
                 normal: [0.0, 0.0, 1.0].into(),
                 color: [0.0, 0.0, 1.0].into(),
@@ -50,25 +53,29 @@ impl Mesh {
 
     pub fn new_quad() -> Self {
         let vertices = vec![
-            Vertex { // Top left
+            Vertex {
+                // Top left
                 position: [-1.0, 1.0, 0.0].into(),
                 normal: [0.0, 0.0, 1.0].into(),
                 color: [1.0, 0.0, 0.0].into(),
                 texcoord: [0.0, 0.0].into(),
             },
-            Vertex { // Bottom left
+            Vertex {
+                // Bottom left
                 position: [-1.0, -1.0, 0.0].into(),
                 normal: [0.0, 0.0, 1.0].into(),
                 color: [0.0, 1.0, 0.0].into(),
                 texcoord: [0.0, 1.0].into(),
             },
-            Vertex { // Top right
+            Vertex {
+                // Top right
                 position: [1.0, 1.0, 0.0].into(),
                 normal: [0.0, 0.0, 1.0].into(),
                 color: [0.0, 0.0, 1.0].into(),
                 texcoord: [1.0, 0.0].into(),
             },
-            Vertex { // Bottom right
+            Vertex {
+                // Bottom right
                 position: [1.0, -1.0, 0.0].into(),
                 normal: [0.0, 0.0, 1.0].into(),
                 color: [1.0, 1.0, 0.0].into(),

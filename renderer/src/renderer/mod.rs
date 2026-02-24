@@ -1,4 +1,3 @@
-use crate::renderer::resource_store::ResourceStore;
 pub use glam;
 pub use winit;
 
@@ -14,6 +13,9 @@ use ash::vk;
 use color_eyre::Result;
 use contexts::device_context::DeviceContext;
 use thiserror::Error;
+use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
+use crate::renderer::subsystems::descriptor_subsystem::DescriptorSubsystem;
+use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
 
 #[derive(Debug, Error)]
 pub enum RendererError {

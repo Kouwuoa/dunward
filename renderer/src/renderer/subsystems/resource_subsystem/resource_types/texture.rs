@@ -1,6 +1,5 @@
-use crate::renderer::contexts::device_context::DeviceContext;
-use crate::renderer::contexts::device_context::commands::TransferCommandRecorder;
-use crate::renderer::resource_store::buffer::Buffer;
+use crate::renderer::subsystems::command_subsystem::transfer_command_recorder::TransferCommandRecorder;
+use crate::renderer::subsystems::resource_subsystem::resource_types::buffer::Buffer;
 use ash::vk;
 use color_eyre::eyre::Result;
 use color_eyre::eyre::eyre;
@@ -197,14 +196,15 @@ impl Texture {
     }
 
     /// # Arguments
-    /// * `view` - If false, this function creates a `ColorTexture` that is NOT responsible for the lifetime of the `vk::ImageView`
+    /// * `destroy_view` - If false, this function creates a `ColorTexture` that is NOT responsible for the lifetime of the `vk::ImageView`
     pub fn new_color_texture_from_vkimage(
         image: &vk::Image,
         view: &vk::ImageView,
         format: &vk::Format,
         extent: &vk::Extent2D,
         destroy_view: bool,
-        dvc_ctx: &DeviceContext,
+        memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
+        device: Arc<ash::Device>,
     ) -> ColorTexture {
         ColorTexture(Texture {
             image: *image,
@@ -218,8 +218,8 @@ impl Texture {
             aspect: vk::ImageAspectFlags::COLOR,
             destroy_view,
             allocation: None,
-            memory_allocator: dvc_ctx.memory_allocator.clone(),
-            device: dvc_ctx.ash_device_handle(),
+            memory_allocator,
+            device,
         })
     }
 

@@ -1,10 +1,10 @@
 use crate::renderer::contexts::swapchain_context::SwapchainContext;
-use crate::renderer::resource_store::megabuffer::{
+use crate::renderer::subsystems::resource_subsystem::resource_types::megabuffer::{
     AllocatedMegabufferRegion, Megabuffer, MegabufferExt,
 };
-use crate::renderer::resource_store::mesh::Mesh;
-use crate::renderer::resource_store::shader_data::PerVertexData;
-use crate::renderer::resource_store::vertex::Vertex;
+use crate::renderer::subsystems::resource_subsystem::resource_types::mesh::Mesh;
+use crate::renderer::subsystems::resource_subsystem::resource_types::shader_data::PerVertexData;
+use crate::renderer::subsystems::resource_subsystem::resource_types::vertex::Vertex;
 use color_eyre::eyre::{Result, eyre};
 use glam::Vec3;
 

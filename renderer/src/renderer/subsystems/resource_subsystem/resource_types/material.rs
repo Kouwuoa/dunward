@@ -1,6 +1,8 @@
-use crate::renderer::contexts::device_context::descriptors::descriptor_allocator::DescriptorAllocator;
-use crate::renderer::resource_store::shader::{ComputeShader, GraphicsShader};
-use crate::renderer::resource_store::vertex::VertexInputDescription;
+use crate::renderer::subsystems::descriptor_subsystem::descriptor_allocator::DescriptorAllocator;
+use crate::renderer::subsystems::resource_subsystem::resource_types::shader::{
+    ComputeShader, GraphicsShader,
+};
+use crate::renderer::subsystems::resource_subsystem::resource_types::vertex::VertexInputDescription;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};

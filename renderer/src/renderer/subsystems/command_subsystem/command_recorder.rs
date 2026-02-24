@@ -1,7 +1,7 @@
 use super::command_recorder_allocator::CommandRecorderAllocator;
 use crate::renderer::contexts::device_context::queue::Queue;
-use crate::renderer::subsystems::resource_subsystem::resource_store::material::Material;
-use crate::renderer::subsystems::resource_subsystem::resource_store::texture::{
+use crate::renderer::subsystems::resource_subsystem::resource_types::material::Material;
+use crate::renderer::subsystems::resource_subsystem::resource_types::texture::{
     ColorTexture, DepthTexture, StorageTexture, Texture,
 };
 use ash::vk;

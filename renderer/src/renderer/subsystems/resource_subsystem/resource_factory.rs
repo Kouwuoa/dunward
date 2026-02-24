@@ -23,10 +23,25 @@ use std::sync::{Arc, Mutex};
 pub struct ResourceFactory {
     memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
     transfer_command_recorder: Arc<TransferCommandRecorder>,
+    descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
     device: Arc<ash::Device>,
 }
 
 impl ResourceFactory {
+    pub fn new(
+        memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
+        transfer_command_recorder: Arc<TransferCommandRecorder>,
+        descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
+        device: Arc<ash::Device>,
+    ) -> Self {
+        Self {
+            memory_allocator,
+            transfer_command_recorder,
+            descriptor_allocator,
+            device,
+        }
+    }
+
     pub fn create_color_texture(
         &self,
         width: u32,
@@ -68,7 +83,7 @@ impl ResourceFactory {
             buf_usage,
             self.memory_allocator.clone(),
             self.device.clone(),
-            self.transfer_command_recorder,
+            self.transfer_command_recorder.clone(),
         )
     }
 
@@ -87,15 +102,12 @@ impl ResourceFactory {
         )
     }
 
-    pub fn create_bindless_material_factory(
-        &self,
-        descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
-    ) -> Result<MaterialFactory> {
+    pub fn create_bindless_material_factory(&self) -> Result<MaterialFactory> {
         let bindless_descriptor_set_layout = self.create_bindless_descriptor_set_layout()?;
         let bindless_pipeline_layout =
             self.create_bindless_pipeline_layout(bindless_descriptor_set_layout)?;
         let default_shader = ComputeShader::new("sky", self.device.clone())?;
-        ComputeMaterialFactoryBuilder::new(self.device.clone(), descriptor_allocator.clone())
+        ComputeMaterialFactoryBuilder::new(self.device.clone(), self.descriptor_allocator.clone())
             .with_shader(default_shader)
             .with_pipeline_layout(bindless_pipeline_layout)
             .with_descriptor_set_layout(bindless_descriptor_set_layout)
