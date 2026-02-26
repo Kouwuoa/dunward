@@ -11,7 +11,7 @@ use color_eyre::Result;
 use std::sync::Arc;
 
 pub struct CommandSubsystem {
-    command_recorder_allocator: CommandRecorderAllocator,
+    pub command_recorder_allocator: CommandRecorderAllocator,
     pub(super) transfer_command_recorder: Arc<TransferCommandRecorder>,
 }
 

@@ -2,15 +2,18 @@ mod swapchain;
 
 use crate::renderer::contexts::device_context::DeviceContext;
 use crate::renderer::contexts::device_context::queue::Queue;
-use crate::renderer::resource_store::texture::{ColorTexture, Texture};
+use crate::renderer::subsystems::resource_subsystem::resource_types::texture::{
+    ColorTexture, Texture,
+};
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use swapchain::Swapchain;
 use thiserror::Error;
 use winit::window::Window;
+use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
 
 pub(crate) struct PresentTextureBundle {
     pub texture: ColorTexture,
@@ -31,10 +34,12 @@ pub(crate) enum SwapchainPresentError {
 pub(crate) struct SwapchainContext {
     pub(crate) swapchain: Swapchain,
     present_queue: Arc<Queue>,
+    memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
+    device: Arc<ash::Device>,
 }
 
 impl SwapchainContext {
-    pub fn new(window: &Window, dvc_ctx: &DeviceContext) -> Result<Self> {
+    pub fn new(window: &Window, dvc_ctx: &DeviceContext, rsc_sys: &ResourceSubsystem) -> Result<Self> {
         log::info!("Creating SwapchainContext");
 
         let swapchain = Swapchain::new(&window.inner_size(), dvc_ctx, None)?;
@@ -42,6 +47,8 @@ impl SwapchainContext {
         Ok(Self {
             swapchain,
             present_queue: dvc_ctx.get_present_queue(),
+            memory_allocator: rsc_sys.get_memory_allocator(),
+            device: dvc_ctx.logical_device_handle(),
         })
     }
 
@@ -49,7 +56,6 @@ impl SwapchainContext {
         &self,
         signal_image_acquired_sem: vk::Semaphore,
         timeout: Duration,
-        dvc_ctx: &DeviceContext,
     ) -> Result<PresentTextureBundle> {
         let (image_index, suboptimal) = unsafe {
             self.swapchain.swapchain_loader.acquire_next_image(
@@ -81,8 +87,15 @@ impl SwapchainContext {
             ))?;
         let format = &self.swapchain.swapchain_image_format;
         let extent = &self.swapchain.swapchain_image_extent;
-        let texture =
-            Texture::new_color_texture_from_vkimage(image, view, format, extent, false, dvc_ctx);
+        let texture = Texture::new_color_texture_from_vkimage(
+            image,
+            view,
+            format,
+            extent,
+            false,
+            self.memory_allocator.clone(),
+            self.device.clone(),
+        );
 
         Ok(PresentTextureBundle {
             texture,

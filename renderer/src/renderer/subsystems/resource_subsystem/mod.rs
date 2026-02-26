@@ -21,8 +21,9 @@ pub(crate) mod resource_store;
 pub(crate) mod resource_types;
 
 pub(crate) struct ResourceSubsystem {
-    resource_store: ResourceStore,
-    resource_binder: ResourceBinder,
+    pub resource_store: ResourceStore,
+    pub resource_binder: ResourceBinder,
+    pub resource_factory: ResourceFactory,
     memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
     transfer_command_recorder: Arc<TransferCommandRecorder>,
     device: Arc<ash::Device>,
@@ -64,9 +65,14 @@ impl ResourceSubsystem {
         Ok(Self {
             resource_store,
             resource_binder,
+            resource_factory,
             memory_allocator,
             transfer_command_recorder,
             device: dvc_ctx.logical_device_handle(),
         })
+    }
+
+    pub fn get_memory_allocator(&self) -> Arc<Mutex<vk_mem::Allocator>> {
+        self.memory_allocator.clone()
     }
 }

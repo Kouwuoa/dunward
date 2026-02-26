@@ -1,19 +1,19 @@
 pub(crate) mod packet;
 
 use crate::renderer::contexts::device_context::DeviceContext;
-use crate::renderer::contexts::device_context::commands::{
-    CommandRecorder, CommandRecorderAllocatorExt, Idle,
-};
 use crate::renderer::contexts::frame_context::packet::{FramePresentPacket, FrameRenderPacket};
 use crate::renderer::contexts::swapchain_context::{SwapchainContext, SwapchainPresentError};
-use crate::renderer::resource_store::ResourceStore;
-use crate::renderer::resource_store::material::Material;
-use crate::renderer::resource_store::megabuffer::{AllocatedMegabufferRegion, MegabufferExt};
-use crate::renderer::resource_store::shader_data::{PerDrawData, PerFrameData, PerMaterialData, PerObjectData};
-use crate::renderer::resource_store::texture::{ColorTexture, DepthTexture, StorageTexture};
 use ash::vk;
 use color_eyre::eyre::Result;
 use std::time::Duration;
+use crate::renderer::subsystems::command_subsystem::command_recorder::{CommandRecorder, Idle};
+use crate::renderer::subsystems::command_subsystem::command_recorder_allocator::CommandRecorderAllocatorExt;
+use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
+use crate::renderer::subsystems::resource_subsystem::resource_store::ResourceStore;
+use crate::renderer::subsystems::resource_subsystem::resource_types::material::Material;
+use crate::renderer::subsystems::resource_subsystem::resource_types::megabuffer::{AllocatedMegabufferRegion, MegabufferExt};
+use crate::renderer::subsystems::resource_subsystem::resource_types::texture::StorageTexture;
+use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
 
 const FRAME_VERTEX_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_INDEX_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
@@ -46,11 +46,13 @@ impl FrameContext {
         dvc_ctx: &mut DeviceContext,
         swc_ctx: &SwapchainContext,
         rsc_sto: &mut ResourceStore,
+        cmd_sys: &mut CommandSubsystem,
+        rsc_sys: &ResourceSubsystem,
     ) -> Result<Self> {
         log::info!("Creating FrameContext");
 
         let swc_size = swc_ctx.get_size();
-        let draw_tex = dvc_ctx.create_storage_texture(swc_size.width, swc_size.height, true)?;
+        let render_target_tex = rsc_sys.resource_factory.create_storage_texture(swc_size.width, swc_size.height, true)?;
 
         let vertex_region = rsc_sto
             .vertex_megabuffer
@@ -80,7 +82,7 @@ impl FrameContext {
         let graphics_queue = dvc_ctx.get_graphics_queue();
         assert!(graphics_queue.family.supports_compute());
         let graphics_recorder = Some(
-            dvc_ctx
+            cmd_sys
                 .command_recorder_allocator
                 .allocate(graphics_queue)?,
         );
@@ -89,7 +91,7 @@ impl FrameContext {
 
         Ok(Self {
             graphics_recorder,
-            draw_tex,
+            render_target_tex,
 
             vertex_region,
             index_region,
@@ -119,7 +121,7 @@ impl FrameContext {
 
         // Acquire the next image from the swapchain
         let mut present_tex =
-            swc.acquire_next_present_texture(self.present_semaphore, timeout, dvc)?;
+            swc.acquire_next_present_texture(self.present_semaphore, timeout)?;
 
         // Update frame resources (one per frame or when dirty)
         let frame_resource_set = self.resource_binder.bind_per_frame_buffer(pkt.frame_index, &self.rsc_sto.per_frame_buffer);
@@ -129,7 +131,6 @@ impl FrameContext {
 
         // Bind the target texture (do this each frame)
         resource_binder.bind_render_target_texture()
-
 
 
         let frame_resource_set = self.resource_binder.bind_frame(PerFrameData::default());
