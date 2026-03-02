@@ -17,7 +17,7 @@ pub(crate) struct Recording;
 pub(crate) struct Executable;
 
 pub(crate) struct CommandRecorder<State> {
-    pub(super) command_buffer: vk::CommandBuffer,
+    command_buffer: vk::CommandBuffer,
     queue: Arc<Queue>,
     device: Arc<ash::Device>,
     /// Note that this is only an `Option` to allow for the allocator to be dropped.
@@ -28,6 +28,9 @@ pub(crate) struct CommandRecorder<State> {
 impl<State> CommandRecorder<State> {
     pub fn get_queue(&self) -> Arc<Queue> {
         self.queue.clone()
+    }
+    pub fn get_command_buffer(&self) -> vk::CommandBuffer {
+        self.command_buffer
     }
 }
 

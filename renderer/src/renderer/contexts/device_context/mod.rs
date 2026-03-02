@@ -4,12 +4,16 @@ mod device;
 mod instance;
 mod surface;
 
+use crate::renderer::contexts::device_context::queue::Queue;
+use crate::renderer::contexts::swapchain_context::SwapchainContext;
+use crate::renderer::subsystems::command_subsystem::command_recorder::{
+    CommandRecorder, Executable, Idle,
+};
+use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
 use ash::vk;
 use color_eyre::Result;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use crate::renderer::contexts::device_context::queue::Queue;
-use crate::renderer::contexts::swapchain_context::SwapchainContext;
 
 /// Main abstraction around the graphics API context for rendering.
 pub(crate) struct DeviceContext {
@@ -81,8 +85,9 @@ impl DeviceContext {
     pub fn create_swapchain_context(
         &self,
         window: &winit::window::Window,
+        rsc_sys: &ResourceSubsystem,
     ) -> Result<SwapchainContext> {
-        SwapchainContext::new(window, self)
+        SwapchainContext::new(window, self, rsc_sys)
     }
 
     pub fn submit(
@@ -92,8 +97,8 @@ impl DeviceContext {
         signal_semaphores: &[vk::Semaphore],
         fence: vk::Fence,
     ) -> Result<CommandRecorder<Idle>> {
-        let cmd = cmd_recorder.command_buffer;
-        let queue = cmd_recorder.queue.clone();
+        let cmd = cmd_recorder.get_command_buffer();
+        let queue = cmd_recorder.get_queue();
 
         self.device
             .submit(cmd, queue, wait_semaphores, signal_semaphores, fence)?;

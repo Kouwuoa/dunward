@@ -112,7 +112,7 @@ impl FrameContext {
         pkt: FrameRenderPacket,
         dvc: &DeviceContext,
         swc: &SwapchainContext,
-        rsc: &ResourceStore,
+        rsc_sys: &ResourceSubsystem,
     ) -> Result<FramePresentPacket> {
         let timeout = Duration::from_secs(1);
 
