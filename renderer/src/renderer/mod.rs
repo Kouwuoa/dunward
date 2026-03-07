@@ -2,20 +2,20 @@ pub use glam;
 pub use winit;
 
 mod contexts;
-mod utils;
 mod subsystems;
+mod utils;
 
 use crate::Camera;
 use crate::renderer::contexts::frame_context::FrameContext;
 use crate::renderer::contexts::frame_context::packet::FrameRenderPacket;
 use crate::renderer::contexts::swapchain_context::{SwapchainContext, SwapchainPresentError};
+use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
+use crate::renderer::subsystems::descriptor_subsystem::DescriptorSubsystem;
+use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
 use ash::vk;
 use color_eyre::Result;
 use contexts::device_context::DeviceContext;
 use thiserror::Error;
-use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
-use crate::renderer::subsystems::descriptor_subsystem::DescriptorSubsystem;
-use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
 
 #[derive(Debug, Error)]
 pub enum RendererError {
@@ -49,23 +49,31 @@ impl Renderer {
 
         let mut dvc_ctx = DeviceContext::new(window)?;
         let swc_ctx = dvc_ctx.create_swapchain_context(window)?;
-        let frm_ctxs = (0..Self::FRAMES_IN_FLIGHT)
-            .map(|_| FrameContext::new(&mut dvc_ctx, &swc_ctx, &mut rsc_sto))
-            .collect::<Result<Vec<FrameContext>>>()?;
 
-        let rsc_binder = ResourceBinder::new(&dvc_ctx)?;
+        let mut cmd_sys = CommandSubsystem::new(&dvc_ctx)?;
+        let dsc_sys = DescriptorSubsystem::new(&dvc_ctx)?;
+        let mut rsc_sys = ResourceSubsystem::new(&dvc_ctx, &cmd_sys, &dsc_sys)?;
+
+        let frm_ctxs = (0..Self::FRAMES_IN_FLIGHT)
+            .map(|_| FrameContext::new(&mut dvc_ctx, &swc_ctx, &mut cmd_sys, &mut rsc_sys))
+            .collect::<Result<Vec<FrameContext>>>()?;
 
         // Bind initial global textures and samplers
         // Note: We'll only need to rebind global resources if we import or remove assets while the renderer is running
-        rsc_binder.bind_global_textures(&self.rsc_sto.textures);
-        rsc_binder.bind_global_samplers(&self.rsc_sto.samplers);
-
+        rsc_sys
+            .resource_binder
+            .bind_global_sampled_textures(&rsc_sys.resource_store.textures);
+        rsc_sys
+            .resource_binder
+            .bind_global_samplers(&self.rsc_sto.samplers);
 
         Ok(Self {
             dvc_ctx,
             swc_ctx,
             frm_ctxs,
-            rsc_sto,
+            cmd_sys,
+            dsc_sys,
+            rsc_sys,
             frame_number: 0,
         })
     }

@@ -92,7 +92,7 @@ impl CommandRecorderAllocatorExt<CommandRecorderAllocator> for CommandRecorderAl
                 "Failed to get command pool for queue family: {}",
                 command_recorder.get_queue().family.index
             ))?;
-        let command_buffer = command_recorder.command_buffer;
+        let command_buffer = command_recorder.get_command_buffer();
         unsafe {
             guard
                 .device

@@ -12,6 +12,7 @@ use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
 use crate::renderer::subsystems::resource_subsystem::resource_store::ResourceStore;
 use crate::renderer::subsystems::resource_subsystem::resource_types::material::Material;
 use crate::renderer::subsystems::resource_subsystem::resource_types::megabuffer::{AllocatedMegabufferRegion, MegabufferExt};
+use crate::renderer::subsystems::resource_subsystem::resource_types::shader_data::PerDrawData;
 use crate::renderer::subsystems::resource_subsystem::resource_types::texture::StorageTexture;
 use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
 
@@ -45,28 +46,27 @@ impl FrameContext {
     pub fn new(
         dvc_ctx: &mut DeviceContext,
         swc_ctx: &SwapchainContext,
-        rsc_sto: &mut ResourceStore,
         cmd_sys: &mut CommandSubsystem,
-        rsc_sys: &ResourceSubsystem,
+        rsc_sys: &mut ResourceSubsystem,
     ) -> Result<Self> {
         log::info!("Creating FrameContext");
 
         let swc_size = swc_ctx.get_size();
         let render_target_tex = rsc_sys.resource_factory.create_storage_texture(swc_size.width, swc_size.height, true)?;
 
-        let vertex_region = rsc_sto
+        let vertex_region = rsc_sys.resource_store
             .vertex_megabuffer
             .allocate_region(FRAME_VERTEX_BUFFER_SIZE)?;
-        let index_region = rsc_sto
+        let index_region = rsc_sys.resource_store
             .index_megabuffer
             .allocate_region(FRAME_INDEX_BUFFER_SIZE)?;
-        let per_frame_region = rsc_sto
+        let per_frame_region = rsc_sys.resource_store
             .per_frame_megabuffer
             .allocate_region(FRAME_PER_FRAME_BUFFER_SIZE)?;
-        let per_material_region = rsc_sto
+        let per_material_region = rsc_sys.resource_store
             .per_material_megabuffer
             .allocate_region(FRAME_PER_MATERIAL_BUFFER_SIZE)?;
-        let per_object_region = rsc_sto
+        let per_object_region = rsc_sys.resource_store
             .per_object_megabuffer
             .allocate_region(FRAME_PER_OBJECT_BUFFER_SIZE)?;
 
@@ -87,7 +87,7 @@ impl FrameContext {
                 .allocate(graphics_queue)?,
         );
 
-        let bindless_material = rsc_sto.bindless_material_factory.create_material()?;
+        let bindless_material = rsc_sys.resource_store.bindless_material_factory.create_material()?;
 
         Ok(Self {
             graphics_recorder,
@@ -112,7 +112,7 @@ impl FrameContext {
         pkt: FrameRenderPacket,
         dvc: &DeviceContext,
         swc: &SwapchainContext,
-        rsc_sys: &ResourceSubsystem,
+        rsc: &ResourceSubsystem,
     ) -> Result<FramePresentPacket> {
         let timeout = Duration::from_secs(1);
 
@@ -124,20 +124,20 @@ impl FrameContext {
             swc.acquire_next_present_texture(self.present_semaphore, timeout)?;
 
         // Update frame resources (one per frame or when dirty)
-        let frame_resource_set = self.resource_binder.bind_per_frame_buffer(pkt.frame_index, &self.rsc_sto.per_frame_buffer);
+        let frame_resource_set = rsc.resource_binder.bind_per_frame_buffer(pkt.frame_index, &self.rsc_sto.per_frame_buffer);
 
         // Update material resources (when material changes)
-        let tex_index = resource_binder.bind_per_material_buffer(material_id)
+        let tex_index = rsc.resource_binder.bind_per_material_buffer(material_id);
 
         // Bind the target texture (do this each frame)
         resource_binder.bind_render_target_texture()
 
-
+            /*
         let frame_resource_set = self.resource_binder.bind_frame(PerFrameData::default());
         let material_resource_set = self.resource_binder.bind_material(PerMaterialData::default());
         let object_resource_set = self.resource_binder.bind_object(PerObjectData::default());
         let draw_resource_set = self.resource_binder.bind_object(PerDrawData::default());
-
+             */
 
         // Record render commands
         let recorder = self.graphics_recorder.take().unwrap();
@@ -160,14 +160,6 @@ impl FrameContext {
             recorder
                 .update_push_constants(&self.bindless_material, PerDrawData::default().as_bytes());
             recorder.dispatch(16, 16, 0);
-
-            /*
-            recorder.transition_texture_layout(
-                &mut self.draw_tex,
-                vk::ImageLayout::GENERAL,
-                vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-            )?;
-             */
 
             // TODO: Perform render operations here
 
@@ -214,11 +206,10 @@ impl FrameContext {
         swc.present(pkt.texture, self.render_semaphore)
     }
 
-    pub fn destroy(mut self, dvc_ctx: &mut DeviceContext) -> Result<()> {
+    pub fn destroy(mut self, cmd_sys: &mut CommandSubsystem) -> Result<()> {
         if let Some(graphics_recorder) = self.graphics_recorder.take() {
-            dvc_ctx
-                .command_recorder_allocator
-                .deallocate(&graphics_recorder)?;
+            cmd_sys.command_recorder_allocator
+                .deallocate(graphics_recorder)?;
         }
         Ok(())
     }
