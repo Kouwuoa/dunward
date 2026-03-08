@@ -109,8 +109,9 @@ impl Renderer {
         let target_size = self.swc_ctx.get_size();
         FrameRenderPacket {
             camera: cam,
-            frame_index: self.get_current_frame_index(),
             target_size,
+            frame_index: self.get_current_frame_index(),
+            frame_number: self.frame_number,
             time_start: self.time_start,
         }
     }

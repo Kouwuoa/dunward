@@ -96,6 +96,40 @@ impl CommandRecorder<Idle> {
 }
 
 impl CommandRecorder<Recording> {
+    pub fn insert_texture_memory_barrier(
+        &self,
+        texture: &Texture,
+        old_layout: vk::ImageLayout,
+        new_layout: vk::ImageLayout,
+        src_stage_mask: vk::PipelineStageFlags2,
+        src_access_mask: vk::AccessFlags2,
+        dst_stage_mask: vk::PipelineStageFlags2,
+        dst_access_mask: vk::AccessFlags2,
+    ) {
+        let image_barrier = vk::ImageMemoryBarrier2::default()
+            .src_stage_mask(src_stage_mask)
+            .src_access_mask(src_access_mask)
+            .dst_stage_mask(dst_stage_mask)
+            .dst_access_mask(dst_access_mask)
+            .old_layout(old_layout)
+            .new_layout(new_layout)
+            .image(texture.image)
+            .subresource_range(vk::ImageSubresourceRange {
+                aspect_mask: texture.aspect,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            });
+
+        let dep_info = vk::DependencyInfo::default()
+            .image_memory_barriers(std::slice::from_ref(&image_barrier));
+        unsafe {
+            self.device
+                .cmd_pipeline_barrier2(self.command_buffer, &dep_info);
+        }
+    }
+
     pub fn transition_texture_layout(
         &self,
         texture: &mut Texture,

@@ -43,7 +43,7 @@ pub(crate) struct FrameContext {
 
     bindless_material: Material,
 
-    first_frame: bool,
+    first_render: bool,
 }
 
 impl FrameContext {
@@ -121,7 +121,7 @@ impl FrameContext {
 
             bindless_material,
 
-            first_frame: true,
+            first_render: true,
         })
     }
 
@@ -155,9 +155,19 @@ impl FrameContext {
                     float32: [1.0f32, 0.0f32, 0.0f32, 1.0f32],
                 },
             )?;
+            // Insert memory barrier that waits until the storage texture has been fully cleared before continuing with read/write operations
+            recorder.insert_texture_memory_barrier(
+                &self.render_target_tex,
+                vk::ImageLayout::GENERAL,
+                vk::ImageLayout::GENERAL,
+                vk::PipelineStageFlags2::TRANSFER,
+                vk::AccessFlags2::TRANSFER_WRITE,
+                vk::PipelineStageFlags2::COMPUTE_SHADER,
+                vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
+            );
 
             // Update the render target texture if it needs updating
-            if self.first_frame {
+            if self.first_render {
                 let mut writer = recorder.create_resource_writer();
                 writer
                     .write_render_target_texture(&self.render_target_tex, &self.bindless_material);
@@ -169,8 +179,7 @@ impl FrameContext {
                 time_sec: pkt.time_start.elapsed().as_secs_f32(),
                 ..Default::default()
             };
-            recorder
-                .update_push_constants(&self.bindless_material, per_draw_data.as_bytes());
+            recorder.update_push_constants(&self.bindless_material, per_draw_data.as_bytes());
             let group_count_x = (self.render_target_tex.width() as f32 / 16.0).ceil() as u32;
             let group_count_y = (self.render_target_tex.height() as f32 / 16.0).ceil() as u32;
             recorder.dispatch(group_count_x, group_count_y, 1);
@@ -206,6 +215,8 @@ impl FrameContext {
             &[self.render_semaphore],
             self.render_fence,
         )?);
+
+        self.first_render = false;
 
         Ok(FramePresentPacket {
             texture: present_tex,

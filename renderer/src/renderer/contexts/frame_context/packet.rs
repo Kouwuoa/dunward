@@ -9,8 +9,9 @@ use crate::renderer::contexts::swapchain_context::PresentTextureBundle;
 /// It is not meant to be stored or used outside the scope of a single frame render call
 pub(crate) struct FrameRenderPacket<'a> {
     pub camera: &'a crate::Camera,
-    pub frame_index: usize,
     pub target_size: winit::dpi::PhysicalSize<u32>,
+    pub frame_index: usize,
+    pub frame_number: u64,
     pub time_start: Instant,
 }
 
