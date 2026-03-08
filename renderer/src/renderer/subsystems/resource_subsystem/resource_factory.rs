@@ -1,6 +1,5 @@
 use crate::renderer::subsystems::command_subsystem::transfer_command_recorder::TransferCommandRecorder;
-use crate::renderer::subsystems::descriptor_subsystem::descriptor_allocator::DescriptorAllocator;
-use crate::renderer::subsystems::descriptor_subsystem::descriptor_set_layout_builder::DescriptorSetLayoutBuilder;
+use crate::renderer::subsystems::resource_subsystem::resource_descriptors::descriptor_allocator::DescriptorAllocator;
 use crate::renderer::subsystems::resource_subsystem::resource_types::ResourceType;
 use crate::renderer::subsystems::resource_subsystem::resource_types::material::{
     ComputeMaterialFactoryBuilder, MaterialFactory,
@@ -16,6 +15,7 @@ use crate::renderer::subsystems::resource_subsystem::resource_types::texture::{
 use ash::vk;
 use color_eyre::Result;
 use std::sync::{Arc, Mutex};
+use crate::renderer::subsystems::resource_subsystem::resource_descriptors::descriptor_set_layout_builder::DescriptorSetLayoutBuilder;
 
 /// `ResourceFactory` is responsible only for construction (`create_*` APIs)
 /// such as buffers, textures, and materials as needed.
@@ -31,15 +31,16 @@ impl ResourceFactory {
     pub fn new(
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         transfer_command_recorder: Arc<TransferCommandRecorder>,
-        descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
         device: Arc<ash::Device>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        let descriptor_allocator =
+            Arc::new(Mutex::new(DescriptorAllocator::new(device.clone(), 1000)?));
+        Ok(Self {
             memory_allocator,
             transfer_command_recorder,
             descriptor_allocator,
             device,
-        }
+        })
     }
 
     pub fn create_color_texture(

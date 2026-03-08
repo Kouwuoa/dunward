@@ -1,4 +1,3 @@
-use crate::renderer::subsystems::descriptor_subsystem::descriptor_allocator::DescriptorAllocator;
 use crate::renderer::subsystems::resource_subsystem::resource_types::shader::{
     ComputeShader, GraphicsShader,
 };
@@ -8,18 +7,17 @@ use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
 use std::ffi::CString;
 use std::sync::{Arc, Mutex};
+use crate::renderer::subsystems::resource_subsystem::resource_descriptors::descriptor_allocator::DescriptorAllocator;
 
 /// You can think of a Material as a shader instance that you can bind resources and data to.
 /// You only need to create a Material once, and then you can use it to render multiple objects.
 /// You only need to switch the Material when you want to change the shader or pipeline.
 pub struct Material {
-    pipeline: vk::Pipeline,
-    pipeline_layout: vk::PipelineLayout,
-    pipeline_bind_point: vk::PipelineBindPoint,
-    descriptor_set: vk::DescriptorSet,
-
+    pub pipeline: vk::Pipeline,
+    pub pipeline_layout: vk::PipelineLayout,
+    pub pipeline_bind_point: vk::PipelineBindPoint,
+    pub descriptor_set: vk::DescriptorSet,
     device: Arc<ash::Device>,
-    descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
 }
 
 impl Material {
@@ -76,7 +74,6 @@ impl MaterialFactory {
             pipeline_bind_point: self.pipeline_bind_point,
             descriptor_set,
             device: self.device.clone(),
-            descriptor_allocator: self.descriptor_allocator.clone(),
         })
     }
 

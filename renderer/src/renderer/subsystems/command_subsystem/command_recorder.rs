@@ -211,11 +211,13 @@ impl CommandRecorder<Recording> {
         Ok(())
     }
 
+    /// Should be called every frame
     pub fn bind_material(&self, material: &Material) {
         material.bind_pipeline(self.command_buffer);
         material.bind_descriptor_sets(self.command_buffer);
     }
 
+    /// Should be called every frame
     pub fn update_push_constants(&self, material: &Material, data: &[u8]) {
         material.update_push_constants(self.command_buffer, data);
     }
