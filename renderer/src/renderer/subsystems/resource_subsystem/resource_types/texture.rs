@@ -278,6 +278,14 @@ impl Texture {
         Ok(StorageTexture(image))
     }
 
+    pub fn width(&self) -> u32 {
+        self.extent.width
+    }
+
+    pub fn height(&self) -> u32 {
+        self.extent.height
+    }
+
     pub fn transition_layout(
         &mut self,
         cmd: vk::CommandBuffer,

@@ -1,3 +1,4 @@
+use std::time::Instant;
 use crate::renderer::contexts::swapchain_context::PresentTextureBundle;
 
 /// This struct is used to pass all necessary data for rendering a single frame.
@@ -10,6 +11,7 @@ pub(crate) struct FrameRenderPacket<'a> {
     pub camera: &'a crate::Camera,
     pub frame_index: usize,
     pub target_size: winit::dpi::PhysicalSize<u32>,
+    pub time_start: Instant,
 }
 
 pub(crate) struct FramePresentPacket {

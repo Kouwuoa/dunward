@@ -21,7 +21,6 @@ pub(crate) mod resource_types;
 
 pub(crate) struct ResourceSubsystem {
     pub resource_store: ResourceStore,
-    pub resource_binder: ResourceWriter,
     pub resource_factory: ResourceFactory,
     memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
     transfer_command_recorder: Arc<TransferCommandRecorder>,
@@ -30,7 +29,6 @@ pub(crate) struct ResourceSubsystem {
 
 impl ResourceSubsystem {
     pub fn new(dvc_ctx: &DeviceContext, cmd_sys: &CommandSubsystem) -> Result<Self> {
-        let resource_binder = ResourceWriter::new(dvc_ctx.logical_device_handle());
         let memory_allocator = Arc::new(Mutex::new(unsafe {
             vk_mem::Allocator::new(vk_mem::AllocatorCreateInfo::new(
                 &dvc_ctx.instance_handle(),
@@ -58,7 +56,6 @@ impl ResourceSubsystem {
 
         Ok(Self {
             resource_store,
-            resource_binder,
             resource_factory,
             memory_allocator,
             transfer_command_recorder,

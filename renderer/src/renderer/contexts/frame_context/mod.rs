@@ -7,13 +7,13 @@ use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
 use crate::renderer::subsystems::command_subsystem::command_recorder::{CommandRecorder, Idle};
 use crate::renderer::subsystems::command_subsystem::command_recorder_allocator::CommandRecorderAllocatorExt;
 use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
-use crate::renderer::subsystems::resource_subsystem::resource_writer::ResourceWriter;
 use crate::renderer::subsystems::resource_subsystem::resource_types::material::Material;
 use crate::renderer::subsystems::resource_subsystem::resource_types::megabuffer::{
     AllocatedMegabufferRegion, MegabufferExt,
 };
 use crate::renderer::subsystems::resource_subsystem::resource_types::shader_data::PerDrawData;
 use crate::renderer::subsystems::resource_subsystem::resource_types::texture::StorageTexture;
+use crate::renderer::subsystems::resource_subsystem::resource_writer::ResourceWriter;
 use ash::vk;
 use color_eyre::eyre::Result;
 use std::time::Duration;
@@ -42,6 +42,8 @@ pub(crate) struct FrameContext {
     render_fence: vk::Fence,
 
     bindless_material: Material,
+
+    first_frame: bool,
 }
 
 impl FrameContext {
@@ -118,6 +120,8 @@ impl FrameContext {
             render_fence,
 
             bindless_material,
+
+            first_frame: true,
         })
     }
 
@@ -153,14 +157,23 @@ impl FrameContext {
             )?;
 
             // Update the render target texture if it needs updating
-            let mut writer = recorder.create_resource_writer();
-            writer.write_render_target_texture(&self.render_target_tex)?;
+            if self.first_frame {
+                let mut writer = recorder.create_resource_writer();
+                writer
+                    .write_render_target_texture(&self.render_target_tex, &self.bindless_material);
+            }
 
             // Compute render operations
             recorder.bind_material(&self.bindless_material);
+            let per_draw_data = PerDrawData {
+                time_sec: pkt.time_start.elapsed().as_secs_f32(),
+                ..Default::default()
+            };
             recorder
-                .update_push_constants(&self.bindless_material, PerDrawData::default().as_bytes());
-            recorder.dispatch(16, 16, 1);
+                .update_push_constants(&self.bindless_material, per_draw_data.as_bytes());
+            let group_count_x = (self.render_target_tex.width() as f32 / 16.0).ceil() as u32;
+            let group_count_y = (self.render_target_tex.height() as f32 / 16.0).ceil() as u32;
+            recorder.dispatch(group_count_x, group_count_y, 1);
 
             // TODO: Perform render operations here
 

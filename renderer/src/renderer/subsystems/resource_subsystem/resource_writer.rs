@@ -3,6 +3,7 @@ use crate::renderer::subsystems::resource_subsystem::resource_types::texture::{
     ColorTexture, StorageTexture, Texture,
 };
 use ash::vk;
+use crate::renderer::subsystems::resource_subsystem::resource_types::material::Material;
 
 pub(crate) struct ResourceWriter<'a> {
     device: &'a ash::Device,
@@ -20,13 +21,16 @@ impl<'a> ResourceWriter<'a> {
         }
     }
 
-    pub fn write_render_target_texture(&mut self, texture: &StorageTexture) {
+    pub fn write_render_target_texture(&mut self, texture: &StorageTexture, material: &Material) {
         self.descriptor_writer.write_image(
             0,
             texture.view,
             vk::Sampler::null(),
             vk::ImageLayout::GENERAL,
             vk::DescriptorType::STORAGE_IMAGE,
-        )
+        );
+
+
+        self.descriptor_writer.update_set(self.device, material.descriptor_set);
     }
 }

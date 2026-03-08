@@ -1,3 +1,4 @@
+use std::time::Instant;
 pub use glam;
 pub use winit;
 
@@ -10,7 +11,6 @@ use crate::renderer::contexts::frame_context::FrameContext;
 use crate::renderer::contexts::frame_context::packet::FrameRenderPacket;
 use crate::renderer::contexts::swapchain_context::{SwapchainContext, SwapchainPresentError};
 use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
-use crate::renderer::subsystems::descriptor_subsystem::DescriptorSubsystem;
 use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
 use ash::vk;
 use color_eyre::Result;
@@ -34,10 +34,10 @@ pub struct Renderer {
 
     // Subsystems
     cmd_sys: CommandSubsystem,
-    dsc_sys: DescriptorSubsystem,
     rsc_sys: ResourceSubsystem,
 
     frame_number: u64,
+    time_start: Instant,
 }
 
 impl Renderer {
@@ -48,33 +48,21 @@ impl Renderer {
         let _ = env_logger::try_init();
 
         let mut dvc_ctx = DeviceContext::new(window)?;
-        let swc_ctx = dvc_ctx.create_swapchain_context(window)?;
-
         let mut cmd_sys = CommandSubsystem::new(&dvc_ctx)?;
-        let dsc_sys = DescriptorSubsystem::new(&dvc_ctx)?;
-        let mut rsc_sys = ResourceSubsystem::new(&dvc_ctx, &cmd_sys, &dsc_sys)?;
-
+        let mut rsc_sys = ResourceSubsystem::new(&dvc_ctx, &cmd_sys)?;
+        let swc_ctx = dvc_ctx.create_swapchain_context(window, &rsc_sys)?;
         let frm_ctxs = (0..Self::FRAMES_IN_FLIGHT)
             .map(|_| FrameContext::new(&mut dvc_ctx, &swc_ctx, &mut cmd_sys, &mut rsc_sys))
             .collect::<Result<Vec<FrameContext>>>()?;
-
-        // Bind initial global textures and samplers
-        // Note: We'll only need to rebind global resources if we import or remove assets while the renderer is running
-        rsc_sys
-            .resource_binder
-            .bind_global_sampled_textures(&rsc_sys.resource_store.textures);
-        rsc_sys
-            .resource_binder
-            .bind_global_samplers(&self.rsc_sto.samplers);
 
         Ok(Self {
             dvc_ctx,
             swc_ctx,
             frm_ctxs,
             cmd_sys,
-            dsc_sys,
             rsc_sys,
             frame_number: 0,
+            time_start: Instant::now(),
         })
     }
 
@@ -88,7 +76,7 @@ impl Renderer {
 
         // Render the scene for the current frame
         let present_pkt = current_frame
-            .render(render_pkt, &self.dvc_ctx, &self.swc_ctx, &self.rsc_sto)
+            .render(render_pkt, &self.dvc_ctx, &self.swc_ctx, &self.rsc_sys)
             .unwrap();
 
         // Present the frame
@@ -123,6 +111,7 @@ impl Renderer {
             camera: cam,
             frame_index: self.get_current_frame_index(),
             target_size,
+            time_start: self.time_start,
         }
     }
 
@@ -137,7 +126,7 @@ impl Drop for Renderer {
 
         // Destroy all frames
         for frame in self.frm_ctxs.drain(..) {
-            frame.destroy(&mut self.dvc_ctx).unwrap();
+            frame.destroy(&mut self.cmd_sys).unwrap();
         }
     }
 }

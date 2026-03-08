@@ -41,6 +41,7 @@ pub struct PerDrawData {
     pub object_index: u32,
     pub material_index: u32,
     pub vertex_offset: u32,
+    pub time_sec: f32,
 }
 
 impl PerDrawData {

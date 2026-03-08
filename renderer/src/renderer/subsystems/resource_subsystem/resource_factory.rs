@@ -107,7 +107,7 @@ impl ResourceFactory {
         let bindless_descriptor_set_layout = self.create_bindless_descriptor_set_layout()?;
         let bindless_pipeline_layout =
             self.create_bindless_pipeline_layout(bindless_descriptor_set_layout)?;
-        let default_shader = ComputeShader::new("sky", self.device.clone())?;
+        let default_shader = ComputeShader::new("moving-shape", self.device.clone())?;
         ComputeMaterialFactoryBuilder::new(self.device.clone(), self.descriptor_allocator.clone())
             .with_shader(default_shader)
             .with_pipeline_layout(bindless_pipeline_layout)
