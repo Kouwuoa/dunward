@@ -327,7 +327,6 @@ impl Device {
             ash::khr::maintenance3::NAME,
             ash::ext::shader_object::NAME,
             // Descriptors
-            ash::ext::descriptor_buffer::NAME,
             ash::ext::descriptor_indexing::NAME,
 
             #[cfg(target_os = "macos")]
