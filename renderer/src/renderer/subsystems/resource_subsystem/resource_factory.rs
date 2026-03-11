@@ -15,6 +15,7 @@ use crate::renderer::subsystems::resource_subsystem::resource_types::texture::{
 use ash::vk;
 use color_eyre::Result;
 use std::sync::{Arc, Mutex};
+use shaderpack::ShaderId;
 use crate::renderer::subsystems::resource_subsystem::resource_descriptors::descriptor_set_layout_builder::DescriptorSetLayoutBuilder;
 
 /// `ResourceFactory` is responsible only for construction (`create_*` APIs)
@@ -107,7 +108,7 @@ impl ResourceFactory {
         let bindless_descriptor_set_layout = self.create_bindless_descriptor_set_layout()?;
         let bindless_pipeline_layout =
             self.create_bindless_pipeline_layout(bindless_descriptor_set_layout)?;
-        let default_shader = ComputeShader::new("moving-shape", self.device.clone())?;
+        let default_shader = ComputeShader::new(ShaderId::MovingShape, self.device.clone())?;
         ComputeMaterialFactoryBuilder::new(self.device.clone(), self.descriptor_allocator.clone())
             .with_shader(default_shader)
             .with_pipeline_layout(bindless_pipeline_layout)

@@ -14,15 +14,10 @@ image = "0.25.6"
 log = "0.4.27"
 presser = "0.3.1"
 raw-window-handle = "0.6"
-rust-embed = "8.7.2"
 smallvec = "1.15.1"
 thiserror = "2.0.15"
 vk-mem = "0.5.0"
 winit = { version = "0.30", default-features = false, features = ["rwh_06"] }
+shaderpack = { path = "shaderpack" }
+rust-embed = { workspace = true }
 
-[build-dependencies]
-bytemuck = "1.21.0"
-color-eyre = "0.6.3"
-log = "0.4.22"
-naga = { version = "28.0.0", features = ["wgsl-in", "spv-out"] }
-shaderc = "0.10.1"

@@ -5,7 +5,10 @@ edition = "2024"
 
 [workspace]
 resolver = "2"
-members = ["renderer"]
+members = ["renderer", "renderer/shaderpack"]
+
+[workspace.dependencies]
+rust-embed = "8.7.2"
 
 [profile.dev]
 opt-level = 1

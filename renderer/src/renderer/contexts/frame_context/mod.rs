@@ -89,7 +89,7 @@ impl FrameContext {
             &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
         )?;
 
-        // Note: Even though we're using compute shaders,
+        // Note: Even though we're using compute shaders-temp,
         // we'll still use the graphics queue to avoid queue family ownership transfers and semaphore complexity.
         // The graphics queue should support compute operations.
         let graphics_queue = dvc_ctx.get_graphics_queue();

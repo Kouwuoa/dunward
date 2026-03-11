@@ -248,7 +248,7 @@ impl Texture {
         )?))
     }
 
-    /// Create a special type of texture likely used by compute shaders
+    /// Create a special type of texture likely used by compute shaders-temp
     pub fn new_storage_texture(
         width: u32,
         height: u32,

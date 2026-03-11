@@ -2,12 +2,9 @@ use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::OptionExt;
 use rust_embed::RustEmbed;
+use shaderpack::*;
 use std::path::Path;
 use std::sync::Arc;
-
-#[derive(RustEmbed)]
-#[folder = "shaders-built/"]
-struct ShadersEmbed;
 
 pub struct GraphicsShader {
     pub vert_mod: vk::ShaderModule,
@@ -21,11 +18,9 @@ pub struct ComputeShader {
 }
 
 impl GraphicsShader {
-    pub fn new(shader_name: &str, device: Arc<ash::Device>) -> Result<Self> {
-        let vert_mod =
-            create_shader_module((&format!("{}.vert.spv", shader_name)).as_ref(), &device)?;
-        let frag_mod =
-            create_shader_module((&format!("{}.frag.spv", shader_name)).as_ref(), &device)?;
+    pub fn new(vert_id: ShaderId, frag_id: ShaderId, device: Arc<ash::Device>) -> Result<Self> {
+        let vert_mod = create_shader_module(vert_id, &device)?;
+        let frag_mod = create_shader_module(frag_id, &device)?;
         Ok(Self {
             vert_mod,
             frag_mod,
@@ -35,9 +30,8 @@ impl GraphicsShader {
 }
 
 impl ComputeShader {
-    pub fn new(shader_name: &str, device: Arc<ash::Device>) -> Result<Self> {
-        let comp_mod =
-            create_shader_module((&format!("{}.comp.spv", shader_name)).as_ref(), &device)?;
+    pub fn new(id: ShaderId, device: Arc<ash::Device>) -> Result<Self> {
+        let comp_mod = create_shader_module(id, &device)?;
         Ok(Self { comp_mod, device })
     }
 }
@@ -59,15 +53,15 @@ impl Drop for ComputeShader {
     }
 }
 
-fn create_shader_module(filepath: &Path, device: &ash::Device) -> Result<vk::ShaderModule> {
-    log::info!("Creating shader module from file: {:?}", filepath);
+fn create_shader_module(shader_id: ShaderId, device: &ash::Device) -> Result<vk::ShaderModule> {
+    log::info!("Creating shader module from id: {:?}", shader_id);
 
-    let filepath = filepath.to_str().ok_or_eyre("Invalid shader file path")?;
-    let embedded_file =
-        ShadersEmbed::get(filepath).ok_or_eyre("Shader not found in embedded resources")?;
-    let bytes = embedded_file.data;
-
-    assert_eq!(bytes.len() % 4, 0, "Shader bytecode must be a multiple of 4 bytes");
+    let bytes = get_shader_spv(shader_id);
+    assert_eq!(
+        bytes.len() % 4,
+        0,
+        "Shader bytecode must be a multiple of 4 bytes"
+    );
 
     let shader_module_info =
         vk::ShaderModuleCreateInfo::default().code(bytemuck::cast_slice(&bytes));

@@ -1,0 +1,14 @@
+[package]
+name = "shaderpack"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rust-embed = { workspace = true }
+
+[build-dependencies]
+bytemuck = "1.21.0"
+color-eyre = "0.6.3"
+log = "0.4.22"
+naga = { version = "28.0.0", features = ["wgsl-in", "spv-out"] }
+shaderc = "0.10.1"
