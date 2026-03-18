@@ -4,7 +4,7 @@ use crate::renderer::subsystems::resource_subsystem::resource_types::material::M
 use crate::renderer::subsystems::resource_subsystem::resource_types::texture::{
     ColorTexture, DepthTexture, StorageTexture, Texture,
 };
-use crate::renderer::subsystems::resource_subsystem::resource_writer::ResourceWriter;
+use crate::renderer::subsystems::resource_subsystem::resource_updater::ResourceUpdater;
 use ash::vk;
 use color_eyre::Result;
 use std::marker::PhantomData;
@@ -268,8 +268,8 @@ impl CommandRecorder<Recording> {
         }
     }
 
-    pub fn create_resource_writer(&self) -> ResourceWriter<'_> {
-        ResourceWriter::new(&self.device, &self.command_buffer)
+    pub fn create_resource_updater(&self) -> ResourceUpdater<'_> {
+        ResourceUpdater::new(&self.device, &self.command_buffer)
     }
 
     fn end_recording(self) -> Result<CommandRecorder<Executable>> {

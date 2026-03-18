@@ -102,7 +102,15 @@ impl Renderer {
     }
 
     pub fn resize(&mut self, size: winit::dpi::PhysicalSize<u32>) -> Result<()> {
-        self.swc_ctx.resize(&size, &self.dvc_ctx)
+        // Resize the swapchain
+        self.swc_ctx.resize(&size, &self.dvc_ctx)?;
+
+        // Resize the frame contexts
+        for frame in &mut self.frm_ctxs {
+            frame.resize(&size, &self.rsc_sys);
+        }
+
+        Ok(())
     }
 
     fn update_scene<'a>(&mut self, cam: &'a Camera) -> FrameRenderPacket<'a> {

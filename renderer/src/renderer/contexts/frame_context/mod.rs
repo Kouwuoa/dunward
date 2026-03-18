@@ -13,7 +13,7 @@ use crate::renderer::subsystems::resource_subsystem::resource_types::megabuffer:
 };
 use crate::renderer::subsystems::resource_subsystem::resource_types::shader_data::PerDrawData;
 use crate::renderer::subsystems::resource_subsystem::resource_types::texture::StorageTexture;
-use crate::renderer::subsystems::resource_subsystem::resource_writer::ResourceWriter;
+use crate::renderer::subsystems::resource_subsystem::resource_updater::ResourceUpdater;
 use ash::vk;
 use color_eyre::eyre::Result;
 use std::time::Duration;
@@ -27,6 +27,7 @@ const FRAME_PER_OBJECT_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 pub(crate) struct FrameContext {
     graphics_recorder: Option<CommandRecorder<Idle>>,
     render_target_tex: StorageTexture,
+    render_target_tex_needs_update: bool,
 
     vertex_region: AllocatedMegabufferRegion,
     index_region: AllocatedMegabufferRegion,
@@ -42,8 +43,6 @@ pub(crate) struct FrameContext {
     render_fence: vk::Fence,
 
     bindless_material: Material,
-
-    first_render: bool,
 }
 
 impl FrameContext {
@@ -108,6 +107,7 @@ impl FrameContext {
         Ok(Self {
             graphics_recorder,
             render_target_tex,
+            render_target_tex_needs_update: true,
 
             vertex_region,
             index_region,
@@ -120,8 +120,6 @@ impl FrameContext {
             render_fence,
 
             bindless_material,
-
-            first_render: true,
         })
     }
 
@@ -143,11 +141,27 @@ impl FrameContext {
         // Record render commands
         let recorder = self.graphics_recorder.take().unwrap();
         let recorder = recorder.record(|recorder| {
+            // Transition render target texture to GENERAL layout
             recorder.transition_texture_layout(
                 &mut self.render_target_tex,
                 vk::ImageLayout::UNDEFINED,
                 vk::ImageLayout::GENERAL,
             )?;
+
+            // Update the render target texture if it needs updating
+            if self.render_target_tex_needs_update {
+                let mut updater = recorder.create_resource_updater();
+                updater.enqueue_update(
+                    |builder| {
+                        builder.set_render_target_texture(&self.render_target_tex);
+                    },
+                    &self.bindless_material,
+                );
+                updater.execute_updates();
+                self.render_target_tex_needs_update = false;
+            }
+
+            // Clear render target texture
             recorder.clear_storage_texture(
                 &self.render_target_tex,
                 vk::ImageLayout::GENERAL,
@@ -155,6 +169,7 @@ impl FrameContext {
                     float32: [1.0f32, 0.0f32, 0.0f32, 1.0f32],
                 },
             )?;
+
             // Insert memory barrier that waits until the storage texture has been fully cleared before continuing with read/write operations
             recorder.insert_texture_memory_barrier(
                 &self.render_target_tex,
@@ -165,13 +180,6 @@ impl FrameContext {
                 vk::PipelineStageFlags2::COMPUTE_SHADER,
                 vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
             );
-
-            // Update the render target texture if it needs updating
-            if self.first_render {
-                let mut writer = recorder.create_resource_writer();
-                writer
-                    .write_render_target_texture(&self.render_target_tex, &self.bindless_material);
-            }
 
             // Compute render operations
             recorder.bind_material(&self.bindless_material);
@@ -216,8 +224,6 @@ impl FrameContext {
             self.render_fence,
         )?);
 
-        self.first_render = false;
-
         Ok(FramePresentPacket {
             texture: present_tex,
         })
@@ -229,6 +235,14 @@ impl FrameContext {
         swc: &SwapchainContext,
     ) -> core::result::Result<(), SwapchainPresentError> {
         swc.present(pkt.texture, self.render_semaphore)
+    }
+
+    pub fn resize(&mut self, size: &winit::dpi::PhysicalSize<u32>, rsc_sys: &ResourceSubsystem) {
+        self.render_target_tex = rsc_sys
+            .resource_factory
+            .create_storage_texture(size.width, size.height, true)
+            .unwrap();
+        self.render_target_tex_needs_update = true;
     }
 
     pub fn destroy(mut self, cmd_sys: &mut CommandSubsystem) -> Result<()> {

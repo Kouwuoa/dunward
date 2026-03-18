@@ -4,7 +4,7 @@ use crate::renderer::{
     subsystems::{
         command_subsystem::CommandSubsystem,
         command_subsystem::transfer_command_recorder::TransferCommandRecorder,
-        resource_subsystem::resource_writer::ResourceWriter,
+        resource_subsystem::resource_updater::ResourceUpdater,
         resource_subsystem::resource_store::ResourceStore,
         resource_subsystem::resource_types::megabuffer::MegabufferExt,
     },
@@ -13,7 +13,7 @@ use ash::vk;
 use color_eyre::eyre::Result;
 use std::sync::{Arc, Mutex};
 
-pub(crate) mod resource_writer;
+pub(crate) mod resource_updater;
 pub(crate) mod resource_descriptors;
 pub(crate) mod resource_factory;
 pub(crate) mod resource_store;
