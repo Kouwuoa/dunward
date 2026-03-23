@@ -326,6 +326,7 @@ impl Device {
             ash::khr::synchronization2::NAME,
             ash::khr::maintenance3::NAME,
             ash::ext::shader_object::NAME,
+            ash::ext::extended_dynamic_state::NAME,
             // Descriptors
             ash::ext::descriptor_indexing::NAME,
 

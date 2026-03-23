@@ -29,7 +29,8 @@ pub struct ResourceStore {
     pub per_material_megabuffer: Megabuffer,
     pub per_object_megabuffer: Megabuffer,
 
-    pub bindless_material_factory: MaterialFactory,
+    pub graphics_material_factory: MaterialFactory,
+    pub compute_material_factory: MaterialFactory,
 }
 
 impl ResourceStore {

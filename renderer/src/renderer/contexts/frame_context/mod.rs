@@ -1,4 +1,6 @@
 pub(crate) mod packet;
+mod frame_geometry_stage;
+mod frame_lighting_stage;
 
 use crate::renderer::contexts::device_context::DeviceContext;
 use crate::renderer::contexts::frame_context::packet::{FramePresentPacket, FrameRenderPacket};
@@ -13,10 +15,11 @@ use crate::renderer::subsystems::resource_subsystem::resource_types::megabuffer:
 };
 use crate::renderer::subsystems::resource_subsystem::resource_types::shader_data::PerDrawData;
 use crate::renderer::subsystems::resource_subsystem::resource_types::texture::StorageTexture;
-use crate::renderer::subsystems::resource_subsystem::resource_updater::ResourceUpdater;
 use ash::vk;
 use color_eyre::eyre::Result;
 use std::time::Duration;
+use crate::renderer::contexts::frame_context::frame_geometry_stage::FrameGeometryStage;
+use crate::renderer::contexts::frame_context::frame_lighting_stage::FrameLightingStage;
 
 const FRAME_VERTEX_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_INDEX_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
@@ -25,24 +28,9 @@ const FRAME_PER_MATERIAL_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_PER_OBJECT_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 
 pub(crate) struct FrameContext {
-    graphics_recorder: Option<CommandRecorder<Idle>>,
-    render_target_tex: StorageTexture,
-    render_target_tex_needs_update: bool,
-
-    vertex_region: AllocatedMegabufferRegion,
-    index_region: AllocatedMegabufferRegion,
-    per_frame_region: AllocatedMegabufferRegion,
-    per_material_region: AllocatedMegabufferRegion,
-    per_object_region: AllocatedMegabufferRegion,
-
-    /// Signals when the swapchain is ready to present (i.e. when the next swapchain image has been acquired successfully).
-    present_semaphore: vk::Semaphore,
-    /// Signals when rendering commands have been submitted to a queue.
-    render_semaphore: vk::Semaphore,
-    /// Signals when all rendering commands have finished execution.
-    render_fence: vk::Fence,
-
-    bindless_material: Material,
+    geometry_stage: FrameGeometryStage,
+    lighting_stage: FrameLightingStage,
+    present_image_acquired_semaphore: vk::Semaphore,
 }
 
 impl FrameContext {
@@ -54,12 +42,6 @@ impl FrameContext {
     ) -> Result<Self> {
         log::info!("Creating FrameContext");
 
-        let swc_size = swc_ctx.get_size();
-        let render_target_tex = rsc_sys.resource_factory.create_storage_texture(
-            swc_size.width,
-            swc_size.height,
-            true,
-        )?;
 
         let vertex_region = rsc_sys
             .resource_store
@@ -82,9 +64,13 @@ impl FrameContext {
             .per_object_megabuffer
             .allocate_region(FRAME_PER_OBJECT_BUFFER_SIZE)?;
 
-        let present_semaphore = dvc_ctx.create_vk_semaphore(&vk::SemaphoreCreateInfo::default())?;
-        let render_semaphore = dvc_ctx.create_vk_semaphore(&vk::SemaphoreCreateInfo::default())?;
-        let render_fence = dvc_ctx.create_vk_fence(
+        let present_image_acquired_semaphore = dvc_ctx.create_vk_semaphore(&vk::SemaphoreCreateInfo::default())?;
+        let graphics_finished_semaphore = dvc_ctx.create_vk_semaphore(&vk::SemaphoreCreateInfo::default())?;
+        let graphics_finished_fence = dvc_ctx.create_vk_fence(
+            &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
+        )?;
+        let compute_finished_semaphore = dvc_ctx.create_vk_semaphore(&vk::SemaphoreCreateInfo::default())?;
+        let compute_finished_fence = dvc_ctx.create_vk_fence(
             &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
         )?;
 
@@ -98,28 +84,32 @@ impl FrameContext {
                 .command_recorder_allocator
                 .allocate(graphics_queue)?,
         );
-
-        let bindless_material = rsc_sys
-            .resource_store
-            .bindless_material_factory
-            .create_material()?;
+        let compute_recorder = Some(
+            cmd_sys
+                .command_recorder_allocator
+                .allocate(dvc_ctx.get_graphics_queue())?,
+        );
 
         Ok(Self {
-            graphics_recorder,
-            render_target_tex,
-            render_target_tex_needs_update: true,
-
-            vertex_region,
-            index_region,
-            per_frame_region,
-            per_material_region,
-            per_object_region,
-
-            present_semaphore,
-            render_semaphore,
-            render_fence,
-
-            bindless_material,
+            graphics: FrameGraphicsPart {
+                recorder: graphics_recorder,
+                vertex_region,
+                index_region,
+                per_frame_region,
+                per_material_region,
+                per_object_region,
+                present_image_acquired_semaphore,
+                graphics_finished_semaphore,
+                graphics_finished_fence,
+            },
+            compute: FrameComputePart {
+                recorder: compute_recorder,
+                render_target_tex,
+                render_target_tex_needs_update: true,
+                compute_finished_semaphore,
+                compute_finished_fence,
+                bindless_material,
+            },
         })
     }
 
@@ -133,37 +123,40 @@ impl FrameContext {
         let timeout = Duration::from_secs(1);
 
         // Wait until the commands have finished from the last time this frame was rendered
-        dvc.wait_and_reset_fence(self.render_fence, timeout)?;
+        dvc.wait_and_reset_fence(self.graphics.graphics_finished_fence, timeout)?;
 
         // Acquire the next image from the swapchain
-        let mut present_tex = swc.acquire_next_present_texture(self.present_semaphore, timeout)?;
+        let mut present_tex = swc.acquire_next_present_texture(
+            self.graphics.present_image_acquired_semaphore,
+            timeout,
+        )?;
 
         // Record render commands
-        let recorder = self.graphics_recorder.take().unwrap();
+        let recorder = self.graphics.recorder.take().unwrap();
         let recorder = recorder.record(|recorder| {
             // Transition render target texture to GENERAL layout
             recorder.transition_texture_layout(
-                &mut self.render_target_tex,
+                &mut self.compute.render_target_tex,
                 vk::ImageLayout::UNDEFINED,
                 vk::ImageLayout::GENERAL,
             )?;
 
             // Update the render target texture if it needs updating
-            if self.render_target_tex_needs_update {
+            if self.compute.render_target_tex_needs_update {
                 let mut updater = recorder.create_resource_updater();
                 updater.enqueue_update(
                     |builder| {
-                        builder.set_render_target_texture(&self.render_target_tex);
+                        builder.set_render_target_texture(&self.compute.render_target_tex);
                     },
-                    &self.bindless_material,
+                    &self.compute.bindless_material,
                 );
                 updater.execute_updates();
-                self.render_target_tex_needs_update = false;
+                self.compute.render_target_tex_needs_update = false;
             }
 
             // Clear render target texture
             recorder.clear_storage_texture(
-                &self.render_target_tex,
+                &self.compute.render_target_tex,
                 vk::ImageLayout::GENERAL,
                 &vk::ClearColorValue {
                     float32: [1.0f32, 0.0f32, 0.0f32, 1.0f32],
@@ -172,7 +165,7 @@ impl FrameContext {
 
             // Insert memory barrier that waits until the storage texture has been fully cleared before continuing with read/write operations
             recorder.insert_texture_memory_barrier(
-                &self.render_target_tex,
+                &self.compute.render_target_tex,
                 vk::ImageLayout::GENERAL,
                 vk::ImageLayout::GENERAL,
                 vk::PipelineStageFlags2::TRANSFER,
@@ -182,21 +175,23 @@ impl FrameContext {
             );
 
             // Compute render operations
-            recorder.bind_material(&self.bindless_material);
+            recorder.bind_material(&self.compute.bindless_material);
             let per_draw_data = PerDrawData {
                 time_sec: pkt.time_start.elapsed().as_secs_f32(),
                 ..Default::default()
             };
-            recorder.update_push_constants(&self.bindless_material, per_draw_data.as_bytes());
-            let group_count_x = (self.render_target_tex.width() as f32 / 16.0).ceil() as u32;
-            let group_count_y = (self.render_target_tex.height() as f32 / 16.0).ceil() as u32;
+            recorder.update_push_constants(&self.compute.bindless_material, per_draw_data.as_bytes());
+            let group_count_x =
+                (self.compute.render_target_tex.width() as f32 / 16.0).ceil() as u32;
+            let group_count_y =
+                (self.compute.render_target_tex.height() as f32 / 16.0).ceil() as u32;
             recorder.dispatch(group_count_x, group_count_y, 1);
 
             // TODO: Perform render operations here
 
             // Copy draw_color_tex onto swapchain texture
             recorder.transition_texture_layout(
-                &mut self.render_target_tex,
+                &mut self.compute.render_target_tex,
                 vk::ImageLayout::GENERAL,
                 vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             )?;
@@ -205,7 +200,10 @@ impl FrameContext {
                 vk::ImageLayout::UNDEFINED,
                 vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             )?;
-            recorder.copy_texture_to_texture(&self.render_target_tex, &mut present_tex.texture)?;
+            recorder.copy_texture_to_texture(
+                &self.compute.render_target_tex,
+                &mut present_tex.texture,
+            )?;
 
             // Prepare swapchain texture for presentation
             recorder.transition_texture_layout(
@@ -217,11 +215,11 @@ impl FrameContext {
             Ok(())
         })?;
 
-        self.graphics_recorder = Some(dvc.submit(
+        self.graphics.recorder = Some(dvc.submit(
             recorder,
-            &[self.present_semaphore],
-            &[self.render_semaphore],
-            self.render_fence,
+            &[self.graphics.present_image_acquired_semaphore],
+            &[self.graphics.graphics_finished_semaphore],
+            self.graphics.graphics_finished_fence,
         )?);
 
         Ok(FramePresentPacket {
@@ -234,22 +232,27 @@ impl FrameContext {
         pkt: FramePresentPacket,
         swc: &SwapchainContext,
     ) -> core::result::Result<(), SwapchainPresentError> {
-        swc.present(pkt.texture, self.render_semaphore)
+        swc.present(pkt.texture, self.graphics.graphics_finished_semaphore)
     }
 
     pub fn resize(&mut self, size: &winit::dpi::PhysicalSize<u32>, rsc_sys: &ResourceSubsystem) {
-        self.render_target_tex = rsc_sys
+        self.compute.render_target_tex = rsc_sys
             .resource_factory
             .create_storage_texture(size.width, size.height, true)
             .unwrap();
-        self.render_target_tex_needs_update = true;
+        self.compute.render_target_tex_needs_update = true;
     }
 
     pub fn destroy(mut self, cmd_sys: &mut CommandSubsystem) -> Result<()> {
-        if let Some(graphics_recorder) = self.graphics_recorder.take() {
+        if let Some(graphics_recorder) = self.graphics.recorder.take() {
             cmd_sys
                 .command_recorder_allocator
                 .deallocate(graphics_recorder)?;
+        }
+        if let Some(compute_recorder) = self.compute.recorder.take() {
+            cmd_sys
+                .command_recorder_allocator
+                .deallocate(compute_recorder)?;
         }
         Ok(())
     }

@@ -1,89 +1,13 @@
-use crate::renderer::subsystems::resource_subsystem::resource_types::shader::{
-    ComputeShader, GraphicsShader,
-};
+use crate::renderer::subsystems::resource_subsystem::resource_descriptors::descriptor_allocator::DescriptorAllocator;
+use crate::renderer::subsystems::resource_subsystem::resource_types::material::MaterialFactory;
+use crate::renderer::subsystems::resource_subsystem::resource_types::shader::GraphicsShader;
 use crate::renderer::subsystems::resource_subsystem::resource_types::vertex::VertexInputDescription;
 use ash::vk;
-use color_eyre::Result;
-use color_eyre::eyre::{OptionExt, eyre};
+use color_eyre::eyre::OptionExt;
+use color_eyre::eyre::Result;
+use color_eyre::eyre::eyre;
 use std::ffi::CString;
 use std::sync::{Arc, Mutex};
-use crate::renderer::subsystems::resource_subsystem::resource_descriptors::descriptor_allocator::DescriptorAllocator;
-
-/// You can think of a Material as a shader instance that you can bind resources and data to.
-/// You only need to create a Material once, and then you can use it to render multiple objects.
-/// You only need to switch the Material when you want to change the shader or pipeline.
-pub struct Material {
-    pub pipeline: vk::Pipeline,
-    pub pipeline_layout: vk::PipelineLayout,
-    pub pipeline_bind_point: vk::PipelineBindPoint,
-    pub descriptor_set: vk::DescriptorSet,
-    device: Arc<ash::Device>,
-}
-
-impl Material {
-    pub fn update_push_constants(&self, command_buffer: vk::CommandBuffer, data: &[u8]) {
-        unsafe {
-            self.device.cmd_push_constants(
-                command_buffer,
-                self.pipeline_layout,
-                vk::ShaderStageFlags::COMPUTE,
-                0,
-                data,
-            );
-        }
-    }
-
-    pub fn bind_pipeline(&self, command_buffer: vk::CommandBuffer) {
-        unsafe {
-            self.device
-                .cmd_bind_pipeline(command_buffer, self.pipeline_bind_point, self.pipeline);
-        }
-    }
-
-    pub fn bind_descriptor_sets(&self, command_buffer: vk::CommandBuffer) {
-        let descriptor_sets = [self.descriptor_set];
-        unsafe {
-            self.device.cmd_bind_descriptor_sets(
-                command_buffer,
-                self.pipeline_bind_point,
-                self.pipeline_layout,
-                0,
-                &descriptor_sets,
-                &[],
-            );
-        }
-    }
-}
-
-pub struct MaterialFactory {
-    pipeline: vk::Pipeline,
-    pipeline_layout: vk::PipelineLayout,
-    pipeline_bind_point: vk::PipelineBindPoint,
-    descriptor_set_layout: vk::DescriptorSetLayout,
-
-    device: Arc<ash::Device>,
-    descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
-}
-
-impl MaterialFactory {
-    pub fn create_material(&'_ mut self) -> Result<Material> {
-        let descriptor_set = self.allocate_descriptor_set()?;
-        Ok(Material {
-            pipeline: self.pipeline,
-            pipeline_layout: self.pipeline_layout,
-            pipeline_bind_point: self.pipeline_bind_point,
-            descriptor_set,
-            device: self.device.clone(),
-        })
-    }
-
-    fn allocate_descriptor_set(&mut self) -> Result<vk::DescriptorSet> {
-        self.descriptor_allocator
-            .lock()
-            .map_err(|e| eyre!(e.to_string()))?
-            .allocate(self.descriptor_set_layout)
-    }
-}
 
 pub struct GraphicsMaterialFactoryBuilder<'a> {
     vertex_input_description: VertexInputDescription,
@@ -397,89 +321,5 @@ impl<'a> GraphicsMaterialFactoryBuilder<'a> {
             .min_depth_bounds(0.0)
             .max_depth_bounds(1.0)
             .stencil_test_enable(false)
-    }
-}
-
-pub struct ComputeMaterialFactoryBuilder {
-    shader: Option<ComputeShader>,
-    pipeline_layout: Option<vk::PipelineLayout>,
-    descriptor_set_layout: Option<vk::DescriptorSetLayout>,
-
-    device: Arc<ash::Device>,
-    descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
-}
-
-impl ComputeMaterialFactoryBuilder {
-    pub fn new(
-        device: Arc<ash::Device>,
-        descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
-    ) -> Self {
-        Self {
-            shader: None,
-            pipeline_layout: None,
-            descriptor_set_layout: None,
-            device,
-            descriptor_allocator,
-        }
-    }
-
-    pub fn with_shader(mut self, shader: ComputeShader) -> Self {
-        let _ = self.shader.replace(shader);
-        self
-    }
-
-    pub fn with_pipeline_layout(mut self, layout: vk::PipelineLayout) -> Self {
-        let _ = self.pipeline_layout.replace(layout);
-        self
-    }
-
-    pub fn with_descriptor_set_layout(mut self, layout: vk::DescriptorSetLayout) -> Self {
-        let _ = self.descriptor_set_layout.replace(layout);
-        self
-    }
-
-    pub fn build(mut self) -> Result<MaterialFactory> {
-        let shader = self
-            .shader
-            .take()
-            .ok_or_eyre("No shader provided for ComputeMaterialBuilder")?;
-        let pipeline_layout = self
-            .pipeline_layout
-            .take()
-            .ok_or_eyre("No pipeline layout provided for ComputeMaterialBuilder")?;
-
-        let descriptor_set_layout = self
-            .descriptor_set_layout
-            .take()
-            .ok_or_eyre("No descriptor set layout provided for GraphicsMaterialBuilder")?;
-
-        let name = CString::new("main")?;
-        let stage_info = vk::PipelineShaderStageCreateInfo::default()
-            .stage(vk::ShaderStageFlags::COMPUTE)
-            .module(shader.comp_mod)
-            .name(&name);
-
-        let pipeline_info = vk::ComputePipelineCreateInfo::default()
-            .layout(pipeline_layout)
-            .stage(stage_info);
-        let pipeline = unsafe {
-            match self.device.create_compute_pipelines(
-                vk::PipelineCache::null(),
-                &[pipeline_info],
-                None,
-            ) {
-                Ok(pipelines) => Ok(pipelines),
-                Err(_) => Err(eyre!("Failed to create compute pipeline")),
-            }
-        }?[0];
-
-        Ok(MaterialFactory {
-            pipeline,
-            pipeline_layout,
-            pipeline_bind_point: vk::PipelineBindPoint::COMPUTE,
-            descriptor_set_layout,
-            device: self.device,
-            descriptor_allocator: self.descriptor_allocator,
-        })
     }
 }

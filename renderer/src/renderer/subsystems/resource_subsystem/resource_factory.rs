@@ -104,19 +104,31 @@ impl ResourceFactory {
         )
     }
 
-    pub fn create_bindless_material_factory(&self) -> Result<MaterialFactory> {
-        let bindless_descriptor_set_layout = self.create_bindless_descriptor_set_layout()?;
-        let bindless_pipeline_layout =
-            self.create_bindless_pipeline_layout(bindless_descriptor_set_layout)?;
-        let default_shader = ComputeShader::new(ShaderId::MovingShape, self.device.clone())?;
+    pub fn create_graphics_material_factory(&self) -> Result<MaterialFactory> {
+        let descriptor_set_layout = self.create_graphics_descriptor_set_layout()?;
+        let pipeline_layout =
+            self.create_graphics_pipeline_layout(descriptor_set_layout)?;
+        let compute_shader = ComputeShader::new(ShaderId::MovingShape, self.device.clone())?;
         ComputeMaterialFactoryBuilder::new(self.device.clone(), self.descriptor_allocator.clone())
-            .with_shader(default_shader)
-            .with_pipeline_layout(bindless_pipeline_layout)
-            .with_descriptor_set_layout(bindless_descriptor_set_layout)
+            .with_shader(compute_shader)
+            .with_pipeline_layout(pipeline_layout)
+            .with_descriptor_set_layout(descriptor_set_layout)
             .build()
     }
 
-    pub fn create_bindless_descriptor_set_layout(&self) -> Result<vk::DescriptorSetLayout> {
+    pub fn create_compute_material_factory(&self) -> Result<MaterialFactory> {
+        let descriptor_set_layout = self.create_compute_descriptor_set_layout()?;
+        let pipeline_layout =
+            self.create_compute_pipeline_layout(descriptor_set_layout)?;
+        let compute_shader = ComputeShader::new(ShaderId::MovingShape, self.device.clone())?;
+        ComputeMaterialFactoryBuilder::new(self.device.clone(), self.descriptor_allocator.clone())
+            .with_shader(compute_shader)
+            .with_pipeline_layout(pipeline_layout)
+            .with_descriptor_set_layout(descriptor_set_layout)
+            .build()
+    }
+
+    fn create_compute_descriptor_set_layout(&self) -> Result<vk::DescriptorSetLayout> {
         DescriptorSetLayoutBuilder::new()
             .add_binding(
                 // Image to render to
@@ -178,7 +190,7 @@ impl ResourceFactory {
             )
     }
 
-    pub fn create_bindless_pipeline_layout(
+    fn create_compute_pipeline_layout(
         &self,
         bindless_descriptor_set_layout: vk::DescriptorSetLayout,
     ) -> Result<vk::PipelineLayout> {
