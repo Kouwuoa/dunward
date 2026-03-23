@@ -42,3 +42,23 @@ fn render_frame(
     }
     .unwrap();
 }
+
+fn handle_window_resized(
+    mut renderer: NonSendMut<renderer::Renderer>,
+    mut resize_events: EventReader<winit::event::WindowEvent>,
+) {
+    let window_size = resize_events
+        .iter()
+        .filter_map(|event| {
+            if let winit::event::WindowEvent::Resized(size) = event {
+                Some(size)
+            } else {
+                None
+            }
+        })
+        .last();
+    if let Some(size) = window_size {
+        let winit_size = renderer::winit::dpi::PhysicalSize::new(size.width, size.height);
+        renderer.resize(winit_size).unwrap();
+    }
+}

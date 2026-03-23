@@ -21,16 +21,11 @@ use std::time::Duration;
 use crate::renderer::contexts::frame_context::frame_geometry_stage::FrameGeometryStage;
 use crate::renderer::contexts::frame_context::frame_lighting_stage::FrameLightingStage;
 
-const FRAME_VERTEX_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
-const FRAME_INDEX_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
-const FRAME_PER_FRAME_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
-const FRAME_PER_MATERIAL_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
-const FRAME_PER_OBJECT_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
-
 pub(crate) struct FrameContext {
     geometry_stage: FrameGeometryStage,
     lighting_stage: FrameLightingStage,
     present_image_acquired_semaphore: vk::Semaphore,
+    previous_frame_render_finished_fence: vk::Fence,
 }
 
 impl FrameContext {
@@ -42,74 +37,14 @@ impl FrameContext {
     ) -> Result<Self> {
         log::info!("Creating FrameContext");
 
-
-        let vertex_region = rsc_sys
-            .resource_store
-            .vertex_megabuffer
-            .allocate_region(FRAME_VERTEX_BUFFER_SIZE)?;
-        let index_region = rsc_sys
-            .resource_store
-            .index_megabuffer
-            .allocate_region(FRAME_INDEX_BUFFER_SIZE)?;
-        let per_frame_region = rsc_sys
-            .resource_store
-            .per_frame_megabuffer
-            .allocate_region(FRAME_PER_FRAME_BUFFER_SIZE)?;
-        let per_material_region = rsc_sys
-            .resource_store
-            .per_material_megabuffer
-            .allocate_region(FRAME_PER_MATERIAL_BUFFER_SIZE)?;
-        let per_object_region = rsc_sys
-            .resource_store
-            .per_object_megabuffer
-            .allocate_region(FRAME_PER_OBJECT_BUFFER_SIZE)?;
-
+        let geometry_stage = FrameGeometryStage::new(dvc_ctx, cmd_sys, rsc_sys)?;
+        let lighting_stage = FrameLightingStage::new(dvc_ctx, swc_ctx, cmd_sys, rsc_sys)?;
         let present_image_acquired_semaphore = dvc_ctx.create_vk_semaphore(&vk::SemaphoreCreateInfo::default())?;
-        let graphics_finished_semaphore = dvc_ctx.create_vk_semaphore(&vk::SemaphoreCreateInfo::default())?;
-        let graphics_finished_fence = dvc_ctx.create_vk_fence(
-            &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
-        )?;
-        let compute_finished_semaphore = dvc_ctx.create_vk_semaphore(&vk::SemaphoreCreateInfo::default())?;
-        let compute_finished_fence = dvc_ctx.create_vk_fence(
-            &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
-        )?;
-
-        // Note: Even though we're using compute shaders-temp,
-        // we'll still use the graphics queue to avoid queue family ownership transfers and semaphore complexity.
-        // The graphics queue should support compute operations.
-        let graphics_queue = dvc_ctx.get_graphics_queue();
-        assert!(graphics_queue.family.supports_compute());
-        let graphics_recorder = Some(
-            cmd_sys
-                .command_recorder_allocator
-                .allocate(graphics_queue)?,
-        );
-        let compute_recorder = Some(
-            cmd_sys
-                .command_recorder_allocator
-                .allocate(dvc_ctx.get_graphics_queue())?,
-        );
 
         Ok(Self {
-            graphics: FrameGraphicsPart {
-                recorder: graphics_recorder,
-                vertex_region,
-                index_region,
-                per_frame_region,
-                per_material_region,
-                per_object_region,
-                present_image_acquired_semaphore,
-                graphics_finished_semaphore,
-                graphics_finished_fence,
-            },
-            compute: FrameComputePart {
-                recorder: compute_recorder,
-                render_target_tex,
-                render_target_tex_needs_update: true,
-                compute_finished_semaphore,
-                compute_finished_fence,
-                bindless_material,
-            },
+            geometry_stage,
+            lighting_stage,
+            present_image_acquired_semaphore,
         })
     }
 
