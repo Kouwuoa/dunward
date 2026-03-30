@@ -136,7 +136,7 @@ impl Texture {
             device,
         })
     }
-    
+
     /// Create a 32-bit shader-readable texture from a byte array
     pub fn new_color_texture_from_bytes(
         width: u32,
@@ -277,11 +277,11 @@ impl Texture {
 
         Ok(StorageTexture(image))
     }
-    
+
     pub fn width(&self) -> u32 {
         self.extent.width
     }
-    
+
     pub fn height(&self) -> u32 {
         self.extent.height
     }

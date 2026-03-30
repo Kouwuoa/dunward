@@ -2,8 +2,8 @@ use super::instance::Instance;
 use super::queue::Queue;
 use super::queue::QueueFamily;
 use ash::vk;
-use color_eyre::{eyre::OptionExt, Result};
-use std::ffi::{c_char, CStr};
+use color_eyre::{Result, eyre::OptionExt};
+use std::ffi::{CStr, c_char};
 use std::str::Utf8Error;
 use std::sync::Arc;
 
@@ -12,10 +12,19 @@ pub(crate) struct Device {
     pub(super) logical: Arc<ash::Device>,
     pub(super) physical: vk::PhysicalDevice,
 
-    // For now, require the graphics queue to support presentation
+    /// For now, require the graphics queue to support presentation
     graphics_queue: Arc<Queue>,
     compute_queue: Arc<Queue>,
     transfer_queue: Arc<Queue>,
+}
+
+pub(crate) struct SemaphoreSubmitInfo {
+    semaphore: vk::Semaphore,
+    wait_stage_mask: vk::PipelineStageFlags,
+
+    /// For timeline semaphores, the value to wait/signal.
+    /// For binary semaphores, this is ignored.
+    value: Option<u64>,
 }
 
 impl Device {
@@ -40,7 +49,6 @@ impl Device {
         let compute_queue = Arc::new(compute_queue);
         let transfer_queue = Arc::new(transfer_queue);
 
-
         let dev = Self {
             logical: logical_device,
             physical: physical_device,
@@ -57,17 +65,51 @@ impl Device {
         &self,
         cmd: vk::CommandBuffer,
         queue: Arc<Queue>,
-        wait_semaphores: &[vk::Semaphore],
-        signal_semaphores: &[vk::Semaphore],
+        wait_semaphores: &[SemaphoreSubmitInfo],
+        signal_semaphores: &[SemaphoreSubmitInfo],
         fence: vk::Fence,
     ) -> Result<()> {
-        let wait_stages = [vk::PipelineStageFlags::COMPUTE_SHADER];
         let command_buffers = [cmd];
-        let submit = vk::SubmitInfo::default()
+
+        let mut wait_sems = Vec::new();
+        let mut wait_stages = Vec::new();
+        let mut wait_values = Vec::new();
+        for info in wait_semaphores {
+            wait_sems.push(info.semaphore);
+            wait_stages.push(info.wait_stage_mask);
+            if let Some(value) = info.value {
+                wait_values.push(value);
+            }
+        }
+
+        let mut signal_sems = Vec::new();
+        let mut signal_values = Vec::new();
+        for info in signal_semaphores {
+            signal_sems.push(info.semaphore);
+            if let Some(value) = info.value {
+                signal_values.push(value);
+            }
+        }
+
+        let mut submit = vk::SubmitInfo::default()
             .wait_dst_stage_mask(&wait_stages)
-            .wait_semaphores(wait_semaphores)
-            .signal_semaphores(signal_semaphores)
+            .wait_semaphores(&wait_sems)
+            .signal_semaphores(&signal_sems)
             .command_buffers(&command_buffers);
+
+        // Timeline semaphore submission info
+        let mut timeline_info = if wait_values.is_empty() && signal_values.is_empty() {
+            None
+        } else {
+            Some(
+                vk::TimelineSemaphoreSubmitInfo::default()
+                    .wait_semaphore_values(&wait_values)
+                    .signal_semaphore_values(&signal_values),
+            )
+        };
+        if let Some(info) = timeline_info.as_mut() {
+            submit = submit.push_next(info);
+        }
 
         unsafe {
             self.logical.queue_submit(queue.handle, &[submit], fence)?;
@@ -329,7 +371,6 @@ impl Device {
             ash::ext::extended_dynamic_state::NAME,
             // Descriptors
             ash::ext::descriptor_indexing::NAME,
-
             #[cfg(target_os = "macos")]
             ash::khr::portability_subset::NAME,
         ]

@@ -1,5 +1,5 @@
-use std::time::Instant;
 pub use glam;
+use std::time::Instant;
 pub use winit;
 
 mod contexts;

@@ -67,6 +67,24 @@ impl DeviceContext {
         self.device.get_transfer_queue()
     }
 
+    pub fn wait_timeline_semaphore(
+        &self,
+        semaphore: vk::Semaphore,
+        value: u64,
+        timeout: Duration,
+    ) -> Result<()> {
+        let wait_info = vk::SemaphoreWaitInfo::default()
+            .semaphores(std::slice::from_ref(&semaphore))
+            .values(std::slice::from_ref(&value));
+
+        unsafe {
+            self.device
+                .logical
+                .wait_semaphores(&wait_info, timeout.as_nanos() as u64)?;
+        }
+        Ok(())
+    }
+
     pub fn wait_and_reset_fence(&self, fence: vk::Fence, timeout: Duration) -> Result<()> {
         unsafe {
             let fences = [fence];
@@ -93,18 +111,42 @@ impl DeviceContext {
     pub fn submit(
         &self,
         cmd_recorder: CommandRecorder<Executable>,
-        wait_semaphores: &[vk::Semaphore],
-        signal_semaphores: &[vk::Semaphore],
+        wait_semaphore: &SemaphoreSubmitInfo,
+        signal_semaphore: &SemaphoreSubmitInfo,
         fence: vk::Fence,
     ) -> Result<CommandRecorder<Idle>> {
         let cmd = cmd_recorder.get_command_buffer();
         let queue = cmd_recorder.get_queue();
 
         self.device
-            .submit(cmd, queue, wait_semaphores, signal_semaphores, fence)?;
+            .submit(cmd, queue, wait_semaphores, signal_semaphores, fence, None)?;
 
         Ok(CommandRecorder::<Idle>::new_from_old(cmd_recorder))
     }
+
+    pub fn submit_with_timeline(
+        &self,
+        cmd_recorder: CommandRecorder<Executable>,
+        wait_semaphores: &[vk::Semaphore],
+        signal_semaphores: &[vk::Semaphore],
+        fence: vk::Fence,
+        timeline_semaphore_
+    ) -> Result<CommandRecorder<Idle>> {
+        let cmd = cmd_recorder.get_command_buffer();
+        let queue = cmd_recorder.get_queue();
+
+        self.device.submit(
+            cmd,
+            queue,
+            wait_semaphores,
+            signal_semaphores,
+            fence,
+            timeline_semaphore_info,
+        )?;
+
+        Ok(CommandRecorder::<Idle>::new_from_old(cmd_recorder))
+    }
+
     pub fn create_vk_image_view(&self, info: &vk::ImageViewCreateInfo) -> Result<vk::ImageView> {
         Ok(unsafe { self.device.logical.create_image_view(info, None)? })
     }

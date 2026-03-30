@@ -1,10 +1,12 @@
 use crate::renderer::contexts::device_context::DeviceContext;
+use crate::renderer::contexts::frame_context::packet::FrameRenderPacket;
 use crate::renderer::contexts::swapchain_context::SwapchainContext;
 use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
 use crate::renderer::subsystems::command_subsystem::command_recorder::{CommandRecorder, Idle};
 use crate::renderer::subsystems::command_subsystem::command_recorder_allocator::CommandRecorderAllocatorExt;
 use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
 use crate::renderer::subsystems::resource_subsystem::resource_types::material::Material;
+use crate::renderer::subsystems::resource_subsystem::resource_types::shader_data::PerDrawData;
 use crate::renderer::subsystems::resource_subsystem::resource_types::texture::StorageTexture;
 use ash::vk;
 use color_eyre::Result;
@@ -22,6 +24,8 @@ pub(super) struct FrameLightingStage {
 }
 
 impl FrameLightingStage {
+    const TIMELINE_SEM_SIGNAL_VALUE: u64 = 1;
+
     pub fn new(
         dvc_ctx: &DeviceContext,
         swc_ctx: &SwapchainContext,
@@ -56,5 +60,86 @@ impl FrameLightingStage {
             finished_fence,
             material,
         })
+    }
+
+    pub fn render(
+        &mut self,
+        pkt: FrameRenderPacket,
+        dvc: &DeviceContext,
+        swc: &SwapchainContext,
+        rsc: &ResourceSubsystem,
+    ) -> Result<()> {
+        // Record render commands
+        let recorder = self.recorder.take().unwrap();
+        let recorder = recorder.record(|recorder| {
+            // Transition render target texture to GENERAL layout
+            recorder.transition_texture_layout(
+                &mut self.target_tex,
+                vk::ImageLayout::UNDEFINED,
+                vk::ImageLayout::GENERAL,
+            )?;
+
+            // Update the render target texture if it needs updating
+            if self.target_tex_needs_update {
+                let mut updater = recorder.create_resource_updater();
+                updater.enqueue_update(
+                    |builder| {
+                        builder.set_render_target_texture(&self.target_tex);
+                    },
+                    &self.material,
+                );
+                updater.execute_updates();
+                self.target_tex_needs_update = false;
+            }
+
+            // Clear render target texture
+            recorder.clear_storage_texture(
+                &self.target_tex,
+                vk::ImageLayout::GENERAL,
+                &vk::ClearColorValue {
+                    float32: [1.0f32, 0.0f32, 0.0f32, 1.0f32],
+                },
+            )?;
+
+            // Insert memory barrier that waits until the storage texture has been fully cleared before continuing with read/write operations
+            recorder.insert_texture_memory_barrier(
+                &self.target_tex,
+                vk::ImageLayout::GENERAL,
+                vk::ImageLayout::GENERAL,
+                vk::PipelineStageFlags2::TRANSFER,
+                vk::AccessFlags2::TRANSFER_WRITE,
+                vk::PipelineStageFlags2::COMPUTE_SHADER,
+                vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
+            );
+
+            // Compute render operations
+            recorder.bind_material(&self.material);
+            let per_draw_data = PerDrawData {
+                time_sec: pkt.time_start.elapsed().as_secs_f32(),
+                ..Default::default()
+            };
+            recorder.update_push_constants(&self.material, per_draw_data.as_bytes());
+            let group_count_x = (self.target_tex.width() as f32 / 16.0).ceil() as u32;
+            let group_count_y = (self.target_tex.height() as f32 / 16.0).ceil() as u32;
+            recorder.dispatch(group_count_x, group_count_y, 1);
+
+            // Transition render target texture to transfer source layout to prepare for copying onto swapchain image
+            recorder.transition_texture_layout(
+                &mut self.target_tex,
+                vk::ImageLayout::GENERAL,
+                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+            )?;
+
+            Ok(())
+        })?;
+
+        self.recorder = Some(dvc.submit(
+            recorder,
+            &[self.graphics.present_image_acquired_semaphore],
+            &[self.graphics.graphics_finished_semaphore],
+            self.graphics.graphics_finished_fence,
+        )?);
+
+        Ok(())
     }
 }
