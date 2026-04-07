@@ -9,6 +9,7 @@ use crate::renderer::contexts::frame_context::frame_lighting_stage::FrameLightin
 use crate::renderer::contexts::frame_context::packet::{FramePresentPacket, FrameRenderPacket};
 use crate::renderer::contexts::swapchain_context::{SwapchainContext, SwapchainPresentError};
 use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
+use crate::renderer::subsystems::command_subsystem::command_recorder::{CommandRecorder, Idle};
 use crate::renderer::subsystems::command_subsystem::command_recorder_allocator::CommandRecorderAllocatorExt;
 use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
 use crate::renderer::subsystems::resource_subsystem::resource_types::shader_data::PerDrawData;
@@ -22,6 +23,7 @@ pub(crate) struct FrameContext {
     present_image_acquired_semaphore: vk::Semaphore,
     previous_frame_render_finished_fence: vk::Fence,
     timeline_semaphore: vk::Semaphore,
+    transfer_recorder: Option<CommandRecorder<Idle>>,
 }
 
 impl FrameContext {
@@ -49,12 +51,20 @@ impl FrameContext {
             }),
         )?;
 
+        let transfer_queue = dvc_ctx.get_transfer_queue();
+        let transfer_recorder = Some(
+            cmd_sys
+                .command_recorder_allocator
+                .allocate(transfer_queue)?,
+        );
+
         Ok(Self {
             geometry_stage,
             lighting_stage,
             present_image_acquired_semaphore,
             previous_frame_render_finished_fence,
             timeline_semaphore,
+            transfer_recorder,
         })
     }
 
@@ -70,23 +80,32 @@ impl FrameContext {
         // Wait until the commands have finished from the last time this frame was rendered
         dvc.wait_and_reset_fence(self.previous_frame_render_finished_fence, timeout)?;
 
-        {
-            // TODO: Perform render operations here
+        // Render the lighting stage
+        let mut lighting_stage_output = self.lighting_stage.render(pkt, dvc, swc, rsc)?;
 
-            // Acquire the next image from the swapchain
-            let mut present_tex = swc.acquire_next_present_texture(
-                self.graphics.present_image_acquired_semaphore,
-                timeout,
+        // Acquire the next image from the swapchain
+        let mut present_tex =
+            swc.acquire_next_present_texture(self.present_image_acquired_semaphore, timeout)?;
+
+        // Perform post-render operations
+        let transfer_recorder = self.transfer_recorder.take().unwrap();
+        let transfer_recorder = transfer_recorder.record(|recorder| {
+            // Transition the image layouts for both textures
+            recorder.transition_texture_layout(
+                &mut lighting_stage_output.target_tex,
+                vk::ImageLayout::GENERAL,
+                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             )?;
-
-            // Copy draw_color_tex onto swapchain texture
             recorder.transition_texture_layout(
                 &mut present_tex.texture,
                 vk::ImageLayout::UNDEFINED,
                 vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             )?;
+
+            // Transfer ownership of lighting stage output texture from compute to graphics queue family
+
             recorder.copy_texture_to_texture(
-                &self.compute.render_target_tex,
+                lighting_stage_output.target_tex,
                 &mut present_tex.texture,
             )?;
 
@@ -96,10 +115,11 @@ impl FrameContext {
                 vk::ImageLayout::TRANSFER_DST_OPTIMAL,
                 vk::ImageLayout::PRESENT_SRC_KHR,
             )?;
-        }
+            Ok(())
+        })?;
 
-        self.lighting_stage.recorder = Some(dvc.submit(
-            recorder,
+        self.transfer_recorder = Some(dvc.submit(
+            transfer_recorder,
             &[self.graphics.present_image_acquired_semaphore],
             &[self.graphics.graphics_finished_semaphore],
             self.graphics.graphics_finished_fence,

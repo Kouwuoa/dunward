@@ -2,9 +2,11 @@ pub(crate) mod queue;
 
 mod device;
 mod instance;
+mod semaphore;
 mod surface;
 
 use crate::renderer::contexts::device_context::queue::Queue;
+use crate::renderer::contexts::device_context::semaphore::Semaphore;
 use crate::renderer::contexts::swapchain_context::SwapchainContext;
 use crate::renderer::subsystems::command_subsystem::command_recorder::{
     CommandRecorder, Executable, Idle,
@@ -111,38 +113,15 @@ impl DeviceContext {
     pub fn submit(
         &self,
         cmd_recorder: CommandRecorder<Executable>,
-        wait_semaphore: &SemaphoreSubmitInfo,
-        signal_semaphore: &SemaphoreSubmitInfo,
+        wait_semaphore: Semaphore,
+        signal_semaphore: Semaphore,
         fence: vk::Fence,
     ) -> Result<CommandRecorder<Idle>> {
         let cmd = cmd_recorder.get_command_buffer();
         let queue = cmd_recorder.get_queue();
 
         self.device
-            .submit(cmd, queue, wait_semaphores, signal_semaphores, fence, None)?;
-
-        Ok(CommandRecorder::<Idle>::new_from_old(cmd_recorder))
-    }
-
-    pub fn submit_with_timeline(
-        &self,
-        cmd_recorder: CommandRecorder<Executable>,
-        wait_semaphores: &[vk::Semaphore],
-        signal_semaphores: &[vk::Semaphore],
-        fence: vk::Fence,
-        timeline_semaphore_
-    ) -> Result<CommandRecorder<Idle>> {
-        let cmd = cmd_recorder.get_command_buffer();
-        let queue = cmd_recorder.get_queue();
-
-        self.device.submit(
-            cmd,
-            queue,
-            wait_semaphores,
-            signal_semaphores,
-            fence,
-            timeline_semaphore_info,
-        )?;
+            .submit(cmd, queue, &[wait_semaphore], &[signal_semaphore], fence)?;
 
         Ok(CommandRecorder::<Idle>::new_from_old(cmd_recorder))
     }

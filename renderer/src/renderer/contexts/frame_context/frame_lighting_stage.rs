@@ -11,6 +11,10 @@ use crate::renderer::subsystems::resource_subsystem::resource_types::texture::St
 use ash::vk;
 use color_eyre::Result;
 
+pub(super) struct FrameLightingStageOutput<'a> {
+    pub target_tex: &'a StorageTexture,
+}
+
 pub(super) struct FrameLightingStage {
     recorder: Option<CommandRecorder<Idle>>,
 
@@ -68,7 +72,7 @@ impl FrameLightingStage {
         dvc: &DeviceContext,
         swc: &SwapchainContext,
         rsc: &ResourceSubsystem,
-    ) -> Result<()> {
+    ) -> Result<FrameLightingStageOutput<'_>> {
         // Record render commands
         let recorder = self.recorder.take().unwrap();
         let recorder = recorder.record(|recorder| {
@@ -140,6 +144,8 @@ impl FrameLightingStage {
             self.graphics.graphics_finished_fence,
         )?);
 
-        Ok(())
+        Ok(FrameLightingStageOutput {
+            target_tex: &self.target_tex,
+        })
     }
 }

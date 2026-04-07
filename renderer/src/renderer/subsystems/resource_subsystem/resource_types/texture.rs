@@ -500,12 +500,14 @@ fn copy_vkimage_to_vkimage(
     }
 }
 
-fn transition_image_layout(
+fn transition_image_state(
     cmd: vk::CommandBuffer,
     image: vk::Image,
     image_aspect: vk::ImageAspectFlags,
     old_layout: vk::ImageLayout,
     new_layout: vk::ImageLayout,
+    src_stage: vk::PipelineStageFlags2,
+    dst_stage: vk::PipelineStageFlags2,
     device: &ash::Device,
 ) {
     if old_layout == new_layout {
@@ -514,7 +516,7 @@ fn transition_image_layout(
 
     let image_barrier = vk::ImageMemoryBarrier2 {
         src_stage_mask: vk::PipelineStageFlags2::ALL_COMMANDS,
-        src_access_mask: vk::AccessFlags2::MEMORY_WRITE,
+        src_access_mask: vk::AccessFlags2::MEMORY_WRITE, // TODO: let user pass in argument for stage and access masks
         dst_stage_mask: vk::PipelineStageFlags2::ALL_COMMANDS,
         dst_access_mask: vk::AccessFlags2::MEMORY_WRITE | vk::AccessFlags2::MEMORY_READ,
         old_layout,
@@ -527,7 +529,8 @@ fn transition_image_layout(
             layer_count: 1,
         },
         image,
-        ..Default::default()
+        src_queue_family_index: ,
+        dst_queue_family_index: ,
     };
 
     let dep_info = vk::DependencyInfo {
