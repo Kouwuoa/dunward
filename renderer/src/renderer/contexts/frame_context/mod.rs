@@ -20,7 +20,7 @@ use std::time::Duration;
 pub(crate) struct FrameContext {
     geometry_stage: FrameGeometryStage,
     lighting_stage: FrameLightingStage,
-    present_image_acquired_semaphore: vk::Semaphore,
+    present_image_acquired_semaphore: BinarySemaphore,
     previous_frame_render_finished_fence: vk::Fence,
     timeline_semaphore: vk::Semaphore,
     transfer_recorder: Option<CommandRecorder<Idle>>,

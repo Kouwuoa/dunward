@@ -1,4 +1,6 @@
-use crate::renderer::contexts::device_context::semaphore::Semaphore;
+use crate::renderer::contexts::device_context::semaphore::SemaphoreValue;
+use crate::renderer::contexts::device_context::semaphore::SignalSemaphore;
+use crate::renderer::contexts::device_context::semaphore::WaitSemaphore;
 
 use super::instance::Instance;
 use super::queue::Queue;
@@ -58,47 +60,62 @@ impl Device {
         &self,
         cmd: vk::CommandBuffer,
         queue: Arc<Queue>,
-        wait_semaphores: &[Semaphore],
-        signal_semaphores: &[Semaphore],
+        wait_semaphores: &[WaitSemaphore],
+        signal_semaphores: &[SignalSemaphore],
         fence: vk::Fence,
     ) -> Result<()> {
         let command_buffers = [cmd];
 
-        let mut wait_sems = Vec::new();
-        let mut wait_stages = Vec::new();
-        let mut wait_values = Vec::new();
-        for sem in wait_semaphores {
-            wait_sems.push(sem.semaphore);
-            wait_stages.push(sem.wait_stage_mask);
-            if let Some(value) = sem.value {
-                wait_values.push(value);
-            }
-        }
+        let wait_sems = wait_semaphores
+            .iter()
+            .map(|s| s.semaphore)
+            .collect::<Vec<_>>();
+        let wait_stages = wait_semaphores
+            .iter()
+            .map(|s| s.stage_mask)
+            .collect::<Vec<_>>();
+        let wait_values = wait_semaphores
+            .iter()
+            .map(|s| match s.value {
+                SemaphoreValue::Binary => 0,
+                SemaphoreValue::Timeline(value) => value,
+            })
+            .collect::<Vec<_>>();
 
-        let mut signal_sems = Vec::new();
-        let mut signal_values = Vec::new();
-        for sem in signal_semaphores {
-            signal_sems.push(sem.semaphore);
-            if let Some(value) = sem.value {
-                signal_values.push(value);
-            }
-        }
+        let signal_sems = signal_semaphores
+            .iter()
+            .map(|s| s.semaphore)
+            .collect::<Vec<_>>();
+        let signal_values = signal_semaphores
+            .iter()
+            .map(|s| match s.value {
+                SemaphoreValue::Binary => 0,
+                SemaphoreValue::Timeline(value) => value,
+            })
+            .collect::<Vec<_>>();
+
+        let use_timeline_sems = wait_semaphores
+            .iter()
+            .any(|s| matches!(s.value, SemaphoreValue::Timeline(_)))
+            || signal_semaphores
+                .iter()
+                .any(|s| matches!(s.value, SemaphoreValue::Timeline(_)));
 
         let mut submit = vk::SubmitInfo::default()
-            .wait_dst_stage_mask(&wait_stages)
             .wait_semaphores(&wait_sems)
+            .wait_dst_stage_mask(&wait_stages)
             .signal_semaphores(&signal_sems)
             .command_buffers(&command_buffers);
 
         // Timeline semaphore submission info
-        let mut timeline_info = if wait_values.is_empty() && signal_values.is_empty() {
-            None
-        } else {
+        let mut timeline_info = if use_timeline_sems {
             Some(
                 vk::TimelineSemaphoreSubmitInfo::default()
                     .wait_semaphore_values(&wait_values)
                     .signal_semaphore_values(&signal_values),
             )
+        } else {
+            None
         };
         if let Some(info) = timeline_info.as_mut() {
             submit = submit.push_next(info);
