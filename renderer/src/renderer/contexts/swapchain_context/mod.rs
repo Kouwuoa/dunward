@@ -2,6 +2,8 @@ mod swapchain;
 
 use crate::renderer::contexts::device_context::DeviceContext;
 use crate::renderer::contexts::device_context::queue::Queue;
+use crate::renderer::contexts::device_context::semaphore::BinarySemaphore;
+use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
 use crate::renderer::subsystems::resource_subsystem::resource_types::texture::{
     ColorTexture, Texture,
 };
@@ -13,7 +15,6 @@ use std::time::Duration;
 use swapchain::Swapchain;
 use thiserror::Error;
 use winit::window::Window;
-use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
 
 pub(crate) struct PresentTextureBundle {
     pub texture: ColorTexture,
@@ -39,7 +40,11 @@ pub(crate) struct SwapchainContext {
 }
 
 impl SwapchainContext {
-    pub fn new(window: &Window, dvc_ctx: &DeviceContext, rsc_sys: &ResourceSubsystem) -> Result<Self> {
+    pub fn new(
+        window: &Window,
+        dvc_ctx: &DeviceContext,
+        rsc_sys: &ResourceSubsystem,
+    ) -> Result<Self> {
         log::info!("Creating SwapchainContext");
 
         let swapchain = Swapchain::new(&window.inner_size(), dvc_ctx, None)?;
@@ -54,14 +59,14 @@ impl SwapchainContext {
 
     pub fn acquire_next_present_texture(
         &self,
-        signal_image_acquired_sem: vk::Semaphore,
+        signal_image_acquired_sem: &BinarySemaphore,
         timeout: Duration,
     ) -> Result<PresentTextureBundle> {
         let (image_index, suboptimal) = unsafe {
             self.swapchain.swapchain_loader.acquire_next_image(
                 self.swapchain.swapchain,
                 timeout.as_nanos() as u64,
-                signal_image_acquired_sem,
+                signal_image_acquired_sem.raw(),
                 vk::Fence::null(),
             )?
         };

@@ -1,12 +1,14 @@
 pub(crate) mod queue;
+pub(crate) mod semaphore;
 
 mod device;
 mod instance;
-mod semaphore;
 mod surface;
 
 use crate::renderer::contexts::device_context::queue::Queue;
-use crate::renderer::contexts::device_context::semaphore::Semaphore;
+use crate::renderer::contexts::device_context::semaphore::{
+    BinarySemaphore, SignalSemaphore, TimelineSemaphore, WaitSemaphore,
+};
 use crate::renderer::contexts::swapchain_context::SwapchainContext;
 use crate::renderer::subsystems::command_subsystem::command_recorder::{
     CommandRecorder, Executable, Idle,
@@ -69,6 +71,27 @@ impl DeviceContext {
         self.device.get_transfer_queue()
     }
 
+    pub fn create_binary_semaphore(&self) -> Result<BinarySemaphore> {
+        Ok(BinarySemaphore::new(unsafe {
+            self.device
+                .logical
+                .create_semaphore(&vk::SemaphoreCreateInfo::default(), None)?
+        }))
+    }
+
+    pub fn create_timeline_semaphore(&self) -> Result<TimelineSemaphore> {
+        Ok(TimelineSemaphore::new(unsafe {
+            self.device.logical.create_semaphore(
+                &vk::SemaphoreCreateInfo::default().push_next(&mut vk::SemaphoreTypeCreateInfo {
+                    semaphore_type: vk::SemaphoreType::TIMELINE,
+                    initial_value: 0,
+                    ..Default::default()
+                }),
+                None,
+            )?
+        }))
+    }
+
     pub fn wait_timeline_semaphore(
         &self,
         semaphore: vk::Semaphore,
@@ -113,15 +136,18 @@ impl DeviceContext {
     pub fn submit(
         &self,
         cmd_recorder: CommandRecorder<Executable>,
-        wait_semaphore: Semaphore,
-        signal_semaphore: Semaphore,
+        wait_semaphore: Option<WaitSemaphore>,
+        signal_semaphore: Option<SignalSemaphore>,
         fence: vk::Fence,
     ) -> Result<CommandRecorder<Idle>> {
         let cmd = cmd_recorder.get_command_buffer();
         let queue = cmd_recorder.get_queue();
 
+        let wait_semaphores = wait_semaphore.map(|s| vec![s]).unwrap_or_default();
+        let signal_semaphores = signal_semaphore.map(|s| vec![s]).unwrap_or_default();
+
         self.device
-            .submit(cmd, queue, &[wait_semaphore], &[signal_semaphore], fence)?;
+            .submit(cmd, queue, &wait_semaphores, &signal_semaphores, fence)?;
 
         Ok(CommandRecorder::<Idle>::new_from_old(cmd_recorder))
     }
@@ -132,10 +158,6 @@ impl DeviceContext {
 
     pub fn create_vk_sampler(&self, info: &vk::SamplerCreateInfo) -> Result<vk::Sampler> {
         Ok(unsafe { self.device.logical.create_sampler(info, None)? })
-    }
-
-    pub fn create_vk_semaphore(&self, info: &vk::SemaphoreCreateInfo) -> Result<vk::Semaphore> {
-        Ok(unsafe { self.device.logical.create_semaphore(info, None)? })
     }
 
     pub fn create_vk_fence(&self, info: &vk::FenceCreateInfo) -> Result<vk::Fence> {

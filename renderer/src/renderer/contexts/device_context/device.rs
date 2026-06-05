@@ -311,6 +311,7 @@ impl Device {
             let mut features11 =
                 vk::PhysicalDeviceVulkan11Features::default().shader_draw_parameters(true);
             let mut features12 = vk::PhysicalDeviceVulkan12Features::default()
+                .timeline_semaphore(true)
                 .runtime_descriptor_array(true)
                 .buffer_device_address(true)
                 .descriptor_indexing(true)

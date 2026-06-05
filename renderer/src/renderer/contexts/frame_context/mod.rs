@@ -4,6 +4,7 @@ mod frame_geometry_stage;
 mod frame_lighting_stage;
 
 use crate::renderer::contexts::device_context::DeviceContext;
+use crate::renderer::contexts::device_context::semaphore::{BinarySemaphore, TimelineSemaphore};
 use crate::renderer::contexts::frame_context::frame_geometry_stage::FrameGeometryStage;
 use crate::renderer::contexts::frame_context::frame_lighting_stage::FrameLightingStage;
 use crate::renderer::contexts::frame_context::packet::{FramePresentPacket, FrameRenderPacket};
@@ -12,7 +13,6 @@ use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
 use crate::renderer::subsystems::command_subsystem::command_recorder::{CommandRecorder, Idle};
 use crate::renderer::subsystems::command_subsystem::command_recorder_allocator::CommandRecorderAllocatorExt;
 use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
-use crate::renderer::subsystems::resource_subsystem::resource_types::shader_data::PerDrawData;
 use ash::vk;
 use color_eyre::eyre::Result;
 use std::time::Duration;
@@ -22,7 +22,7 @@ pub(crate) struct FrameContext {
     lighting_stage: FrameLightingStage,
     present_image_acquired_semaphore: BinarySemaphore,
     previous_frame_render_finished_fence: vk::Fence,
-    timeline_semaphore: vk::Semaphore,
+    frame_completion_timeline: TimelineSemaphore,
     transfer_recorder: Option<CommandRecorder<Idle>>,
 }
 
@@ -38,18 +38,11 @@ impl FrameContext {
         let geometry_stage = FrameGeometryStage::new(dvc_ctx, cmd_sys, rsc_sys)?;
         let lighting_stage = FrameLightingStage::new(dvc_ctx, swc_ctx, cmd_sys, rsc_sys)?;
 
-        let present_image_acquired_semaphore =
-            dvc_ctx.create_vk_semaphore(&vk::SemaphoreCreateInfo::default())?;
+        let present_image_acquired_semaphore = dvc_ctx.create_binary_semaphore()?;
         let previous_frame_render_finished_fence = dvc_ctx.create_vk_fence(
             &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
         )?;
-        let timeline_semaphore = dvc_ctx.create_vk_semaphore(
-            &vk::SemaphoreCreateInfo::default().push_next(&mut vk::SemaphoreTypeCreateInfo {
-                semaphore_type: vk::SemaphoreType::TIMELINE,
-                initial_value: 0,
-                ..Default::default()
-            }),
-        )?;
+        let frame_completion_timeline = dvc_ctx.create_timeline_semaphore()?;
 
         let transfer_queue = dvc_ctx.get_transfer_queue();
         let transfer_recorder = Some(
@@ -63,7 +56,7 @@ impl FrameContext {
             lighting_stage,
             present_image_acquired_semaphore,
             previous_frame_render_finished_fence,
-            timeline_semaphore,
+            frame_completion_timeline,
             transfer_recorder,
         })
     }
@@ -85,7 +78,7 @@ impl FrameContext {
 
         // Acquire the next image from the swapchain
         let mut present_tex =
-            swc.acquire_next_present_texture(self.present_image_acquired_semaphore, timeout)?;
+            swc.acquire_next_present_texture(&self.present_image_acquired_semaphore, timeout)?;
 
         // Perform post-render operations
         let transfer_recorder = self.transfer_recorder.take().unwrap();
@@ -118,12 +111,15 @@ impl FrameContext {
             Ok(())
         })?;
 
-        self.transfer_recorder = Some(dvc.submit(
-            transfer_recorder,
-            &[self.graphics.present_image_acquired_semaphore],
-            &[self.graphics.graphics_finished_semaphore],
-            self.graphics.graphics_finished_fence,
-        )?);
+        self.transfer_recorder = Some(
+            dvc.submit(
+                transfer_recorder,
+                self.present_image_acquired_semaphore
+                    .to_wait_semaphore(vk::PipelineStageFlags::TRANSFER),
+                self.render_finished_semaphore.to_signal_semaphore(),
+                self.preview_frame_render_finished_fence,
+            )?,
+        );
 
         Ok(FramePresentPacket {
             texture: present_tex,

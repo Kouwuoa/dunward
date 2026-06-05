@@ -1,4 +1,5 @@
 use crate::renderer::contexts::device_context::DeviceContext;
+use crate::renderer::contexts::device_context::semaphore::{BinarySemaphore, TimelineSemaphore};
 use crate::renderer::contexts::frame_context::packet::FrameRenderPacket;
 use crate::renderer::contexts::swapchain_context::SwapchainContext;
 use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
@@ -21,7 +22,6 @@ pub(super) struct FrameLightingStage {
     target_tex: StorageTexture,
     target_tex_needs_update: bool,
 
-    finished_semaphore: vk::Semaphore,
     finished_fence: vk::Fence,
 
     material: Material,
@@ -72,6 +72,9 @@ impl FrameLightingStage {
         dvc: &DeviceContext,
         swc: &SwapchainContext,
         rsc: &ResourceSubsystem,
+        frame_completion_timeline: &TimelineSemaphore,
+        geometry_complete_timeline_value: u64,
+        lighting_complete_timeline_value: u64,
     ) -> Result<FrameLightingStageOutput<'_>> {
         // Record render commands
         let recorder = self.recorder.take().unwrap();
@@ -139,9 +142,12 @@ impl FrameLightingStage {
 
         self.recorder = Some(dvc.submit(
             recorder,
-            &[self.graphics.present_image_acquired_semaphore],
-            &[self.graphics.graphics_finished_semaphore],
-            self.graphics.graphics_finished_fence,
+            Some(frame_completion_timeline.to_wait_semaphore(
+                vk::PipelineStageFlags::COMPUTE_SHADER,
+                geometry_complete_timeline_value,
+            )),
+            Some(frame_completion_timeline.to_signal_semaphore(lighting_complete_timeline_value)),
+            self.finished_fence,
         )?);
 
         Ok(FrameLightingStageOutput {

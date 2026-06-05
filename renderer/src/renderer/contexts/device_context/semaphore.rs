@@ -1,5 +1,11 @@
 use ash::vk;
 
+#[repr(transparent)]
+pub(crate) struct BinarySemaphore(vk::Semaphore);
+
+#[repr(transparent)]
+pub(crate) struct TimelineSemaphore(vk::Semaphore);
+
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum SemaphoreValue {
     Binary,
@@ -17,4 +23,58 @@ pub(crate) struct WaitSemaphore {
 pub(crate) struct SignalSemaphore {
     pub(super) semaphore: vk::Semaphore,
     pub(super) value: SemaphoreValue,
+}
+
+impl BinarySemaphore {
+    pub fn new(sem: vk::Semaphore) -> Self {
+        Self(sem)
+    }
+
+    pub fn raw(&self) -> vk::Semaphore {
+        self.0
+    }
+
+    pub fn to_wait_semaphore(&self, stage_mask: vk::PipelineStageFlags) -> WaitSemaphore {
+        WaitSemaphore {
+            semaphore: self.0,
+            stage_mask,
+            value: SemaphoreValue::Binary,
+        }
+    }
+
+    pub fn to_signal_semaphore(&self) -> SignalSemaphore {
+        SignalSemaphore {
+            semaphore: self.0,
+            value: SemaphoreValue::Binary,
+        }
+    }
+}
+
+impl TimelineSemaphore {
+    pub fn new(sem: vk::Semaphore) -> Self {
+        Self(sem)
+    }
+
+    pub fn raw(&self) -> vk::Semaphore {
+        self.0
+    }
+
+    pub fn to_wait_semaphore(
+        &self,
+        stage_mask: vk::PipelineStageFlags,
+        value: u64,
+    ) -> WaitSemaphore {
+        WaitSemaphore {
+            semaphore: self.0,
+            stage_mask,
+            value: SemaphoreValue::Timeline(value),
+        }
+    }
+
+    pub fn to_signal_semaphore(&self, value: u64) -> SignalSemaphore {
+        SignalSemaphore {
+            semaphore: self.0,
+            value: SemaphoreValue::Timeline(value),
+        }
+    }
 }
