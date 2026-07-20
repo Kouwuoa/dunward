@@ -112,13 +112,13 @@ impl SwapchainContext {
     pub fn present(
         &self,
         texture: PresentTextureBundle,
-        wait_render_finished_sem: vk::Semaphore,
+        wait_render_finished_sem: &BinarySemaphore,
     ) -> core::result::Result<(), SwapchainPresentError> {
         let swapchain_image_index = texture.index;
         let present_info = vk::PresentInfoKHR {
             p_swapchains: &self.swapchain.swapchain,
             swapchain_count: 1,
-            p_wait_semaphores: &wait_render_finished_sem, // Wait until rendering is done before presenting
+            p_wait_semaphores: &wait_render_finished_sem.raw(), // Wait until rendering is done before presenting
             wait_semaphore_count: 1,
             p_image_indices: &swapchain_image_index,
             ..Default::default()

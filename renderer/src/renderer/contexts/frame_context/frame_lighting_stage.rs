@@ -28,7 +28,7 @@ pub(super) struct FrameLightingStage {
 }
 
 impl FrameLightingStage {
-    const TIMELINE_SEM_SIGNAL_VALUE: u64 = 1;
+    pub const TIMELINE_SEM_SIGNAL_OFFSET: u64 = 1;
 
     pub fn new(
         dvc_ctx: &DeviceContext,
@@ -46,7 +46,6 @@ impl FrameLightingStage {
             true,
         )?;
 
-        let finished_semaphore = dvc_ctx.create_vk_semaphore(&vk::SemaphoreCreateInfo::default())?;
         let finished_fence = dvc_ctx.create_vk_fence(
             &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
         )?;
@@ -60,7 +59,6 @@ impl FrameLightingStage {
             recorder,
             target_tex,
             target_tex_needs_update: true,
-            finished_semaphore,
             finished_fence,
             material,
         })
@@ -70,11 +68,9 @@ impl FrameLightingStage {
         &mut self,
         pkt: FrameRenderPacket,
         dvc: &DeviceContext,
-        swc: &SwapchainContext,
-        rsc: &ResourceSubsystem,
         frame_completion_timeline: &TimelineSemaphore,
-        geometry_complete_timeline_value: u64,
-        lighting_complete_timeline_value: u64,
+        timeline_wait_val: u64,
+        timeline_signal_val: u64,
     ) -> Result<FrameLightingStageOutput<'_>> {
         // Record render commands
         let recorder = self.recorder.take().unwrap();
@@ -140,18 +136,26 @@ impl FrameLightingStage {
             Ok(())
         })?;
 
-        self.recorder = Some(dvc.submit(
-            recorder,
-            Some(frame_completion_timeline.to_wait_semaphore(
-                vk::PipelineStageFlags::COMPUTE_SHADER,
-                geometry_complete_timeline_value,
-            )),
-            Some(frame_completion_timeline.to_signal_semaphore(lighting_complete_timeline_value)),
-            self.finished_fence,
-        )?);
+        self.recorder = Some(
+            dvc.submit(
+                recorder,
+                &[frame_completion_timeline
+                    .to_wait_semaphore(vk::PipelineStageFlags::COMPUTE_SHADER, timeline_wait_val)],
+                &[frame_completion_timeline.to_signal_semaphore(timeline_signal_val)],
+                self.finished_fence,
+            )?,
+        );
 
         Ok(FrameLightingStageOutput {
             target_tex: &self.target_tex,
         })
+    }
+
+    pub fn resize(&mut self, size: &winit::dpi::PhysicalSize<u32>, rsc_sys: &ResourceSubsystem) {
+        self.target_tex = rsc_sys
+            .resource_factory
+            .create_storage_texture(size.width, size.height, true)
+            .unwrap();
+        self.target_tex_needs_update = true;
     }
 }

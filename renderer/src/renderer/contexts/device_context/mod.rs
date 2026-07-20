@@ -136,18 +136,15 @@ impl DeviceContext {
     pub fn submit(
         &self,
         cmd_recorder: CommandRecorder<Executable>,
-        wait_semaphore: Option<WaitSemaphore>,
-        signal_semaphore: Option<SignalSemaphore>,
+        wait_semaphores: &[WaitSemaphore],
+        signal_semaphores: &[SignalSemaphore],
         fence: vk::Fence,
     ) -> Result<CommandRecorder<Idle>> {
         let cmd = cmd_recorder.get_command_buffer();
         let queue = cmd_recorder.get_queue();
 
-        let wait_semaphores = wait_semaphore.map(|s| vec![s]).unwrap_or_default();
-        let signal_semaphores = signal_semaphore.map(|s| vec![s]).unwrap_or_default();
-
         self.device
-            .submit(cmd, queue, &wait_semaphores, &signal_semaphores, fence)?;
+            .submit(cmd, queue, wait_semaphores, signal_semaphores, fence)?;
 
         Ok(CommandRecorder::<Idle>::new_from_old(cmd_recorder))
     }

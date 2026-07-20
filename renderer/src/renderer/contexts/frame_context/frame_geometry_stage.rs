@@ -25,13 +25,14 @@ pub(super) struct FrameGeometryStage {
     per_material_region: AllocatedMegabufferRegion,
     per_object_region: AllocatedMegabufferRegion,
 
-    finished_semaphore: vk::Semaphore,
     finished_fence: vk::Fence,
 
     material: Material,
 }
 
 impl FrameGeometryStage {
+    const TIMELINE_SEM_SIGNAL_VALUE: u64 = 1; // TODO: ignored for now
+
     pub fn new(
         dvc_ctx: &DeviceContext,
         cmd_sys: &mut CommandSubsystem,
@@ -65,7 +66,6 @@ impl FrameGeometryStage {
             .per_object_megabuffer
             .allocate_region(FRAME_PER_OBJECT_BUFFER_SIZE)?;
 
-        let finished_semaphore = dvc_ctx.create_vk_semaphore(&vk::SemaphoreCreateInfo::default())?;
         let finished_fence = dvc_ctx.create_vk_fence(
             &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
         )?;
@@ -82,7 +82,6 @@ impl FrameGeometryStage {
             per_frame_region,
             per_material_region,
             per_object_region,
-            finished_semaphore,
             finished_fence,
             material,
         })
