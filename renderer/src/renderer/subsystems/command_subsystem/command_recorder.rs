@@ -105,7 +105,20 @@ impl CommandRecorder<Recording> {
         src_access_mask: vk::AccessFlags2,
         dst_stage_mask: vk::PipelineStageFlags2,
         dst_access_mask: vk::AccessFlags2,
+        src_queue: Option<Queue>,
+        dst_queue: Option<Queue>,
     ) {
+        let src_queue_family_index =
+            src_queue.map_or(vk::QUEUE_FAMILY_IGNORED, |queue| queue.family.index);
+        let dst_queue_family_index =
+            dst_queue.map_or(vk::QUEUE_FAMILY_IGNORED, |queue| queue.family.index);
+        let (src_queue_family_index, dst_queue_family_index) =
+            if src_queue_family_index == dst_queue_family_index {
+                (vk::QUEUE_FAMILY_IGNORED, vk::QUEUE_FAMILY_IGNORED)
+            } else {
+                (src_queue_family_index, dst_queue_family_index)
+            };
+
         let image_barrier = vk::ImageMemoryBarrier2::default()
             .src_stage_mask(src_stage_mask)
             .src_access_mask(src_access_mask)
@@ -113,6 +126,8 @@ impl CommandRecorder<Recording> {
             .dst_access_mask(dst_access_mask)
             .old_layout(old_layout)
             .new_layout(new_layout)
+            .src_queue_family_index(src_queue_family_index)
+            .dst_queue_family_index(dst_queue_family_index)
             .image(texture.image)
             .subresource_range(vk::ImageSubresourceRange {
                 aspect_mask: texture.aspect,
@@ -128,17 +143,6 @@ impl CommandRecorder<Recording> {
             self.device
                 .cmd_pipeline_barrier2(self.command_buffer, &dep_info);
         }
-    }
-
-    pub fn transition_texture_layout(
-        &self,
-        texture: &mut Texture,
-        old_layout: vk::ImageLayout,
-        new_layout: vk::ImageLayout,
-    ) -> Result<()> {
-        texture.transition_layout(self.command_buffer, old_layout, new_layout);
-
-        Ok(())
     }
 
     pub fn copy_texture_to_texture(&self, src: &Texture, dst: &Texture) -> Result<()> {

@@ -20,7 +20,7 @@ use std::time::Duration;
 pub(crate) struct FrameContext {
     geometry_stage: FrameGeometryStage,
     lighting_stage: FrameLightingStage,
-    present_image_acquired_semaphore: BinarySemaphore,
+    present_texture_acquired_semaphore: BinarySemaphore,
     render_finished_semaphore: BinarySemaphore, // Used for
     previous_frame_render_finished_fence: vk::Fence,
     frame_completion_timeline: TimelineSemaphore,
@@ -49,13 +49,17 @@ impl FrameContext {
         )?;
         let frame_completion_timeline = dvc_ctx.create_timeline_semaphore()?;
 
-        let compute_queue = dvc_ctx.get_compute_queue();
-        let postrender_recorder = Some(cmd_sys.command_recorder_allocator.allocate(compute_queue)?);
+        let graphics_queue = dvc_ctx.get_graphics_queue();
+        let postrender_recorder = Some(
+            cmd_sys
+                .command_recorder_allocator
+                .allocate(graphics_queue)?,
+        );
 
         Ok(Self {
             geometry_stage,
             lighting_stage,
-            present_image_acquired_semaphore,
+            present_texture_acquired_semaphore: present_image_acquired_semaphore,
             render_finished_semaphore,
             previous_frame_render_finished_fence,
             frame_completion_timeline,
@@ -87,7 +91,7 @@ impl FrameContext {
         // TODO: Transfer the geometry stage output texture from graphics queue to compute queue
 
         // Render the lighting stage
-        let mut lighting_stage_output = self.lighting_stage.render(
+        let lighting_stage_output = self.lighting_stage.render(
             pkt,
             dvc,
             &self.frame_completion_timeline,
@@ -97,7 +101,7 @@ impl FrameContext {
 
         // Acquire the next image from the swapchain
         let mut present_tex =
-            swc.acquire_next_present_texture(&self.present_image_acquired_semaphore, timeout)?;
+            swc.acquire_next_present_texture(&self.present_texture_acquired_semaphore, timeout)?;
 
         // Perform post-render operations on the compute queue
         let postrender_recorder = self.postrender_recorder.take().unwrap();
@@ -109,9 +113,7 @@ impl FrameContext {
                 vk::ImageLayout::TRANSFER_DST_OPTIMAL,
             )?;
 
-            // TODO: Transfer ownership of lighting stage output texture from compute to graphics queue family
-            // We need to do this because the texture copy operation requires both textures to be in the same queue family,
-            // and the present texture (i.e. swapchain image) is in the graphics queue
+            lighting_stage_output.target_tex.acquire_from_queue(dvc.get_compute_queue(), dvc.get_graphics_queue(), vk::ImageLayout::GENERAL, vk::ImageLayout::TRANSFER_SRC_OPTIMAL);
 
             recorder.copy_texture_to_texture(
                 lighting_stage_output.target_tex,
@@ -130,9 +132,17 @@ impl FrameContext {
         self.postrender_recorder = Some(
             dvc.submit(
                 postrender_recorder,
-                &[self
-                    .present_image_acquired_semaphore
-                    .to_wait_semaphore(vk::PipelineStageFlags::TRANSFER)],
+                &[
+                    // Wait for the lighting stage to finish rendering
+                    self.frame_completion_timeline.to_wait_semaphore(
+                        vk::PipelineStageFlags::TRANSFER,
+                        lighting_timeline_signal,
+                    ),
+                    // Wait for the present texture to be acquired
+                    self.present_texture_acquired_semaphore
+                        .to_wait_semaphore(vk::PipelineStageFlags::TRANSFER),
+                ],
+                // Signal that all render operations have finished, meaning the swapchain image is ready to be presented
                 &[self.render_finished_semaphore.to_signal_semaphore()],
                 self.previous_frame_render_finished_fence,
             )?,

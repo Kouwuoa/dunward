@@ -6,6 +6,7 @@ use color_eyre::eyre::eyre;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use vk_mem::Alloc;
+use crate::renderer::contexts::device_context::queue::Queue;
 
 #[repr(transparent)]
 pub struct ColorTexture(pub Texture);
@@ -46,6 +47,17 @@ impl DerefMut for StorageTexture {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
+}
+
+pub struct TextureMemoryBarrier {
+    pub old_layout: vk::ImageLayout,
+    pub new_layout: vk::ImageLayout,
+    pub src_stage: vk::PipelineStageFlags2,
+    pub src_access: vk::AccessFlags2,
+    pub dst_stage: vk::PipelineStageFlags2,
+    pub dst_access: vk::AccessFlags2,
+    pub src_queue: Queue,
+    pub dst_queue: Queue,
 }
 
 pub struct TextureCreateInfo {
@@ -286,22 +298,6 @@ impl Texture {
         self.extent.height
     }
 
-    pub fn transition_layout(
-        &mut self,
-        cmd: vk::CommandBuffer,
-        old_layout: vk::ImageLayout,
-        new_layout: vk::ImageLayout,
-    ) {
-        transition_image_layout(
-            cmd,
-            self.image,
-            self.aspect,
-            old_layout,
-            new_layout,
-            self.device.as_ref(),
-        );
-    }
-
     pub fn copy_to_vkimage(
         &self,
         dst_image: vk::Image,
@@ -500,46 +496,3 @@ fn copy_vkimage_to_vkimage(
     }
 }
 
-fn transition_image_state(
-    cmd: vk::CommandBuffer,
-    image: vk::Image,
-    image_aspect: vk::ImageAspectFlags,
-    old_layout: vk::ImageLayout,
-    new_layout: vk::ImageLayout,
-    src_stage: vk::PipelineStageFlags2,
-    dst_stage: vk::PipelineStageFlags2,
-    device: &ash::Device,
-) {
-    if old_layout == new_layout {
-        return;
-    }
-
-    let image_barrier = vk::ImageMemoryBarrier2 {
-        src_stage_mask: vk::PipelineStageFlags2::ALL_COMMANDS,
-        src_access_mask: vk::AccessFlags2::MEMORY_WRITE, // TODO: let user pass in argument for stage and access masks
-        dst_stage_mask: vk::PipelineStageFlags2::ALL_COMMANDS,
-        dst_access_mask: vk::AccessFlags2::MEMORY_WRITE | vk::AccessFlags2::MEMORY_READ,
-        old_layout,
-        new_layout,
-        subresource_range: vk::ImageSubresourceRange {
-            aspect_mask: image_aspect,
-            base_mip_level: 0,
-            level_count: 1,
-            base_array_layer: 0,
-            layer_count: 1,
-        },
-        image,
-        src_queue_family_index: ,
-        dst_queue_family_index: ,
-    };
-
-    let dep_info = vk::DependencyInfo {
-        image_memory_barrier_count: 1,
-        p_image_memory_barriers: &image_barrier,
-        ..Default::default()
-    };
-
-    unsafe {
-        device.cmd_pipeline_barrier2(cmd, &dep_info);
-    }
-}

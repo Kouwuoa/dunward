@@ -133,6 +133,12 @@ impl FrameLightingStage {
                 vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             )?;
 
+            self.target_tex.release_to_queue(dvc.get_compute_queue(), dvc.get_graphics_queue(), vk::ImageLayout::GENERAL, vk::ImageLayout::TRANSFER_SRC_OPTIMAL);
+
+            // TODO: Transfer ownership of lighting stage output texture from compute to graphics queue family
+            // We need to do this because the texture copy operation requires both textures to be in the same queue family,
+            // and the present texture (i.e. swapchain image) is in the graphics queue
+
             Ok(())
         })?;
 
