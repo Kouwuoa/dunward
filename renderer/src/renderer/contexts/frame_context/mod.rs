@@ -125,6 +125,20 @@ impl FrameContext {
                 None,
             );
 
+            // Acquire the lighting output texture from the compute queue
+            // Also transition render target texture to transfer source layout to prepare for blitting onto swapchain image
+            recorder.insert_texture_memory_barrier(
+                lighting_stage_output.target_tex,
+                vk::ImageLayout::GENERAL,
+                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                vk::PipelineStageFlags2::COMPUTE_SHADER,
+                vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
+                vk::PipelineStageFlags2::TRANSFER,
+                vk::AccessFlags2::TRANSFER_READ,
+                Some(&dvc.get_compute_queue()),
+                Some(&dvc.get_graphics_queue()),
+            );
+
             recorder.blit_texture_to_texture(
                 lighting_stage_output.target_tex,
                 &mut present_tex.texture,
@@ -142,6 +156,20 @@ impl FrameContext {
                 None,
                 None,
             );
+
+            // Release the lighting output texture back to the compute queue
+            recorder.insert_texture_memory_barrier(
+                lighting_stage_output.target_tex,
+                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                vk::PipelineStageFlags2::TRANSFER,
+                vk::AccessFlags2::TRANSFER_READ,
+                vk::PipelineStageFlags2::TRANSFER,
+                vk::AccessFlags2::TRANSFER_READ,
+                Some(&dvc.get_graphics_queue()),
+                Some(&dvc.get_compute_queue()),
+            );
+
             Ok(())
         })?;
 
@@ -159,7 +187,11 @@ impl FrameContext {
                         .to_wait_semaphore(vk::PipelineStageFlags::TRANSFER),
                 ],
                 // Signal that all render operations have finished, meaning the swapchain image is ready to be presented
-                &[self.frame_completion_timeline.to_signal_semaphore(postrender_timeline_signal), self.render_finished_semaphore.to_signal_semaphore()],
+                &[
+                    self.frame_completion_timeline
+                        .to_signal_semaphore(postrender_timeline_signal),
+                    self.render_finished_semaphore.to_signal_semaphore(),
+                ],
                 Some(self.previous_frame_render_finished_fence),
             )?,
         );

@@ -1,4 +1,3 @@
-use std::time::Duration;
 use crate::renderer::contexts::device_context::DeviceContext;
 use crate::renderer::contexts::device_context::semaphore::{BinarySemaphore, TimelineSemaphore};
 use crate::renderer::contexts::frame_context::packet::FrameRenderPacket;
@@ -12,6 +11,7 @@ use crate::renderer::subsystems::resource_subsystem::resource_types::shader_data
 use crate::renderer::subsystems::resource_subsystem::resource_types::texture::StorageTexture;
 use ash::vk;
 use color_eyre::Result;
+use std::time::Duration;
 
 pub(super) struct FrameLightingStageOutput<'a> {
     pub target_tex: &'a StorageTexture,
@@ -81,8 +81,16 @@ impl FrameLightingStage {
                     vk::ImageLayout::TRANSFER_SRC_OPTIMAL
                 },
                 vk::ImageLayout::GENERAL,
-                vk::PipelineStageFlags2::NONE,
-                vk::AccessFlags2::NONE,
+                if self.is_first_render {
+                    vk::PipelineStageFlags2::NONE
+                } else {
+                    vk::PipelineStageFlags2::TRANSFER
+                },
+                if self.is_first_render {
+                    vk::AccessFlags2::NONE
+                } else {
+                    vk::AccessFlags2::TRANSFER_READ
+                },
                 vk::PipelineStageFlags2::COMPUTE_SHADER,
                 vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
                 if self.is_first_render {
@@ -144,16 +152,15 @@ impl FrameLightingStage {
             let group_count_y = (self.target_tex.height() as f32 / 16.0).ceil() as u32;
             recorder.dispatch(group_count_x, group_count_y, 1);
 
-            // Transition render target texture to transfer source layout to prepare for copying onto swapchain image
-            // Also transfer the queue of the texture from compute to graphics to match the queue of the swapchain image
+            // Release the texture from compute onto the graphics queue to match the queue of the swapchain image
             recorder.insert_texture_memory_barrier(
                 &self.target_tex,
                 vk::ImageLayout::GENERAL,
-                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                vk::ImageLayout::GENERAL,
                 vk::PipelineStageFlags2::COMPUTE_SHADER,
                 vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
-                vk::PipelineStageFlags2::TRANSFER,
-                vk::AccessFlags2::TRANSFER_READ,
+                vk::PipelineStageFlags2::COMPUTE_SHADER,
+                vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
                 Some(&compute_queue),
                 Some(&graphics_queue),
             );
