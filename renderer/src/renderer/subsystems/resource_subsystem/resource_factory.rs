@@ -104,18 +104,6 @@ impl ResourceFactory {
         )
     }
 
-    pub fn create_graphics_material_factory(&self) -> Result<MaterialFactory> {
-        let descriptor_set_layout = self.create_graphics_descriptor_set_layout()?;
-        let pipeline_layout =
-            self.create_graphics_pipeline_layout(descriptor_set_layout)?;
-        let compute_shader = ComputeShader::new(ShaderId::MovingShape, self.device.clone())?;
-        ComputeMaterialFactoryBuilder::new(self.device.clone(), self.descriptor_allocator.clone())
-            .with_shader(compute_shader)
-            .with_pipeline_layout(pipeline_layout)
-            .with_descriptor_set_layout(descriptor_set_layout)
-            .build()
-    }
-
     pub fn create_compute_material_factory(&self) -> Result<MaterialFactory> {
         let descriptor_set_layout = self.create_compute_descriptor_set_layout()?;
         let pipeline_layout =

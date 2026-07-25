@@ -62,7 +62,7 @@ impl Device {
         queue: Arc<Queue>,
         wait_semaphores: &[WaitSemaphore],
         signal_semaphores: &[SignalSemaphore],
-        fence: vk::Fence,
+        fence: Option<vk::Fence>,
     ) -> Result<()> {
         let command_buffers = [cmd];
 
@@ -121,6 +121,7 @@ impl Device {
             submit = submit.push_next(info);
         }
 
+        let fence = fence.map_or(vk::Fence::null(), |fence| fence);
         unsafe {
             self.logical.queue_submit(queue.handle, &[submit], fence)?;
         }

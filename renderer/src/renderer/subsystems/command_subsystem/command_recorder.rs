@@ -105,8 +105,8 @@ impl CommandRecorder<Recording> {
         src_access_mask: vk::AccessFlags2,
         dst_stage_mask: vk::PipelineStageFlags2,
         dst_access_mask: vk::AccessFlags2,
-        src_queue: Option<Queue>,
-        dst_queue: Option<Queue>,
+        src_queue: Option<&Queue>,
+        dst_queue: Option<&Queue>,
     ) {
         let src_queue_family_index =
             src_queue.map_or(vk::QUEUE_FAMILY_IGNORED, |queue| queue.family.index);
@@ -145,8 +145,8 @@ impl CommandRecorder<Recording> {
         }
     }
 
-    pub fn copy_texture_to_texture(&self, src: &Texture, dst: &Texture) -> Result<()> {
-        src.copy_to(dst, self.command_buffer);
+    pub fn blit_texture_to_texture(&self, src: &Texture, dst: &Texture) -> Result<()> {
+        src.blit_to(dst, self.command_buffer);
 
         Ok(())
     }

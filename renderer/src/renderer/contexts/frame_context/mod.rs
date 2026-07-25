@@ -21,11 +21,12 @@ pub(crate) struct FrameContext {
     geometry_stage: FrameGeometryStage,
     lighting_stage: FrameLightingStage,
     present_texture_acquired_semaphore: BinarySemaphore,
-    render_finished_semaphore: BinarySemaphore, // Used for
     previous_frame_render_finished_fence: vk::Fence,
     frame_completion_timeline: TimelineSemaphore,
     frame_completion_timeline_base: u64,
+    render_finished_semaphore: BinarySemaphore,
     postrender_recorder: Option<CommandRecorder<Idle>>,
+    is_first_render: bool,
 }
 
 impl FrameContext {
@@ -65,6 +66,7 @@ impl FrameContext {
             frame_completion_timeline,
             frame_completion_timeline_base: 0,
             postrender_recorder,
+            is_first_render: true,
         })
     }
 
@@ -82,9 +84,9 @@ impl FrameContext {
 
         // Calculate timeline semaphore values
         let lighting_timeline_wait = self.frame_completion_timeline_base;
-        let lighting_timeline_signal =
-            self.frame_completion_timeline_base + FrameLightingStage::TIMELINE_SEM_SIGNAL_OFFSET;
-        self.frame_completion_timeline_base = lighting_timeline_signal;
+        let lighting_timeline_signal = self.frame_completion_timeline_base + 1;
+        let postrender_timeline_signal = lighting_timeline_signal + 1;
+        self.frame_completion_timeline_base = postrender_timeline_signal;
 
         // TODO: Render the geometry stage
 
@@ -106,26 +108,40 @@ impl FrameContext {
         // Perform post-render operations on the compute queue
         let postrender_recorder = self.postrender_recorder.take().unwrap();
         let postrender_recorder = postrender_recorder.record(|recorder| {
-            // Transition the image layout for present texture
-            recorder.transition_texture_layout(
-                &mut present_tex.texture,
-                vk::ImageLayout::UNDEFINED,
+            // Transition the image layout into TRANSFER_DST_OPTIMAL for present texture to prepare for blit
+            recorder.insert_texture_memory_barrier(
+                &present_tex.texture,
+                if self.is_first_render {
+                    vk::ImageLayout::UNDEFINED
+                } else {
+                    vk::ImageLayout::PRESENT_SRC_KHR
+                },
                 vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-            )?;
+                vk::PipelineStageFlags2::NONE,
+                vk::AccessFlags2::NONE,
+                vk::PipelineStageFlags2::TRANSFER,
+                vk::AccessFlags2::TRANSFER_WRITE,
+                None,
+                None,
+            );
 
-            lighting_stage_output.target_tex.acquire_from_queue(dvc.get_compute_queue(), dvc.get_graphics_queue(), vk::ImageLayout::GENERAL, vk::ImageLayout::TRANSFER_SRC_OPTIMAL);
-
-            recorder.copy_texture_to_texture(
+            recorder.blit_texture_to_texture(
                 lighting_stage_output.target_tex,
                 &mut present_tex.texture,
             )?;
 
             // Prepare swapchain texture for presentation
-            recorder.transition_texture_layout(
-                &mut present_tex.texture,
+            recorder.insert_texture_memory_barrier(
+                &present_tex.texture,
                 vk::ImageLayout::TRANSFER_DST_OPTIMAL,
                 vk::ImageLayout::PRESENT_SRC_KHR,
-            )?;
+                vk::PipelineStageFlags2::TRANSFER,
+                vk::AccessFlags2::TRANSFER_WRITE,
+                vk::PipelineStageFlags2::NONE,
+                vk::AccessFlags2::NONE,
+                None,
+                None,
+            );
             Ok(())
         })?;
 
@@ -143,10 +159,12 @@ impl FrameContext {
                         .to_wait_semaphore(vk::PipelineStageFlags::TRANSFER),
                 ],
                 // Signal that all render operations have finished, meaning the swapchain image is ready to be presented
-                &[self.render_finished_semaphore.to_signal_semaphore()],
-                self.previous_frame_render_finished_fence,
+                &[self.frame_completion_timeline.to_signal_semaphore(postrender_timeline_signal), self.render_finished_semaphore.to_signal_semaphore()],
+                Some(self.previous_frame_render_finished_fence),
             )?,
         );
+
+        self.is_first_render = false;
 
         Ok(FramePresentPacket {
             texture: present_tex,

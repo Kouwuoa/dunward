@@ -1,3 +1,4 @@
+use std::time::Duration;
 use crate::renderer::contexts::device_context::DeviceContext;
 use crate::renderer::contexts::device_context::semaphore::{BinarySemaphore, TimelineSemaphore};
 use crate::renderer::contexts::frame_context::packet::FrameRenderPacket;
@@ -22,14 +23,11 @@ pub(super) struct FrameLightingStage {
     target_tex: StorageTexture,
     target_tex_needs_update: bool,
 
-    finished_fence: vk::Fence,
-
     material: Material,
+    is_first_render: bool,
 }
 
 impl FrameLightingStage {
-    pub const TIMELINE_SEM_SIGNAL_OFFSET: u64 = 1;
-
     pub fn new(
         dvc_ctx: &DeviceContext,
         swc_ctx: &SwapchainContext,
@@ -46,10 +44,6 @@ impl FrameLightingStage {
             true,
         )?;
 
-        let finished_fence = dvc_ctx.create_vk_fence(
-            &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
-        )?;
-
         let material = rsc_sys
             .resource_store
             .compute_material_factory
@@ -59,8 +53,8 @@ impl FrameLightingStage {
             recorder,
             target_tex,
             target_tex_needs_update: true,
-            finished_fence,
             material,
+            is_first_render: true,
         })
     }
 
@@ -75,12 +69,33 @@ impl FrameLightingStage {
         // Record render commands
         let recorder = self.recorder.take().unwrap();
         let recorder = recorder.record(|recorder| {
+            let graphics_queue = dvc.get_graphics_queue();
+            let compute_queue = dvc.get_compute_queue();
+
             // Transition render target texture to GENERAL layout
-            recorder.transition_texture_layout(
-                &mut self.target_tex,
-                vk::ImageLayout::UNDEFINED,
+            recorder.insert_texture_memory_barrier(
+                &self.target_tex,
+                if self.is_first_render {
+                    vk::ImageLayout::UNDEFINED
+                } else {
+                    vk::ImageLayout::TRANSFER_SRC_OPTIMAL
+                },
                 vk::ImageLayout::GENERAL,
-            )?;
+                vk::PipelineStageFlags2::NONE,
+                vk::AccessFlags2::NONE,
+                vk::PipelineStageFlags2::COMPUTE_SHADER,
+                vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
+                if self.is_first_render {
+                    None
+                } else {
+                    Some(&graphics_queue)
+                },
+                if self.is_first_render {
+                    None
+                } else {
+                    Some(&compute_queue)
+                },
+            );
 
             // Update the render target texture if it needs updating
             if self.target_tex_needs_update {
@@ -105,14 +120,17 @@ impl FrameLightingStage {
             )?;
 
             // Insert memory barrier that waits until the storage texture has been fully cleared before continuing with read/write operations
+            // This effectively performs a flush operation to ensure the render operations that follow do not operate on stale data
             recorder.insert_texture_memory_barrier(
                 &self.target_tex,
                 vk::ImageLayout::GENERAL,
                 vk::ImageLayout::GENERAL,
-                vk::PipelineStageFlags2::TRANSFER,
-                vk::AccessFlags2::TRANSFER_WRITE,
                 vk::PipelineStageFlags2::COMPUTE_SHADER,
                 vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
+                vk::PipelineStageFlags2::COMPUTE_SHADER,
+                vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
+                None,
+                None,
             );
 
             // Compute render operations
@@ -127,17 +145,18 @@ impl FrameLightingStage {
             recorder.dispatch(group_count_x, group_count_y, 1);
 
             // Transition render target texture to transfer source layout to prepare for copying onto swapchain image
-            recorder.transition_texture_layout(
-                &mut self.target_tex,
+            // Also transfer the queue of the texture from compute to graphics to match the queue of the swapchain image
+            recorder.insert_texture_memory_barrier(
+                &self.target_tex,
                 vk::ImageLayout::GENERAL,
                 vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-            )?;
-
-            self.target_tex.release_to_queue(dvc.get_compute_queue(), dvc.get_graphics_queue(), vk::ImageLayout::GENERAL, vk::ImageLayout::TRANSFER_SRC_OPTIMAL);
-
-            // TODO: Transfer ownership of lighting stage output texture from compute to graphics queue family
-            // We need to do this because the texture copy operation requires both textures to be in the same queue family,
-            // and the present texture (i.e. swapchain image) is in the graphics queue
+                vk::PipelineStageFlags2::COMPUTE_SHADER,
+                vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
+                vk::PipelineStageFlags2::TRANSFER,
+                vk::AccessFlags2::TRANSFER_READ,
+                Some(&compute_queue),
+                Some(&graphics_queue),
+            );
 
             Ok(())
         })?;
@@ -148,9 +167,11 @@ impl FrameLightingStage {
                 &[frame_completion_timeline
                     .to_wait_semaphore(vk::PipelineStageFlags::COMPUTE_SHADER, timeline_wait_val)],
                 &[frame_completion_timeline.to_signal_semaphore(timeline_signal_val)],
-                self.finished_fence,
+                None,
             )?,
         );
+
+        self.is_first_render = false;
 
         Ok(FrameLightingStageOutput {
             target_tex: &self.target_tex,

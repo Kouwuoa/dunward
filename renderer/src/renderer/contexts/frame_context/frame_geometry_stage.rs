@@ -27,7 +27,7 @@ pub(super) struct FrameGeometryStage {
 
     finished_fence: vk::Fence,
 
-    material: Material,
+    //material: Material,
 }
 
 impl FrameGeometryStage {
@@ -70,10 +70,12 @@ impl FrameGeometryStage {
             &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
         )?;
 
+        /*
         let material = rsc_sys
             .resource_store
             .graphics_material_factory
             .create_material()?;
+         */
 
         Ok(Self {
             recorder,
@@ -83,7 +85,7 @@ impl FrameGeometryStage {
             per_material_region,
             per_object_region,
             finished_fence,
-            material,
+            //material,
         })
     }
 }

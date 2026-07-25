@@ -29,7 +29,6 @@ pub struct ResourceStore {
     pub per_material_megabuffer: Megabuffer,
     pub per_object_megabuffer: Megabuffer,
 
-    pub graphics_material_factory: MaterialFactory,
     pub compute_material_factory: MaterialFactory,
 }
 
@@ -67,7 +66,7 @@ impl ResourceStore {
             vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
         )?;
 
-        let bindless_material_factory = factory.create_bindless_material_factory()?;
+        let compute_material_factory = factory.create_compute_material_factory()?;
 
         Ok(Self {
             storage_textures: Vec::new(),
@@ -79,7 +78,8 @@ impl ResourceStore {
             per_frame_megabuffer,
             per_material_megabuffer,
             per_object_megabuffer,
-            bindless_material_factory,
+
+            compute_material_factory,
         })
     }
 

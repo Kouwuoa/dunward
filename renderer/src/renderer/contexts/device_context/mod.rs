@@ -138,7 +138,7 @@ impl DeviceContext {
         cmd_recorder: CommandRecorder<Executable>,
         wait_semaphores: &[WaitSemaphore],
         signal_semaphores: &[SignalSemaphore],
-        fence: vk::Fence,
+        fence: Option<vk::Fence>,
     ) -> Result<CommandRecorder<Idle>> {
         let cmd = cmd_recorder.get_command_buffer();
         let queue = cmd_recorder.get_queue();

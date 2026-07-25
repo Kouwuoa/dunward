@@ -298,13 +298,13 @@ impl Texture {
         self.extent.height
     }
 
-    pub fn copy_to_vkimage(
+    pub fn blit_to_vkimage(
         &self,
         dst_image: vk::Image,
         dst_image_extent: vk::Extent2D,
         cmd: vk::CommandBuffer,
     ) {
-        copy_vkimage_to_vkimage(
+        blit_vkimage_to_vkimage(
             cmd,
             self.image,
             dst_image,
@@ -317,8 +317,8 @@ impl Texture {
         );
     }
 
-    pub fn copy_to(&self, dst: &Texture, cmd: vk::CommandBuffer) {
-        self.copy_to_vkimage(
+    pub fn blit_to(&self, dst: &Texture, cmd: vk::CommandBuffer) {
+        self.blit_to_vkimage(
             dst.image,
             vk::Extent2D {
                 width: dst.extent.width,
@@ -440,7 +440,7 @@ impl Drop for Texture {
     }
 }
 
-fn copy_vkimage_to_vkimage(
+fn blit_vkimage_to_vkimage(
     cmd: vk::CommandBuffer,
     src: vk::Image,
     dst: vk::Image,
