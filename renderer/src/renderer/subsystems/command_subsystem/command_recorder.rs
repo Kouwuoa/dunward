@@ -98,8 +98,7 @@ impl CommandRecorder<Idle> {
 impl CommandRecorder<Recording> {
     pub fn insert_texture_memory_barrier(
         &self,
-        texture: &Texture,
-        old_layout: vk::ImageLayout,
+        texture: &mut Texture,
         new_layout: vk::ImageLayout,
         src_stage_mask: vk::PipelineStageFlags2,
         src_access_mask: vk::AccessFlags2,
@@ -124,7 +123,7 @@ impl CommandRecorder<Recording> {
             .src_access_mask(src_access_mask)
             .dst_stage_mask(dst_stage_mask)
             .dst_access_mask(dst_access_mask)
-            .old_layout(old_layout)
+            .old_layout(texture.current_layout)
             .new_layout(new_layout)
             .src_queue_family_index(src_queue_family_index)
             .dst_queue_family_index(dst_queue_family_index)
@@ -143,6 +142,8 @@ impl CommandRecorder<Recording> {
             self.device
                 .cmd_pipeline_barrier2(self.command_buffer, &dep_info);
         }
+
+        texture.current_layout = new_layout;
     }
 
     pub fn blit_texture_to_texture(&self, src: &Texture, dst: &Texture) -> Result<()> {

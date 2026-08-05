@@ -1,12 +1,11 @@
 use crate::renderer::subsystems::command_subsystem::transfer_command_recorder::TransferCommandRecorder;
 use crate::renderer::subsystems::resource_subsystem::resource_types::buffer::Buffer;
 use ash::vk;
-use color_eyre::eyre::Result;
 use color_eyre::eyre::eyre;
+use color_eyre::eyre::Result;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use vk_mem::Alloc;
-use crate::renderer::contexts::device_context::queue::Queue;
 
 #[repr(transparent)]
 pub struct ColorTexture(pub Texture);
@@ -49,17 +48,6 @@ impl DerefMut for StorageTexture {
     }
 }
 
-pub struct TextureMemoryBarrier {
-    pub old_layout: vk::ImageLayout,
-    pub new_layout: vk::ImageLayout,
-    pub src_stage: vk::PipelineStageFlags2,
-    pub src_access: vk::AccessFlags2,
-    pub dst_stage: vk::PipelineStageFlags2,
-    pub dst_access: vk::AccessFlags2,
-    pub src_queue: Queue,
-    pub dst_queue: Queue,
-}
-
 pub struct TextureCreateInfo {
     pub format: vk::Format,
     pub extent: vk::Extent3D,
@@ -75,6 +63,7 @@ pub struct Texture {
     pub format: vk::Format,
     pub extent: vk::Extent3D,
     pub aspect: vk::ImageAspectFlags,
+    pub current_layout: vk::ImageLayout,
 
     /// Determines if the dtor should destroy the vk::ImageView associated with this texture
     destroy_view: bool,
@@ -140,6 +129,7 @@ impl Texture {
             format: create_info.format,
             extent: create_info.extent,
             aspect: create_info.aspect,
+            current_layout: vk::ImageLayout::UNDEFINED,
 
             destroy_view: true, // Since we created the view in this ctor, we'll need to clean it up
 
@@ -228,6 +218,7 @@ impl Texture {
                 depth: 1,
             },
             aspect: vk::ImageAspectFlags::COLOR,
+            current_layout: vk::ImageLayout::UNDEFINED,
             destroy_view,
             allocation: None,
             memory_allocator,
@@ -495,4 +486,3 @@ fn blit_vkimage_to_vkimage(
         device.cmd_blit_image2(cmd, &blit_info);
     }
 }
-

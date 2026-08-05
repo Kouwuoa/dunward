@@ -1,20 +1,19 @@
+use crate::renderer::contexts::device_context::semaphore::TimelineSemaphore;
 use crate::renderer::contexts::device_context::DeviceContext;
-use crate::renderer::contexts::device_context::semaphore::{BinarySemaphore, TimelineSemaphore};
 use crate::renderer::contexts::frame_context::packet::FrameRenderPacket;
 use crate::renderer::contexts::swapchain_context::SwapchainContext;
-use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
 use crate::renderer::subsystems::command_subsystem::command_recorder::{CommandRecorder, Idle};
 use crate::renderer::subsystems::command_subsystem::command_recorder_allocator::CommandRecorderAllocatorExt;
-use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
+use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
 use crate::renderer::subsystems::resource_subsystem::resource_types::material::Material;
 use crate::renderer::subsystems::resource_subsystem::resource_types::shader_data::PerDrawData;
 use crate::renderer::subsystems::resource_subsystem::resource_types::texture::StorageTexture;
+use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
 use ash::vk;
 use color_eyre::Result;
-use std::time::Duration;
 
 pub(super) struct FrameLightingStageOutput<'a> {
-    pub target_tex: &'a StorageTexture,
+    pub target_tex: &'a mut StorageTexture,
 }
 
 pub(super) struct FrameLightingStage {
@@ -74,12 +73,7 @@ impl FrameLightingStage {
 
             // Transition render target texture to GENERAL layout
             recorder.insert_texture_memory_barrier(
-                &self.target_tex,
-                if self.is_first_render {
-                    vk::ImageLayout::UNDEFINED
-                } else {
-                    vk::ImageLayout::TRANSFER_SRC_OPTIMAL
-                },
+                &mut self.target_tex,
                 vk::ImageLayout::GENERAL,
                 if self.is_first_render {
                     vk::PipelineStageFlags2::NONE
@@ -130,8 +124,7 @@ impl FrameLightingStage {
             // Insert memory barrier that waits until the storage texture has been fully cleared before continuing with read/write operations
             // This effectively performs a flush operation to ensure the render operations that follow do not operate on stale data
             recorder.insert_texture_memory_barrier(
-                &self.target_tex,
-                vk::ImageLayout::GENERAL,
+                &mut self.target_tex,
                 vk::ImageLayout::GENERAL,
                 vk::PipelineStageFlags2::COMPUTE_SHADER,
                 vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
@@ -154,8 +147,7 @@ impl FrameLightingStage {
 
             // Release the texture from compute onto the graphics queue to match the queue of the swapchain image
             recorder.insert_texture_memory_barrier(
-                &self.target_tex,
-                vk::ImageLayout::GENERAL,
+                &mut self.target_tex,
                 vk::ImageLayout::GENERAL,
                 vk::PipelineStageFlags2::COMPUTE_SHADER,
                 vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
@@ -181,7 +173,7 @@ impl FrameLightingStage {
         self.is_first_render = false;
 
         Ok(FrameLightingStageOutput {
-            target_tex: &self.target_tex,
+            target_tex: &mut self.target_tex,
         })
     }
 

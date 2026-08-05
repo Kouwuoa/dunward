@@ -3,15 +3,15 @@ pub(crate) mod packet;
 mod frame_geometry_stage;
 mod frame_lighting_stage;
 
-use crate::renderer::contexts::device_context::DeviceContext;
 use crate::renderer::contexts::device_context::semaphore::{BinarySemaphore, TimelineSemaphore};
+use crate::renderer::contexts::device_context::DeviceContext;
 use crate::renderer::contexts::frame_context::frame_geometry_stage::FrameGeometryStage;
 use crate::renderer::contexts::frame_context::frame_lighting_stage::FrameLightingStage;
 use crate::renderer::contexts::frame_context::packet::{FramePresentPacket, FrameRenderPacket};
 use crate::renderer::contexts::swapchain_context::{SwapchainContext, SwapchainPresentError};
-use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
 use crate::renderer::subsystems::command_subsystem::command_recorder::{CommandRecorder, Idle};
 use crate::renderer::subsystems::command_subsystem::command_recorder_allocator::CommandRecorderAllocatorExt;
+use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
 use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
 use ash::vk;
 use color_eyre::eyre::Result;
@@ -93,7 +93,7 @@ impl FrameContext {
         // TODO: Transfer the geometry stage output texture from graphics queue to compute queue
 
         // Render the lighting stage
-        let lighting_stage_output = self.lighting_stage.render(
+        let mut lighting_stage_output = self.lighting_stage.render(
             pkt,
             dvc,
             &self.frame_completion_timeline,
@@ -110,12 +110,7 @@ impl FrameContext {
         let postrender_recorder = postrender_recorder.record(|recorder| {
             // Transition the image layout into TRANSFER_DST_OPTIMAL for present texture to prepare for blit
             recorder.insert_texture_memory_barrier(
-                &present_tex.texture,
-                if self.is_first_render {
-                    vk::ImageLayout::UNDEFINED
-                } else {
-                    vk::ImageLayout::PRESENT_SRC_KHR
-                },
+                &mut present_tex.texture,
                 vk::ImageLayout::TRANSFER_DST_OPTIMAL,
                 vk::PipelineStageFlags2::NONE,
                 vk::AccessFlags2::NONE,
@@ -129,7 +124,6 @@ impl FrameContext {
             // Also transition render target texture to transfer source layout to prepare for blitting onto swapchain image
             recorder.insert_texture_memory_barrier(
                 lighting_stage_output.target_tex,
-                vk::ImageLayout::GENERAL,
                 vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
                 vk::PipelineStageFlags2::COMPUTE_SHADER,
                 vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
@@ -146,8 +140,7 @@ impl FrameContext {
 
             // Prepare swapchain texture for presentation
             recorder.insert_texture_memory_barrier(
-                &present_tex.texture,
-                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                &mut present_tex.texture,
                 vk::ImageLayout::PRESENT_SRC_KHR,
                 vk::PipelineStageFlags2::TRANSFER,
                 vk::AccessFlags2::TRANSFER_WRITE,
@@ -160,7 +153,6 @@ impl FrameContext {
             // Release the lighting output texture back to the compute queue
             recorder.insert_texture_memory_barrier(
                 lighting_stage_output.target_tex,
-                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
                 vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
                 vk::PipelineStageFlags2::TRANSFER,
                 vk::AccessFlags2::TRANSFER_READ,
