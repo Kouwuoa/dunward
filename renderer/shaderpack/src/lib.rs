@@ -10,6 +10,7 @@ pub enum ShaderId {
     MovingShape,
     Sky,
     SolidBackground,
+    TestPattern,
 }
 
 impl ShaderId {
@@ -18,6 +19,7 @@ impl ShaderId {
             ShaderId::MovingShape => "moving-shape.comp.spv",
             ShaderId::Sky => "sky.comp.spv",
             ShaderId::SolidBackground => "solid-background.comp.spv",
+            ShaderId::TestPattern => "test-pattern.comp.spv",
         }
     }
 }

@@ -104,19 +104,27 @@ impl CommandRecorder<Recording> {
         src_access_mask: vk::AccessFlags2,
         dst_stage_mask: vk::PipelineStageFlags2,
         dst_access_mask: vk::AccessFlags2,
-        src_queue: Option<&Queue>,
-        dst_queue: Option<&Queue>,
+        dst_queue: Option<Arc<Queue>>,
     ) {
-        let src_queue_family_index =
-            src_queue.map_or(vk::QUEUE_FAMILY_IGNORED, |queue| queue.family.index);
-        let dst_queue_family_index =
-            dst_queue.map_or(vk::QUEUE_FAMILY_IGNORED, |queue| queue.family.index);
-        let (src_queue_family_index, dst_queue_family_index) =
-            if src_queue_family_index == dst_queue_family_index {
-                (vk::QUEUE_FAMILY_IGNORED, vk::QUEUE_FAMILY_IGNORED)
-            } else {
-                (src_queue_family_index, dst_queue_family_index)
-            };
+        let (src_queue_family_index, dst_queue_family_index) = match dst_queue {
+            // Case 1: RELEASE to another queue family
+            Some(ref target_queue) if target_queue.family.index != self.queue.family.index => {
+                texture.pending_acquire_src_queue = Some(self.queue.clone());
+                texture.current_queue = target_queue.clone();
+                (self.queue.family.index, target_queue.family.index)
+            }
+            // Case 2: ACQUIRE from a prior release
+            _ if texture.pending_acquire_src_queue.is_some() => {
+                let src_queue = texture.pending_acquire_src_queue.take().unwrap();
+                if src_queue.family.index != self.queue.family.index {
+                    (src_queue.family.index, self.queue.family.index)
+                } else {
+                    (vk::QUEUE_FAMILY_IGNORED, vk::QUEUE_FAMILY_IGNORED)
+                }
+            }
+            // Case 3: Ignore same-queue transition
+            _ => (vk::QUEUE_FAMILY_IGNORED, vk::QUEUE_FAMILY_IGNORED),
+        };
 
         let image_barrier = vk::ImageMemoryBarrier2::default()
             .src_stage_mask(src_stage_mask)
@@ -144,6 +152,9 @@ impl CommandRecorder<Recording> {
         }
 
         texture.current_layout = new_layout;
+        if let Some(dst_queue) = dst_queue {
+            texture.current_queue = dst_queue;
+        }
     }
 
     pub fn blit_texture_to_texture(&self, src: &Texture, dst: &Texture) -> Result<()> {

@@ -70,9 +70,6 @@ impl SwapchainContext {
                 vk::Fence::null(),
             )?
         };
-        if suboptimal {
-            log::warn!("Acquired swapchain image is suboptimal. A resize may be necessary.");
-        }
 
         let image = self
             .swapchain
@@ -98,6 +95,7 @@ impl SwapchainContext {
             format,
             extent,
             false,
+            self.present_queue.clone(),
             self.memory_allocator.clone(),
             self.device.clone(),
         );

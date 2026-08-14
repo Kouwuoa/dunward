@@ -3,15 +3,15 @@ pub(crate) mod packet;
 mod frame_geometry_stage;
 mod frame_lighting_stage;
 
-use crate::renderer::contexts::device_context::semaphore::{BinarySemaphore, TimelineSemaphore};
 use crate::renderer::contexts::device_context::DeviceContext;
+use crate::renderer::contexts::device_context::semaphore::{BinarySemaphore, TimelineSemaphore};
 use crate::renderer::contexts::frame_context::frame_geometry_stage::FrameGeometryStage;
 use crate::renderer::contexts::frame_context::frame_lighting_stage::FrameLightingStage;
 use crate::renderer::contexts::frame_context::packet::{FramePresentPacket, FrameRenderPacket};
 use crate::renderer::contexts::swapchain_context::{SwapchainContext, SwapchainPresentError};
+use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
 use crate::renderer::subsystems::command_subsystem::command_recorder::{CommandRecorder, Idle};
 use crate::renderer::subsystems::command_subsystem::command_recorder_allocator::CommandRecorderAllocatorExt;
-use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
 use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
 use ash::vk;
 use color_eyre::eyre::Result;
@@ -26,12 +26,9 @@ pub(crate) struct FrameContext {
     frame_completion_timeline_base: u64,
     render_finished_semaphore: BinarySemaphore,
     postrender_recorder: Option<CommandRecorder<Idle>>,
-    is_first_render: bool,
 }
 
 impl FrameContext {
-    const RENDER_STAGE_COUNT: u64 = 2;
-
     pub fn new(
         dvc_ctx: &mut DeviceContext,
         swc_ctx: &SwapchainContext,
@@ -66,7 +63,6 @@ impl FrameContext {
             frame_completion_timeline,
             frame_completion_timeline_base: 0,
             postrender_recorder,
-            is_first_render: true,
         })
     }
 
@@ -93,7 +89,7 @@ impl FrameContext {
         // TODO: Transfer the geometry stage output texture from graphics queue to compute queue
 
         // Render the lighting stage
-        let mut lighting_stage_output = self.lighting_stage.render(
+        let lighting_stage_output = self.lighting_stage.render(
             pkt,
             dvc,
             &self.frame_completion_timeline,
@@ -117,7 +113,6 @@ impl FrameContext {
                 vk::PipelineStageFlags2::TRANSFER,
                 vk::AccessFlags2::TRANSFER_WRITE,
                 None,
-                None,
             );
 
             // Acquire the lighting output texture from the compute queue
@@ -129,8 +124,7 @@ impl FrameContext {
                 vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
                 vk::PipelineStageFlags2::TRANSFER,
                 vk::AccessFlags2::TRANSFER_READ,
-                Some(&dvc.get_compute_queue()),
-                Some(&dvc.get_graphics_queue()),
+                Some(dvc.get_graphics_queue()),
             );
 
             recorder.blit_texture_to_texture(
@@ -147,7 +141,6 @@ impl FrameContext {
                 vk::PipelineStageFlags2::NONE,
                 vk::AccessFlags2::NONE,
                 None,
-                None,
             );
 
             // Release the lighting output texture back to the compute queue
@@ -158,8 +151,7 @@ impl FrameContext {
                 vk::AccessFlags2::TRANSFER_READ,
                 vk::PipelineStageFlags2::TRANSFER,
                 vk::AccessFlags2::TRANSFER_READ,
-                Some(&dvc.get_graphics_queue()),
-                Some(&dvc.get_compute_queue()),
+                Some(dvc.get_compute_queue()),
             );
 
             Ok(())
@@ -187,8 +179,6 @@ impl FrameContext {
                 Some(self.previous_frame_render_finished_fence),
             )?,
         );
-
-        self.is_first_render = false;
 
         Ok(FramePresentPacket {
             texture: present_tex,

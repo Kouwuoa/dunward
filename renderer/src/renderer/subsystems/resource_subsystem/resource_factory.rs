@@ -1,5 +1,6 @@
 use crate::renderer::subsystems::command_subsystem::transfer_command_recorder::TransferCommandRecorder;
 use crate::renderer::subsystems::resource_subsystem::resource_descriptors::descriptor_allocator::DescriptorAllocator;
+use crate::renderer::subsystems::resource_subsystem::resource_descriptors::descriptor_set_layout_builder::DescriptorSetLayoutBuilder;
 use crate::renderer::subsystems::resource_subsystem::resource_types::ResourceType;
 use crate::renderer::subsystems::resource_subsystem::resource_types::material::{
     ComputeMaterialFactoryBuilder, MaterialFactory,
@@ -14,9 +15,8 @@ use crate::renderer::subsystems::resource_subsystem::resource_types::texture::{
 };
 use ash::vk;
 use color_eyre::Result;
-use std::sync::{Arc, Mutex};
 use shaderpack::ShaderId;
-use crate::renderer::subsystems::resource_subsystem::resource_descriptors::descriptor_set_layout_builder::DescriptorSetLayoutBuilder;
+use std::sync::{Arc, Mutex};
 
 /// `ResourceFactory` is responsible only for construction (`create_*` APIs)
 /// such as buffers, textures, and materials as needed.
@@ -68,6 +68,7 @@ impl ResourceFactory {
         Texture::new_depth_texture(
             width,
             height,
+            self.transfer_command_recorder.transfer_queue.clone(),
             self.memory_allocator.clone(),
             self.device.clone(),
         )
@@ -99,6 +100,7 @@ impl ResourceFactory {
             width,
             height,
             use_dedicated_memory,
+            self.transfer_command_recorder.transfer_queue.clone(),
             self.memory_allocator.clone(),
             self.device.clone(),
         )
@@ -108,7 +110,7 @@ impl ResourceFactory {
         let descriptor_set_layout = self.create_compute_descriptor_set_layout()?;
         let pipeline_layout =
             self.create_compute_pipeline_layout(descriptor_set_layout)?;
-        let compute_shader = ComputeShader::new(ShaderId::MovingShape, self.device.clone())?;
+        let compute_shader = ComputeShader::new(ShaderId::TestPattern, self.device.clone())?;
         ComputeMaterialFactoryBuilder::new(self.device.clone(), self.descriptor_allocator.clone())
             .with_shader(compute_shader)
             .with_pipeline_layout(pipeline_layout)

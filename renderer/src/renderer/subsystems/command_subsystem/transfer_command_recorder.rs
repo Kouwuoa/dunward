@@ -22,7 +22,7 @@ pub(crate) struct TransferCommandRecorder {
     command_pool: vk::CommandPool,
     command_buffer: vk::CommandBuffer,
 
-    transfer_queue: Arc<Queue>,
+    pub(crate) transfer_queue: Arc<Queue>,
     device: Arc<ash::Device>,
 }
 

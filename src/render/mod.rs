@@ -1,7 +1,7 @@
 mod camera;
 mod schedules;
 
-use bevy::{prelude::*, window::PrimaryWindow, winit, winit::WINIT_WINDOWS};
+use bevy::{prelude::*, window::PrimaryWindow, winit::WINIT_WINDOWS};
 use renderer::RendererError;
 
 pub(super) struct DunwardRenderPlugin;
@@ -40,5 +40,5 @@ fn render_frame(
         Err(e) => Err(e),
         Ok(()) => Ok(()),
     }
-    .unwrap();
+        .unwrap();
 }

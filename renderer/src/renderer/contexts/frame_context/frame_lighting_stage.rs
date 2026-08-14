@@ -1,14 +1,14 @@
-use crate::renderer::contexts::device_context::semaphore::TimelineSemaphore;
 use crate::renderer::contexts::device_context::DeviceContext;
+use crate::renderer::contexts::device_context::semaphore::TimelineSemaphore;
 use crate::renderer::contexts::frame_context::packet::FrameRenderPacket;
 use crate::renderer::contexts::swapchain_context::SwapchainContext;
+use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
 use crate::renderer::subsystems::command_subsystem::command_recorder::{CommandRecorder, Idle};
 use crate::renderer::subsystems::command_subsystem::command_recorder_allocator::CommandRecorderAllocatorExt;
-use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
+use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
 use crate::renderer::subsystems::resource_subsystem::resource_types::material::Material;
 use crate::renderer::subsystems::resource_subsystem::resource_types::shader_data::PerDrawData;
 use crate::renderer::subsystems::resource_subsystem::resource_types::texture::StorageTexture;
-use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
 use ash::vk;
 use color_eyre::Result;
 
@@ -90,12 +90,7 @@ impl FrameLightingStage {
                 if self.is_first_render {
                     None
                 } else {
-                    Some(&graphics_queue)
-                },
-                if self.is_first_render {
-                    None
-                } else {
-                    Some(&compute_queue)
+                    Some(compute_queue.clone())
                 },
             );
 
@@ -131,7 +126,6 @@ impl FrameLightingStage {
                 vk::PipelineStageFlags2::COMPUTE_SHADER,
                 vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
                 None,
-                None,
             );
 
             // Compute render operations
@@ -153,8 +147,7 @@ impl FrameLightingStage {
                 vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
                 vk::PipelineStageFlags2::COMPUTE_SHADER,
                 vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
-                Some(&compute_queue),
-                Some(&graphics_queue),
+                Some(graphics_queue.clone()),
             );
 
             Ok(())

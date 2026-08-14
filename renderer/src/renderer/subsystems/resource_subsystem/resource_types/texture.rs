@@ -1,8 +1,9 @@
+use crate::renderer::contexts::device_context::queue::Queue;
 use crate::renderer::subsystems::command_subsystem::transfer_command_recorder::TransferCommandRecorder;
 use crate::renderer::subsystems::resource_subsystem::resource_types::buffer::Buffer;
 use ash::vk;
-use color_eyre::eyre::eyre;
 use color_eyre::eyre::Result;
+use color_eyre::eyre::eyre;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use vk_mem::Alloc;
@@ -64,6 +65,8 @@ pub struct Texture {
     pub extent: vk::Extent3D,
     pub aspect: vk::ImageAspectFlags,
     pub current_layout: vk::ImageLayout,
+    pub current_queue: Arc<Queue>,
+    pub pending_acquire_src_queue: Option<Arc<Queue>>,
 
     /// Determines if the dtor should destroy the vk::ImageView associated with this texture
     destroy_view: bool,
@@ -80,6 +83,7 @@ impl Texture {
     /// `upload()`
     fn new(
         create_info: &TextureCreateInfo,
+        current_queue: Arc<Queue>,
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
     ) -> Result<Texture> {
@@ -130,6 +134,8 @@ impl Texture {
             extent: create_info.extent,
             aspect: create_info.aspect,
             current_layout: vk::ImageLayout::UNDEFINED,
+            current_queue,
+            pending_acquire_src_queue: None,
 
             destroy_view: true, // Since we created the view in this ctor, we'll need to clean it up
 
@@ -162,7 +168,12 @@ impl Texture {
                 aspect: vk::ImageAspectFlags::COLOR,
                 use_dedicated_memory,
             };
-            let mut image = Self::new(&create_info, memory_allocator, device)?;
+            let mut image = Self::new(
+                &create_info,
+                transfer.transfer_queue.clone(),
+                memory_allocator,
+                device,
+            )?;
 
             if let Some(data) = data {
                 image.upload(data, transfer)?;
@@ -205,6 +216,7 @@ impl Texture {
         format: &vk::Format,
         extent: &vk::Extent2D,
         destroy_view: bool,
+        current_queue: Arc<Queue>,
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
     ) -> ColorTexture {
@@ -219,6 +231,8 @@ impl Texture {
             },
             aspect: vk::ImageAspectFlags::COLOR,
             current_layout: vk::ImageLayout::UNDEFINED,
+            current_queue,
+            pending_acquire_src_queue: None,
             destroy_view,
             allocation: None,
             memory_allocator,
@@ -230,6 +244,7 @@ impl Texture {
     pub fn new_depth_texture(
         width: u32,
         height: u32,
+        current_queue: Arc<Queue>,
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
     ) -> Result<DepthTexture> {
@@ -246,6 +261,7 @@ impl Texture {
         };
         Ok(DepthTexture(Self::new(
             &create_info,
+            current_queue,
             memory_allocator,
             device,
         )?))
@@ -256,6 +272,7 @@ impl Texture {
         width: u32,
         height: u32,
         use_dedicated_memory: bool,
+        current_queue: Arc<Queue>,
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
     ) -> Result<StorageTexture> {
@@ -275,7 +292,12 @@ impl Texture {
                 aspect: vk::ImageAspectFlags::COLOR,
                 use_dedicated_memory,
             };
-            Texture::new(&create_info, memory_allocator, device)?
+            Texture::new(
+                &create_info,
+                current_queue,
+                memory_allocator,
+                device,
+            )?
         };
 
         Ok(StorageTexture(image))

@@ -1,0 +1,59 @@
+#version 450
+    layout(local_size_x = 16, local_size_y = 16) in;
+
+    // Must match the render target storage texture format (R16G16B16A16_SFLOAT)
+    layout(rgba16f, set = 0, binding = 0) uniform image2D image;
+
+    layout(push_constant) uniform PerDrawData {
+        uint object_index;
+        uint material_index;
+        uint vertex_offset;
+        float time_sec;
+    } per_draw;
+
+    void main() {
+        ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+        ivec2 sz = imageSize(image);
+
+        if (p.x >= sz.x || p.y >= sz.y) return;
+
+        // 1. Pixel-Space Checkerboard (32x32 pixel squares)
+        // If resizing works: More squares appear as you expand, squares stay crisp and fixed size.
+        // If stretched/scaled: Squares will stretch, squish, or blur.
+        bool check = ((p.x / 32) + (p.y / 32)) % 2 == 0;
+        vec3 color = check ? vec3(0.12, 0.12, 0.15) : vec3(0.18, 0.18, 0.22);
+
+        // 2. UV Coordinates & Aspect-Corrected Center Circle
+        vec2 uv = (vec2(p) + 0.5) / vec2(sz);
+        float aspect = float(sz.x) / float(sz.y);
+        vec2 aspect_uv = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);
+
+        // Dynamic pulsating central circle
+        float radius = 0.25 + 0.05 * sin(per_draw.time_sec * 2.0);
+        float dist = length(aspect_uv);
+        if (abs(dist - radius) < 0.005) {
+            color = vec3(1.0, 0.9, 0.2); // Yellow ring
+        }
+
+        // 3. Center Crosshair
+        ivec2 center = sz / 2;
+        if (abs(p.x - center.x) <= 1 || abs(p.y - center.y) <= 1) {
+            if (abs(dist - radius) < 0.04) {
+                color = vec3(1.0, 0.2, 0.2); // Red crosshair tick
+            }
+        }
+
+        // 4. Four Distinct Corner Anchors (30x30 pixels each)
+        if (p.x < 30 && p.y < 30)               color = vec3(1.0, 0.0, 0.0); // Top-Left: Red
+        if (p.x >= sz.x - 30 && p.y < 30)        color = vec3(0.0, 1.0, 0.0); // Top-Right: Green
+        if (p.x < 30 && p.y >= sz.y - 30)        color = vec3(0.0, 0.5, 1.0); // Bottom-Left: Blue
+        if (p.x >= sz.x - 30 && p.y >= sz.y - 30) color = vec3(1.0, 0.0, 1.0); // Bottom-Right: Magenta
+
+        // 5. 2-Pixel Window Border
+        // If the image is clipped or extent is off, one or more edges will disappear.
+        if (p.x < 2 || p.x >= sz.x - 2 || p.y < 2 || p.y >= sz.y - 2) {
+            color = vec3(1.0, 1.0, 1.0); // White border
+        }
+
+        imageStore(image, p, vec4(color, 1.0));
+    }
