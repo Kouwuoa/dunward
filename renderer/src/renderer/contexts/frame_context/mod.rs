@@ -124,7 +124,7 @@ impl FrameContext {
                 vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
                 vk::PipelineStageFlags2::TRANSFER,
                 vk::AccessFlags2::TRANSFER_READ,
-                Some(dvc.get_graphics_queue()),
+                None,
             );
 
             recorder.blit_texture_to_texture(

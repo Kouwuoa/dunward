@@ -69,7 +69,6 @@ impl FrameLightingStage {
         let recorder = self.recorder.take().unwrap();
         let recorder = recorder.record(|recorder| {
             let graphics_queue = dvc.get_graphics_queue();
-            let compute_queue = dvc.get_compute_queue();
 
             // Transition render target texture to GENERAL layout
             recorder.insert_texture_memory_barrier(
@@ -87,11 +86,7 @@ impl FrameLightingStage {
                 },
                 vk::PipelineStageFlags2::COMPUTE_SHADER,
                 vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
-                if self.is_first_render {
-                    None
-                } else {
-                    Some(compute_queue.clone())
-                },
+                None,
             );
 
             // Update the render target texture if it needs updating

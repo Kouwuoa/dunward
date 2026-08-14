@@ -2,7 +2,7 @@ use super::command_recorder_allocator::CommandRecorderAllocator;
 use crate::renderer::contexts::device_context::queue::Queue;
 use crate::renderer::subsystems::resource_subsystem::resource_types::material::Material;
 use crate::renderer::subsystems::resource_subsystem::resource_types::texture::{
-    ColorTexture, DepthTexture, StorageTexture, Texture,
+    ColorTexture, DepthTexture, StorageTexture, Texture, TextureQueueState,
 };
 use crate::renderer::subsystems::resource_subsystem::resource_updater::ResourceUpdater;
 use ash::vk;
@@ -106,24 +106,101 @@ impl CommandRecorder<Recording> {
         dst_access_mask: vk::AccessFlags2,
         dst_queue: Option<Arc<Queue>>,
     ) {
-        let (src_queue_family_index, dst_queue_family_index) = match dst_queue {
-            // Case 1: RELEASE to another queue family
-            Some(ref target_queue) if target_queue.family.index != self.queue.family.index => {
-                texture.pending_acquire_src_queue = Some(self.queue.clone());
-                texture.current_queue = target_queue.clone();
-                (self.queue.family.index, target_queue.family.index)
-            }
-            // Case 2: ACQUIRE from a prior release
-            _ if texture.pending_acquire_src_queue.is_some() => {
-                let src_queue = texture.pending_acquire_src_queue.take().unwrap();
-                if src_queue.family.index != self.queue.family.index {
-                    (src_queue.family.index, self.queue.family.index)
+        let recorder_queue_family_index = self.queue.family.index;
+        let mut queue_state_to_apply = None;
+        let (src_queue_family_index, dst_queue_family_index) = match (
+            &texture.queue_state,
+            dst_queue,
+        ) {
+            // Case 0: First use of a brand-new texture -> Claim ownership with this recorder
+            (TextureQueueState::Uninitialized, dst_queue) => {
+                if let Some(dst_queue) = dst_queue {
+                    // If the destination queue is different from the recorder queue, begin transferring ownership
+                    if dst_queue.family.index != recorder_queue_family_index {
+                        queue_state_to_apply = Some(TextureQueueState::Transferring {
+                            src_queue: self.queue.clone(),
+                            dst_queue: dst_queue.clone(),
+                        });
+                        (self.queue.family.index, dst_queue.family.index)
+                    // If the destination queue is the same as the recorder queue, assign initial ownership of this texture to this queue
+                    } else {
+                        queue_state_to_apply = Some(TextureQueueState::Owned {
+                            queue: self.queue.clone(),
+                        });
+                        (vk::QUEUE_FAMILY_IGNORED, vk::QUEUE_FAMILY_IGNORED)
+                    }
+                // Assign initial ownership of this texture to this queue
                 } else {
+                    queue_state_to_apply = Some(TextureQueueState::Owned {
+                        queue: self.queue.clone(),
+                    });
                     (vk::QUEUE_FAMILY_IGNORED, vk::QUEUE_FAMILY_IGNORED)
                 }
             }
+
+            // Case 1: RELEASE to another queue
+            (TextureQueueState::Owned { queue }, Some(dst_queue)) => {
+                assert_eq!(
+                    queue.family.index, recorder_queue_family_index,
+                    "Cannot release texture from Queue {:?} because texture is currently owned by Queue {:?}",
+                    recorder_queue_family_index, queue.family.index
+                );
+
+                if dst_queue.family.index != recorder_queue_family_index {
+                    queue_state_to_apply = Some(TextureQueueState::Transferring {
+                        src_queue: queue.clone(),
+                        dst_queue: dst_queue.clone(),
+                    });
+                    (queue.family.index, dst_queue.family.index)
+                } else {
+                    // Ignore case where the texture is already owned by the recorder queue
+                    (vk::QUEUE_FAMILY_IGNORED, vk::QUEUE_FAMILY_IGNORED)
+                }
+            }
+
+            // Case 2: ACQUIRE from a pending transfer
+            (
+                TextureQueueState::Transferring {
+                    src_queue,
+                    dst_queue,
+                },
+                None,
+            ) => {
+                assert_eq!(
+                    dst_queue.family.index, recorder_queue_family_index,
+                    "Queue {:?} attempted to acquire texture, but pending transfer was directed to Queue {:?}",
+                    recorder_queue_family_index, dst_queue.family.index
+                );
+
+                queue_state_to_apply = Some(TextureQueueState::Owned {
+                    queue: dst_queue.clone(),
+                });
+                (src_queue.family.index, dst_queue.family.index)
+            }
+
             // Case 3: Ignore same-queue transition
-            _ => (vk::QUEUE_FAMILY_IGNORED, vk::QUEUE_FAMILY_IGNORED),
+            (TextureQueueState::Owned { queue }, None) => {
+                assert_eq!(
+                    queue.family.index, recorder_queue_family_index,
+                    "Queue {:?} attempted to use texture, but texture is owned by Queue {:?}",
+                    recorder_queue_family_index, queue.family.index
+                );
+                (vk::QUEUE_FAMILY_IGNORED, vk::QUEUE_FAMILY_IGNORED)
+            }
+
+            // Case 4: ERROR when attempting to release a texture that is already pending a transfer
+            (
+                TextureQueueState::Transferring {
+                    src_queue,
+                    dst_queue,
+                },
+                Some(_),
+            ) => {
+                panic!(
+                    "Double queue release detected! Texture is already transferring from Queue {:?} to Queue {:?} and has not been acquired.",
+                    src_queue.family.index, dst_queue.family.index
+                );
+            }
         };
 
         let image_barrier = vk::ImageMemoryBarrier2::default()
@@ -131,7 +208,7 @@ impl CommandRecorder<Recording> {
             .src_access_mask(src_access_mask)
             .dst_stage_mask(dst_stage_mask)
             .dst_access_mask(dst_access_mask)
-            .old_layout(texture.current_layout)
+            .old_layout(texture.layout)
             .new_layout(new_layout)
             .src_queue_family_index(src_queue_family_index)
             .dst_queue_family_index(dst_queue_family_index)
@@ -151,9 +228,9 @@ impl CommandRecorder<Recording> {
                 .cmd_pipeline_barrier2(self.command_buffer, &dep_info);
         }
 
-        texture.current_layout = new_layout;
-        if let Some(dst_queue) = dst_queue {
-            texture.current_queue = dst_queue;
+        texture.layout = new_layout;
+        if let Some(queue_state_to_apply) = queue_state_to_apply {
+            texture.queue_state = queue_state_to_apply;
         }
     }
 

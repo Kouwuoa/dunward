@@ -68,7 +68,6 @@ impl ResourceFactory {
         Texture::new_depth_texture(
             width,
             height,
-            self.transfer_command_recorder.transfer_queue.clone(),
             self.memory_allocator.clone(),
             self.device.clone(),
         )
@@ -100,7 +99,6 @@ impl ResourceFactory {
             width,
             height,
             use_dedicated_memory,
-            self.transfer_command_recorder.transfer_queue.clone(),
             self.memory_allocator.clone(),
             self.device.clone(),
         )

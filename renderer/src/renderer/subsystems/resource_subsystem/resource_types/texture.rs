@@ -64,9 +64,8 @@ pub struct Texture {
     pub format: vk::Format,
     pub extent: vk::Extent3D,
     pub aspect: vk::ImageAspectFlags,
-    pub current_layout: vk::ImageLayout,
-    pub current_queue: Arc<Queue>,
-    pub pending_acquire_src_queue: Option<Arc<Queue>>,
+    pub layout: vk::ImageLayout,
+    pub queue_state: TextureQueueState,
 
     /// Determines if the dtor should destroy the vk::ImageView associated with this texture
     destroy_view: bool,
@@ -76,6 +75,19 @@ pub struct Texture {
     device: Arc<ash::Device>,
 }
 
+pub enum TextureQueueState {
+    /// Texture is exclusively owned and usable by `queue`
+    Owned { queue: Arc<Queue> },
+    /// Released by `src_queue` and pending acquire by `dst_queue`
+    Transferring {
+        src_queue: Arc<Queue>,
+        dst_queue: Arc<Queue>,
+    },
+    /// Freshly created texture; not yet used by any queue
+    /// The first queue that records a barrier will claim ownership
+    Uninitialized,
+}
+
 impl Texture {
     /// NOTE: The `allocation` field of the Image this function returns is GPU-only
     /// and is NOT yet populated with any data.
@@ -83,7 +95,6 @@ impl Texture {
     /// `upload()`
     fn new(
         create_info: &TextureCreateInfo,
-        current_queue: Arc<Queue>,
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
     ) -> Result<Texture> {
@@ -133,9 +144,8 @@ impl Texture {
             format: create_info.format,
             extent: create_info.extent,
             aspect: create_info.aspect,
-            current_layout: vk::ImageLayout::UNDEFINED,
-            current_queue,
-            pending_acquire_src_queue: None,
+            layout: vk::ImageLayout::UNDEFINED,
+            queue_state: TextureQueueState::Uninitialized,
 
             destroy_view: true, // Since we created the view in this ctor, we'll need to clean it up
 
@@ -170,7 +180,6 @@ impl Texture {
             };
             let mut image = Self::new(
                 &create_info,
-                transfer.transfer_queue.clone(),
                 memory_allocator,
                 device,
             )?;
@@ -216,7 +225,7 @@ impl Texture {
         format: &vk::Format,
         extent: &vk::Extent2D,
         destroy_view: bool,
-        current_queue: Arc<Queue>,
+        queue: Arc<Queue>,
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
     ) -> ColorTexture {
@@ -230,9 +239,8 @@ impl Texture {
                 depth: 1,
             },
             aspect: vk::ImageAspectFlags::COLOR,
-            current_layout: vk::ImageLayout::UNDEFINED,
-            current_queue,
-            pending_acquire_src_queue: None,
+            layout: vk::ImageLayout::UNDEFINED,
+            queue_state: TextureQueueState::Owned { queue },
             destroy_view,
             allocation: None,
             memory_allocator,
@@ -244,7 +252,6 @@ impl Texture {
     pub fn new_depth_texture(
         width: u32,
         height: u32,
-        current_queue: Arc<Queue>,
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
     ) -> Result<DepthTexture> {
@@ -261,7 +268,6 @@ impl Texture {
         };
         Ok(DepthTexture(Self::new(
             &create_info,
-            current_queue,
             memory_allocator,
             device,
         )?))
@@ -272,7 +278,6 @@ impl Texture {
         width: u32,
         height: u32,
         use_dedicated_memory: bool,
-        current_queue: Arc<Queue>,
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
     ) -> Result<StorageTexture> {
@@ -294,7 +299,6 @@ impl Texture {
             };
             Texture::new(
                 &create_info,
-                current_queue,
                 memory_allocator,
                 device,
             )?

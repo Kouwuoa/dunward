@@ -1,3 +1,6 @@
+// Ignore warnings for now while there is heavy development in the renderer library
+#![allow(warnings)]
+
 use bevy::{prelude::*, window::WindowResolution};
 
 //mod game;
