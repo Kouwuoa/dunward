@@ -108,7 +108,7 @@ impl FrameContext {
             // Transition the image layout into TRANSFER_DST_OPTIMAL for present texture to prepare for blit
             recorder.insert_texture_memory_barrier(
                 &mut present_tex.texture,
-                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                Some(vk::ImageLayout::TRANSFER_DST_OPTIMAL),
                 Some(TextureAccess {
                     stage_mask: vk::PipelineStageFlags2::TRANSFER,
                     access_mask: vk::AccessFlags2::TRANSFER_WRITE,
@@ -120,7 +120,7 @@ impl FrameContext {
             // Also transition render target texture to transfer source layout to prepare for blitting onto swapchain image
             recorder.insert_texture_memory_barrier(
                 lighting_stage_output.target_tex,
-                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                Some(vk::ImageLayout::TRANSFER_SRC_OPTIMAL),
                 Some(TextureAccess {
                     stage_mask: vk::PipelineStageFlags2::TRANSFER,
                     access_mask: vk::AccessFlags2::TRANSFER_READ,
@@ -136,7 +136,7 @@ impl FrameContext {
             // Prepare swapchain texture for presentation
             recorder.insert_texture_memory_barrier(
                 &mut present_tex.texture,
-                vk::ImageLayout::PRESENT_SRC_KHR,
+                Some(vk::ImageLayout::PRESENT_SRC_KHR),
                 None,
                 None,
             );
@@ -144,7 +144,7 @@ impl FrameContext {
             // Release the lighting output texture back to the compute queue
             recorder.insert_texture_memory_barrier(
                 lighting_stage_output.target_tex,
-                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                Some(vk::ImageLayout::TRANSFER_SRC_OPTIMAL),
                 None,
                 Some(dvc.get_compute_queue()),
             );

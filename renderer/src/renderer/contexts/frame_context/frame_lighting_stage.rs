@@ -73,7 +73,7 @@ impl FrameLightingStage {
             // Transition render target texture to GENERAL layout
             recorder.insert_texture_memory_barrier(
                 &mut self.target_tex,
-                vk::ImageLayout::GENERAL,
+                Some(vk::ImageLayout::GENERAL),
                 Some(TextureAccess {
                     stage_mask: vk::PipelineStageFlags2::COMPUTE_SHADER,
                     access_mask: vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
@@ -107,7 +107,7 @@ impl FrameLightingStage {
             // This effectively performs a flush operation to ensure the render operations that follow do not operate on stale data
             recorder.insert_texture_memory_barrier(
                 &mut self.target_tex,
-                vk::ImageLayout::GENERAL,
+                None,
                 Some(TextureAccess {
                     stage_mask: vk::PipelineStageFlags2::COMPUTE_SHADER,
                     access_mask: vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
@@ -129,7 +129,7 @@ impl FrameLightingStage {
             // Release the texture from compute onto the graphics queue to match the queue of the swapchain image
             recorder.insert_texture_memory_barrier(
                 &mut self.target_tex,
-                vk::ImageLayout::GENERAL,
+                None,
                 None,
                 Some(graphics_queue.clone()),
             );

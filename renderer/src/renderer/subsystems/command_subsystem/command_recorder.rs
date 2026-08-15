@@ -96,13 +96,78 @@ impl CommandRecorder<Idle> {
 }
 
 impl CommandRecorder<Recording> {
+    /// Records a Vulkan pipeline barrier (`vkCmdPipelineBarrier2`) for an image subresource,
+    /// managing layout transitions, pipeline stage execution dependencies, memory access hazards,
+    /// and queue family ownership transfers (QFOT).
+    ///
+    /// This method automatically uses the texture's internally tracked state (`layout`, `stage_mask`,
+    /// `access_mask`, and `queue_state`) to compute source barrier masks, eliminating the need to
+    /// manually track what stage previously touched the texture.
+    ///
+    /// # Arguments
+    ///
+    /// * `texture` - A mutable reference to the [`Texture`] being transitioned. Its internal state
+    ///   machine (`layout`, `access_state`, and `queue_state`) will be updated after
+    ///   the barrier is recorded.
+    ///
+    /// * `dst_layout` - Optional target [`vk::ImageLayout`] for the image.
+    ///   * If `Some(layout)`: Transitions the image from its current layout into the new layout.
+    ///   * If `None`: Keeps the texture in its current layout, recording a pure execution/memory
+    ///     barrier (cache flush and stage sync between passes using the same layout).
+    ///
+    /// * `dst_access` - Optional [`TextureAccess`] specifying the downstream `stage_mask` and `access_mask`
+    ///   that will consume or write to the texture next on the current queue.
+    ///   * If `Some(access)`: Synchronizes against previous operations and establishes an execution dependency
+    ///     for the incoming stage. If the access is a write, it resets the tracked stage/access state; if read-only,
+    ///     it accumulates (`|=`) to prevent Write-After-Read (WAR) hazards.
+    ///   * If `None`: Defaults to `(NONE, NONE)`. Appropriate when releasing a texture to another queue family
+    ///     or preparing a swapchain image for presentation.
+    ///
+    /// * `dst_queue` - Destination [`Queue`] for a Queue Family Ownership Transfer (QFOT).
+    ///   * `Some(target_queue)`: Initiates a **Release operation** transferring ownership from this recorder's
+    ///     queue to `target_queue`.
+    ///   * `None`: Performs an **Acquire operation** if the texture was previously released by another queue
+    ///     or does nothing if the texture is already owned by this recorder's queue.
+    ///
+    /// # Panics
+    ///
+    /// * If `dst_layout` is `None` (or `Some(UNDEFINED)`) when the texture is currently in [`vk::ImageLayout::UNDEFINED`].
+    /// * If `dst_access` contains `vk::PipelineStageFlags2::NONE` or `vk::AccessFlags2::NONE` (pass `None` instead).
+    /// * If attempting to release a texture that is owned by a different queue family.
+    /// * If attempting to release a texture that is already in a `Transferring` state without having been acquired first (Double Release).
+    /// * If attempting to acquire a texture whose pending transfer was directed to a different queue family.
+    /// * If attempting to use a texture owned by another queue without an ownership transfer.
     pub fn insert_texture_memory_barrier(
         &self,
         texture: &mut Texture,
-        new_layout: vk::ImageLayout,
+        dst_layout: Option<vk::ImageLayout>,
         dst_access: Option<TextureAccess>,
         dst_queue: Option<Arc<Queue>>,
     ) {
+        // Validate dst_layout
+        if let Some(layout) = dst_layout {
+            assert_ne!(
+                layout,
+                vk::ImageLayout::UNDEFINED,
+                "Invalid argument: dst_layout was `Some(UNDEFINED)`. Pass `None` if no layout is required."
+            );
+        } else {
+            assert_ne!(
+                texture.layout,
+                vk::ImageLayout::UNDEFINED,
+                "Invalid argument: dst_layout was `None` and texture is currently in UNDEFINED layout. Pass `Some(layout)` to specify a valid layout."
+            );
+        }
+        // If no layout is provided, use the current layout of the texture, indicating that the layout will not be changing
+        let dst_layout = dst_layout.unwrap_or(texture.layout);
+        // Disallow UNDEFINED dst_layout
+        assert_ne!(
+            dst_layout,
+            vk::ImageLayout::UNDEFINED,
+            "Invalid argument: dst_layout must be a valid layout and not UNDEFINED"
+        );
+
+        // Validate dst_access
         if let Some(access) = dst_access {
             assert!(
                 access.stage_mask != vk::PipelineStageFlags2::NONE && !access.stage_mask.is_empty(),
@@ -256,7 +321,7 @@ impl CommandRecorder<Recording> {
                     recorder_queue_family_index, queue.family.index
                 );
 
-                if new_layout != vk::ImageLayout::PRESENT_SRC_KHR {
+                if dst_layout != vk::ImageLayout::PRESENT_SRC_KHR {
                     assert!(
                         dst_access.is_some(),
                         "dst_access must be provided for internal layout transitions unless transitioning to PRESENT_SRC_KHR."
@@ -294,7 +359,7 @@ impl CommandRecorder<Recording> {
             .dst_stage_mask(dst_stage_mask)
             .dst_access_mask(dst_access_mask)
             .old_layout(texture.layout)
-            .new_layout(new_layout)
+            .new_layout(dst_layout)
             .src_queue_family_index(src_queue_family_index)
             .dst_queue_family_index(dst_queue_family_index)
             .image(texture.image)
@@ -314,7 +379,7 @@ impl CommandRecorder<Recording> {
         }
 
         // Update internal texture tracking
-        texture.layout = new_layout;
+        texture.layout = dst_layout;
         if is_write {
             // Overwrite to reset the masks to only the writing stage because subsequent readers only need for that single write to complete
             texture.access_state.stage_mask = dst_stage_mask;
