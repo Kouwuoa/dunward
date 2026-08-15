@@ -2,7 +2,7 @@ use super::command_recorder_allocator::CommandRecorderAllocator;
 use crate::renderer::contexts::device_context::queue::Queue;
 use crate::renderer::subsystems::resource_subsystem::resource_types::material::Material;
 use crate::renderer::subsystems::resource_subsystem::resource_types::texture::{
-    ColorTexture, DepthTexture, StorageTexture, Texture, TextureQueueState,
+    ColorTexture, DepthTexture, StorageTexture, Texture, TextureAccess, TextureQueueState,
 };
 use crate::renderer::subsystems::resource_subsystem::resource_updater::ResourceUpdater;
 use ash::vk;
@@ -100,18 +100,46 @@ impl CommandRecorder<Recording> {
         &self,
         texture: &mut Texture,
         new_layout: vk::ImageLayout,
-        src_stage_mask: vk::PipelineStageFlags2,
-        src_access_mask: vk::AccessFlags2,
-        dst_stage_mask: vk::PipelineStageFlags2,
-        dst_access_mask: vk::AccessFlags2,
+        dst_access: Option<TextureAccess>,
         dst_queue: Option<Arc<Queue>>,
     ) {
+        if let Some(access) = dst_access {
+            assert!(
+                access.stage_mask != vk::PipelineStageFlags2::NONE && !access.stage_mask.is_empty(),
+                "Invalid argument: dst_stage_mask was `Some(NONE)`. Pass `None` if no stage mask is required."
+            );
+            assert!(
+                access.access_mask != vk::AccessFlags2::NONE && !access.access_mask.is_empty(),
+                "Invalid argument: dst_access_mask was `Some(NONE)`. Pass `None` if no access mask is required."
+            );
+        }
+        let dst_stage_mask = if let Some(access) = dst_access {
+            access.stage_mask
+        } else {
+            vk::PipelineStageFlags2::NONE
+        };
+        let dst_access_mask = if let Some(access) = dst_access {
+            access.access_mask
+        } else {
+            vk::AccessFlags2::NONE
+        };
+        let is_write = (dst_access_mask
+            & (vk::AccessFlags2::SHADER_STORAGE_WRITE
+            | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE
+            | vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE
+            | vk::AccessFlags2::TRANSFER_WRITE))
+            != vk::AccessFlags2::NONE;
+
         let recorder_queue_family_index = self.queue.family.index;
         let mut queue_state_to_apply = None;
-        let (src_queue_family_index, dst_queue_family_index) = match (
-            &texture.queue_state,
-            dst_queue,
-        ) {
+        let (
+            src_queue_family_index,
+            dst_queue_family_index,
+            src_stage_mask,
+            src_access_mask,
+            dst_stage_mask,
+            dst_access_mask,
+        ) = match (&texture.queue_state, dst_queue) {
             // Case 0: First use of a brand-new texture -> Claim ownership with this recorder
             (TextureQueueState::Uninitialized, dst_queue) => {
                 if let Some(dst_queue) = dst_queue {
@@ -121,20 +149,41 @@ impl CommandRecorder<Recording> {
                             src_queue: self.queue.clone(),
                             dst_queue: dst_queue.clone(),
                         });
-                        (self.queue.family.index, dst_queue.family.index)
+                        (
+                            self.queue.family.index,
+                            dst_queue.family.index,
+                            vk::PipelineStageFlags2::NONE,
+                            vk::AccessFlags2::NONE,
+                            vk::PipelineStageFlags2::NONE,
+                            vk::AccessFlags2::NONE,
+                        )
                     // If the destination queue is the same as the recorder queue, assign initial ownership of this texture to this queue
                     } else {
                         queue_state_to_apply = Some(TextureQueueState::Owned {
                             queue: self.queue.clone(),
                         });
-                        (vk::QUEUE_FAMILY_IGNORED, vk::QUEUE_FAMILY_IGNORED)
+                        (
+                            vk::QUEUE_FAMILY_IGNORED,
+                            vk::QUEUE_FAMILY_IGNORED,
+                            vk::PipelineStageFlags2::NONE,
+                            vk::AccessFlags2::NONE,
+                            dst_stage_mask,
+                            dst_access_mask,
+                        )
                     }
                 // Assign initial ownership of this texture to this queue
                 } else {
                     queue_state_to_apply = Some(TextureQueueState::Owned {
                         queue: self.queue.clone(),
                     });
-                    (vk::QUEUE_FAMILY_IGNORED, vk::QUEUE_FAMILY_IGNORED)
+                    (
+                        vk::QUEUE_FAMILY_IGNORED,
+                        vk::QUEUE_FAMILY_IGNORED,
+                        vk::PipelineStageFlags2::NONE,
+                        vk::AccessFlags2::NONE,
+                        dst_stage_mask,
+                        dst_access_mask,
+                    )
                 }
             }
 
@@ -151,10 +200,24 @@ impl CommandRecorder<Recording> {
                         src_queue: queue.clone(),
                         dst_queue: dst_queue.clone(),
                     });
-                    (queue.family.index, dst_queue.family.index)
+                    (
+                        queue.family.index,
+                        dst_queue.family.index,
+                        texture.access_state.stage_mask,
+                        texture.access_state.access_mask,
+                        vk::PipelineStageFlags2::NONE,
+                        vk::AccessFlags2::NONE,
+                    )
                 } else {
                     // Ignore case where the texture is already owned by the recorder queue
-                    (vk::QUEUE_FAMILY_IGNORED, vk::QUEUE_FAMILY_IGNORED)
+                    (
+                        vk::QUEUE_FAMILY_IGNORED,
+                        vk::QUEUE_FAMILY_IGNORED,
+                        texture.access_state.stage_mask,
+                        texture.access_state.access_mask,
+                        dst_stage_mask,
+                        dst_access_mask,
+                    )
                 }
             }
 
@@ -175,7 +238,14 @@ impl CommandRecorder<Recording> {
                 queue_state_to_apply = Some(TextureQueueState::Owned {
                     queue: dst_queue.clone(),
                 });
-                (src_queue.family.index, dst_queue.family.index)
+                (
+                    src_queue.family.index,
+                    dst_queue.family.index,
+                    vk::PipelineStageFlags2::NONE,
+                    vk::AccessFlags2::NONE,
+                    dst_stage_mask,
+                    dst_access_mask,
+                )
             }
 
             // Case 3: Ignore same-queue transition
@@ -185,7 +255,22 @@ impl CommandRecorder<Recording> {
                     "Queue {:?} attempted to use texture, but texture is owned by Queue {:?}",
                     recorder_queue_family_index, queue.family.index
                 );
-                (vk::QUEUE_FAMILY_IGNORED, vk::QUEUE_FAMILY_IGNORED)
+
+                if new_layout != vk::ImageLayout::PRESENT_SRC_KHR {
+                    assert!(
+                        dst_access.is_some(),
+                        "dst_access must be provided for internal layout transitions unless transitioning to PRESENT_SRC_KHR."
+                    )
+                }
+
+                (
+                    vk::QUEUE_FAMILY_IGNORED,
+                    vk::QUEUE_FAMILY_IGNORED,
+                    texture.access_state.stage_mask,
+                    texture.access_state.access_mask,
+                    dst_stage_mask,
+                    dst_access_mask,
+                )
             }
 
             // Case 4: ERROR when attempting to release a texture that is already pending a transfer
@@ -228,7 +313,17 @@ impl CommandRecorder<Recording> {
                 .cmd_pipeline_barrier2(self.command_buffer, &dep_info);
         }
 
+        // Update internal texture tracking
         texture.layout = new_layout;
+        if is_write {
+            // Overwrite to reset the masks to only the writing stage because subsequent readers only need for that single write to complete
+            texture.access_state.stage_mask = dst_stage_mask;
+            texture.access_state.access_mask = dst_access_mask;
+        } else {
+            // Accumulate all stages currently reading the texture so the next write knows to wait for all previous reads to complete
+            texture.access_state.stage_mask |= dst_stage_mask;
+            texture.access_state.access_mask |= dst_access_mask;
+        }
         if let Some(queue_state_to_apply) = queue_state_to_apply {
             texture.queue_state = queue_state_to_apply;
         }

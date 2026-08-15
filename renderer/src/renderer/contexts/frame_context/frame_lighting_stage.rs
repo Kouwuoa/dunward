@@ -8,7 +8,7 @@ use crate::renderer::subsystems::command_subsystem::command_recorder_allocator::
 use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
 use crate::renderer::subsystems::resource_subsystem::resource_types::material::Material;
 use crate::renderer::subsystems::resource_subsystem::resource_types::shader_data::PerDrawData;
-use crate::renderer::subsystems::resource_subsystem::resource_types::texture::StorageTexture;
+use crate::renderer::subsystems::resource_subsystem::resource_types::texture::{StorageTexture, TextureAccess};
 use ash::vk;
 use color_eyre::Result;
 
@@ -74,18 +74,10 @@ impl FrameLightingStage {
             recorder.insert_texture_memory_barrier(
                 &mut self.target_tex,
                 vk::ImageLayout::GENERAL,
-                if self.is_first_render {
-                    vk::PipelineStageFlags2::NONE
-                } else {
-                    vk::PipelineStageFlags2::TRANSFER
-                },
-                if self.is_first_render {
-                    vk::AccessFlags2::NONE
-                } else {
-                    vk::AccessFlags2::TRANSFER_READ
-                },
-                vk::PipelineStageFlags2::COMPUTE_SHADER,
-                vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
+                Some(TextureAccess {
+                    stage_mask: vk::PipelineStageFlags2::COMPUTE_SHADER,
+                    access_mask: vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
+                }),
                 None,
             );
 
@@ -116,10 +108,10 @@ impl FrameLightingStage {
             recorder.insert_texture_memory_barrier(
                 &mut self.target_tex,
                 vk::ImageLayout::GENERAL,
-                vk::PipelineStageFlags2::COMPUTE_SHADER,
-                vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
-                vk::PipelineStageFlags2::COMPUTE_SHADER,
-                vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
+                Some(TextureAccess {
+                    stage_mask: vk::PipelineStageFlags2::COMPUTE_SHADER,
+                    access_mask: vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
+                }),
                 None,
             );
 
@@ -138,10 +130,7 @@ impl FrameLightingStage {
             recorder.insert_texture_memory_barrier(
                 &mut self.target_tex,
                 vk::ImageLayout::GENERAL,
-                vk::PipelineStageFlags2::COMPUTE_SHADER,
-                vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
-                vk::PipelineStageFlags2::COMPUTE_SHADER,
-                vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
+                None,
                 Some(graphics_queue.clone()),
             );
 

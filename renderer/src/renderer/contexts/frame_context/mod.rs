@@ -13,6 +13,7 @@ use crate::renderer::subsystems::command_subsystem::CommandSubsystem;
 use crate::renderer::subsystems::command_subsystem::command_recorder::{CommandRecorder, Idle};
 use crate::renderer::subsystems::command_subsystem::command_recorder_allocator::CommandRecorderAllocatorExt;
 use crate::renderer::subsystems::resource_subsystem::ResourceSubsystem;
+use crate::renderer::subsystems::resource_subsystem::resource_types::texture::TextureAccess;
 use ash::vk;
 use color_eyre::eyre::Result;
 use std::time::Duration;
@@ -108,10 +109,10 @@ impl FrameContext {
             recorder.insert_texture_memory_barrier(
                 &mut present_tex.texture,
                 vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                vk::PipelineStageFlags2::NONE,
-                vk::AccessFlags2::NONE,
-                vk::PipelineStageFlags2::TRANSFER,
-                vk::AccessFlags2::TRANSFER_WRITE,
+                Some(TextureAccess {
+                    stage_mask: vk::PipelineStageFlags2::TRANSFER,
+                    access_mask: vk::AccessFlags2::TRANSFER_WRITE,
+                }),
                 None,
             );
 
@@ -120,10 +121,10 @@ impl FrameContext {
             recorder.insert_texture_memory_barrier(
                 lighting_stage_output.target_tex,
                 vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                vk::PipelineStageFlags2::COMPUTE_SHADER,
-                vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
-                vk::PipelineStageFlags2::TRANSFER,
-                vk::AccessFlags2::TRANSFER_READ,
+                Some(TextureAccess {
+                    stage_mask: vk::PipelineStageFlags2::TRANSFER,
+                    access_mask: vk::AccessFlags2::TRANSFER_READ,
+                }),
                 None,
             );
 
@@ -136,10 +137,7 @@ impl FrameContext {
             recorder.insert_texture_memory_barrier(
                 &mut present_tex.texture,
                 vk::ImageLayout::PRESENT_SRC_KHR,
-                vk::PipelineStageFlags2::TRANSFER,
-                vk::AccessFlags2::TRANSFER_WRITE,
-                vk::PipelineStageFlags2::NONE,
-                vk::AccessFlags2::NONE,
+                None,
                 None,
             );
 
@@ -147,10 +145,7 @@ impl FrameContext {
             recorder.insert_texture_memory_barrier(
                 lighting_stage_output.target_tex,
                 vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                vk::PipelineStageFlags2::TRANSFER,
-                vk::AccessFlags2::TRANSFER_READ,
-                vk::PipelineStageFlags2::TRANSFER,
-                vk::AccessFlags2::TRANSFER_READ,
+                None,
                 Some(dvc.get_compute_queue()),
             );
 

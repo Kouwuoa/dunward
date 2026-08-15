@@ -65,6 +65,7 @@ pub struct Texture {
     pub extent: vk::Extent3D,
     pub aspect: vk::ImageAspectFlags,
     pub layout: vk::ImageLayout,
+    pub access_state: TextureAccess,
     pub queue_state: TextureQueueState,
 
     /// Determines if the dtor should destroy the vk::ImageView associated with this texture
@@ -86,6 +87,12 @@ pub enum TextureQueueState {
     /// Freshly created texture; not yet used by any queue
     /// The first queue that records a barrier will claim ownership
     Uninitialized,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TextureAccess {
+    pub stage_mask: vk::PipelineStageFlags2,
+    pub access_mask: vk::AccessFlags2,
 }
 
 impl Texture {
@@ -145,6 +152,10 @@ impl Texture {
             extent: create_info.extent,
             aspect: create_info.aspect,
             layout: vk::ImageLayout::UNDEFINED,
+            access_state: TextureAccess {
+                stage_mask: vk::PipelineStageFlags2::NONE,
+                access_mask: vk::AccessFlags2::NONE,
+            },
             queue_state: TextureQueueState::Uninitialized,
 
             destroy_view: true, // Since we created the view in this ctor, we'll need to clean it up
@@ -240,6 +251,10 @@ impl Texture {
             },
             aspect: vk::ImageAspectFlags::COLOR,
             layout: vk::ImageLayout::UNDEFINED,
+            access_state: TextureAccess {
+                stage_mask: vk::PipelineStageFlags2::NONE,
+                access_mask: vk::AccessFlags2::NONE,
+            },
             queue_state: TextureQueueState::Owned { queue },
             destroy_view,
             allocation: None,
