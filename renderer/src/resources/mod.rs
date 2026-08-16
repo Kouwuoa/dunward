@@ -1,7 +1,7 @@
 //! GPU Resource Subsystem: Memory Allocations, Buffers, Textures, and Descriptors.
 //!
-//! Exposes [`ResourceSubsystem`], which coordinates GPU memory allocation via [`vk_mem::Allocator`],
-//! manages long-lived assets in [`ResourceStore`], and creates GPU primitives via [`ResourceFactory`].
+//! Exposes [`ResourceStore`] for managing long-lived GPU assets, [`ResourceFactory`]
+//! for constructing GPU memory allocations and textures, and [`Megabuffer`] for pooled sub-allocations.
 
 pub mod buffer;
 pub mod descriptors;
@@ -21,12 +21,23 @@ pub use texture::{
 };
 pub use updater::{ResourceUpdateBuilder, ResourceUpdater};
 
-use crate::commands::CommandSubsystem;
-use crate::commands::transfer::TransferCommandRecorder;
 use crate::core::DeviceContext;
 use ash::vk;
 use color_eyre::eyre::Result;
 use std::sync::{Arc, Mutex};
+
+/// Helper function to instantiate the `vk_mem::Allocator` instance.
+pub fn create_memory_allocator(
+    dvc_ctx: &DeviceContext,
+) -> Result<Arc<Mutex<vk_mem::Allocator>>> {
+    Ok(Arc::new(Mutex::new(unsafe {
+        vk_mem::Allocator::new(vk_mem::AllocatorCreateInfo::new(
+            &dvc_ctx.instance_handle(),
+            &dvc_ctx.logical_device_handle(),
+            dvc_ctx.physical_device_handle(),
+        ))?
+    })))
+}
 
 #[derive(PartialEq)]
 pub enum ResourceType {
@@ -90,56 +101,5 @@ impl ResourceType {
             Self::Sampler => 16,
             Self::SampledImage => 16,
         }
-    }
-}
-
-pub struct ResourceSubsystem {
-    pub resource_store: ResourceStore,
-    pub resource_factory: ResourceFactory,
-    memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
-    #[allow(dead_code)]
-    transfer_command_recorder: Arc<TransferCommandRecorder>,
-    #[allow(dead_code)]
-    device: Arc<ash::Device>,
-}
-
-impl ResourceSubsystem {
-    pub fn new(dvc_ctx: &DeviceContext, cmd_sys: &CommandSubsystem) -> Result<Self> {
-        let memory_allocator = Arc::new(Mutex::new(unsafe {
-            vk_mem::Allocator::new(vk_mem::AllocatorCreateInfo::new(
-                &dvc_ctx.instance_handle(),
-                &dvc_ctx.logical_device_handle(),
-                dvc_ctx.physical_device_handle(),
-            ))?
-        }));
-        let transfer_command_recorder = cmd_sys.transfer_command_recorder.clone();
-        let resource_factory = ResourceFactory::new(
-            memory_allocator.clone(),
-            transfer_command_recorder.clone(),
-            dvc_ctx.logical_device_handle(),
-        )?;
-        let mut resource_store = ResourceStore::new(&resource_factory)?;
-        let nearest_sampler = dvc_ctx.create_vk_sampler(
-            &vk::SamplerCreateInfo::default()
-                .mag_filter(vk::Filter::NEAREST)
-                .min_filter(vk::Filter::NEAREST)
-                .mipmap_mode(vk::SamplerMipmapMode::NEAREST)
-                .address_mode_u(vk::SamplerAddressMode::REPEAT)
-                .address_mode_v(vk::SamplerAddressMode::REPEAT)
-                .address_mode_w(vk::SamplerAddressMode::REPEAT),
-        )?;
-        resource_store.add_sampler(nearest_sampler);
-
-        Ok(Self {
-            resource_store,
-            resource_factory,
-            memory_allocator,
-            transfer_command_recorder,
-            device: dvc_ctx.logical_device_handle(),
-        })
-    }
-
-    pub fn get_memory_allocator(&self) -> Arc<Mutex<vk_mem::Allocator>> {
-        self.memory_allocator.clone()
     }
 }

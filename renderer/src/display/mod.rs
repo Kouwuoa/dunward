@@ -10,7 +10,6 @@ pub(crate) use swapchain::Swapchain;
 use crate::core::DeviceContext;
 use crate::core::queue::Queue;
 use crate::core::semaphore::BinarySemaphore;
-use crate::resources::ResourceSubsystem;
 use crate::resources::texture::{ColorTexture, Texture};
 use ash::vk;
 use color_eyre::Result;
@@ -47,7 +46,7 @@ impl DisplayContext {
     pub fn new(
         window: &Window,
         dvc_ctx: &DeviceContext,
-        rsc_sys: &ResourceSubsystem,
+        memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
     ) -> Result<Self> {
         log::info!("Creating DisplayContext");
 
@@ -56,7 +55,7 @@ impl DisplayContext {
         Ok(Self {
             swapchain,
             present_queue: dvc_ctx.get_present_queue(),
-            memory_allocator: rsc_sys.get_memory_allocator(),
+            memory_allocator,
             device: dvc_ctx.logical_device_handle(),
         })
     }

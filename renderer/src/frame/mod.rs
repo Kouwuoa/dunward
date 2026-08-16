@@ -11,13 +11,13 @@ pub use geometry_stage::FrameGeometryStage;
 pub use lighting_stage::FrameLightingStage;
 pub use packet::{FramePresentPacket, FrameRenderPacket};
 
-use crate::commands::CommandSubsystem;
-use crate::commands::allocator::CommandRecorderAllocatorExt;
+use crate::commands::allocator::{CommandRecorderAllocator, CommandRecorderAllocatorExt};
 use crate::commands::recorder::{CommandRecorder, Idle};
 use crate::core::DeviceContext;
 use crate::core::semaphore::{BinarySemaphore, TimelineSemaphore};
 use crate::display::{DisplayContext, DisplayPresentError};
-use crate::resources::ResourceSubsystem;
+use crate::resources::factory::ResourceFactory;
+use crate::resources::store::ResourceStore;
 use crate::resources::texture::TextureAccess;
 use ash::vk;
 use color_eyre::eyre::Result;
@@ -39,13 +39,20 @@ impl FrameContext {
     pub fn new(
         dvc_ctx: &mut DeviceContext,
         display_ctx: &DisplayContext,
-        cmd_sys: &mut CommandSubsystem,
-        rsc_sys: &mut ResourceSubsystem,
+        cmd_allocator: &mut CommandRecorderAllocator,
+        resource_factory: &ResourceFactory,
+        resource_store: &mut ResourceStore,
     ) -> Result<Self> {
         log::info!("Creating FrameContext");
 
-        let geometry_stage = FrameGeometryStage::new(dvc_ctx, cmd_sys, rsc_sys)?;
-        let lighting_stage = FrameLightingStage::new(dvc_ctx, display_ctx, cmd_sys, rsc_sys)?;
+        let geometry_stage = FrameGeometryStage::new(dvc_ctx, cmd_allocator, resource_store)?;
+        let lighting_stage = FrameLightingStage::new(
+            dvc_ctx,
+            display_ctx,
+            cmd_allocator,
+            resource_factory,
+            resource_store,
+        )?;
 
         let present_image_acquired_semaphore = dvc_ctx.create_binary_semaphore()?;
         let render_finished_semaphore = dvc_ctx.create_binary_semaphore()?;
@@ -55,11 +62,7 @@ impl FrameContext {
         let frame_completion_timeline = dvc_ctx.create_timeline_semaphore()?;
 
         let graphics_queue = dvc_ctx.get_graphics_queue();
-        let postrender_recorder = Some(
-            cmd_sys
-                .command_recorder_allocator
-                .allocate(graphics_queue)?,
-        );
+        let postrender_recorder = Some(cmd_allocator.allocate(graphics_queue)?);
 
         Ok(Self {
             geometry_stage,
@@ -78,7 +81,6 @@ impl FrameContext {
         pkt: FrameRenderPacket,
         dvc: &DeviceContext,
         display: &DisplayContext,
-        _rsc: &ResourceSubsystem,
     ) -> Result<FramePresentPacket> {
         let timeout = Duration::from_secs(1);
 
@@ -183,16 +185,14 @@ impl FrameContext {
         display.present(pkt.texture, &self.render_finished_semaphore)
     }
 
-    pub fn resize(&mut self, size: &winit::dpi::PhysicalSize<u32>, rsc_sys: &ResourceSubsystem) {
+    pub fn resize(&mut self, size: &winit::dpi::PhysicalSize<u32>, resource_factory: &ResourceFactory) {
         // TODO: Resize the geometry stage as well
-        self.lighting_stage.resize(size, rsc_sys);
+        self.lighting_stage.resize(size, resource_factory);
     }
 
-    pub fn destroy(mut self, cmd_sys: &mut CommandSubsystem) -> Result<()> {
+    pub fn destroy(mut self, cmd_allocator: &mut CommandRecorderAllocator) -> Result<()> {
         if let Some(postrender_recorder) = self.postrender_recorder.take() {
-            cmd_sys
-                .command_recorder_allocator
-                .deallocate(postrender_recorder)?;
+            cmd_allocator.deallocate(postrender_recorder)?;
         }
         Ok(())
     }

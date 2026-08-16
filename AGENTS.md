@@ -55,7 +55,7 @@ Command pool allocation and typestate command recording:
   * [`barriers.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/commands/recorder/barriers.rs): Layout transitions (`transition_texture`), stage synchronization (`sync_texture`, `sync_texture_same_access`), presentation preparation, and Queue Family Ownership Transfers (QFOT).
   * [`transfers.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/commands/recorder/transfers.rs): Image blitting (`blit_texture_to_texture`), texture resolve, and clear operations (`clear_storage_texture`, `clear_color_texture`, `clear_depth_texture`).
   * [`pipeline.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/commands/recorder/pipeline.rs): Material pipeline binding, push constant updates, compute dispatch, and resource updaters.
-* [`mod.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/commands/mod.rs): [`CommandSubsystem`](file:///C:/Users/koada/workspace/dunward/renderer/src/commands/mod.rs#L19).
+* [`mod.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/commands/mod.rs): Re-exports [`CommandRecorderAllocator`](file:///C:/Users/koada/workspace/dunward/renderer/src/commands/allocator.rs#L14), [`TransferCommandRecorder`](file:///C:/Users/koada/workspace/dunward/renderer/src/commands/transfer.rs#L23), and [`CommandRecorder`](file:///C:/Users/koada/workspace/dunward/renderer/src/commands/recorder/mod.rs#L24).
 
 ### D. Resources (`renderer/src/resources/`)
 GPU memory, buffers, textures, and descriptor management:
@@ -69,7 +69,7 @@ GPU memory, buffers, textures, and descriptor management:
 * [`factory.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/resources/factory.rs): [`ResourceFactory`](file:///C:/Users/koada/workspace/dunward/renderer/src/resources/factory.rs#L21) for constructing GPU resources.
 * [`store.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/resources/store.rs): [`ResourceStore`](file:///C:/Users/koada/workspace/dunward/renderer/src/resources/store.rs#L22) owning pooled megabuffers and long-lived textures/samplers.
 * [`updater.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/resources/updater.rs): [`ResourceUpdater`](file:///C:/Users/koada/workspace/dunward/renderer/src/resources/updater.rs#L10) for batching descriptor set updates during recording.
-* [`mod.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/resources/mod.rs): [`ResourceSubsystem`](file:///C:/Users/koada/workspace/dunward/renderer/src/resources/mod.rs#L96).
+* [`mod.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/resources/mod.rs): Helper [`create_memory_allocator`](file:///C:/Users/koada/workspace/dunward/renderer/src/resources/mod.rs#L28) and domain exports.
 
 ### E. Material (`renderer/src/material/`)
 Materials, shaders, pipeline state builders, and GPU data:

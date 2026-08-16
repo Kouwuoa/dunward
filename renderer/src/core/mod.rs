@@ -13,11 +13,10 @@ pub(crate) use queue::Queue;
 pub(crate) use semaphore::{BinarySemaphore, SignalSemaphore, TimelineSemaphore, WaitSemaphore};
 
 use crate::commands::recorder::{CommandRecorder, Executable, Idle};
-use crate::resources::ResourceSubsystem;
 use crate::display::DisplayContext;
 use ash::vk;
 use color_eyre::Result;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 /// Main abstraction around the graphics API context for rendering.
@@ -129,9 +128,9 @@ impl DeviceContext {
     pub fn create_display_context(
         &self,
         window: &winit::window::Window,
-        rsc_sys: &ResourceSubsystem,
+        memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
     ) -> Result<DisplayContext> {
-        DisplayContext::new(window, self, rsc_sys)
+        DisplayContext::new(window, self, memory_allocator)
     }
 
     pub fn submit(

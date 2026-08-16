@@ -4,14 +4,18 @@
 //! display presentation, resizing, and teardown.
 
 use crate::Camera;
-use crate::commands::CommandSubsystem;
+use crate::commands::allocator::{CommandRecorderAllocator, CommandRecorderAllocatorExt};
+use crate::commands::transfer::TransferCommandRecorder;
 use crate::core::DeviceContext;
 use crate::display::{DisplayContext, DisplayPresentError};
-use crate::frame::packet::FrameRenderPacket;
 use crate::frame::FrameContext;
-use crate::resources::ResourceSubsystem;
+use crate::frame::packet::FrameRenderPacket;
+use crate::resources::create_memory_allocator;
+use crate::resources::factory::ResourceFactory;
+use crate::resources::store::ResourceStore;
 use ash::vk;
 use color_eyre::Result;
+use std::sync::Arc;
 use std::time::Instant;
 use thiserror::Error;
 
@@ -28,14 +32,16 @@ pub enum RendererError {
 }
 
 pub struct Renderer {
-    // Contexts
+    // Hardware & Presentation
     dvc_ctx: DeviceContext,
     display_ctx: DisplayContext,
     frm_ctxs: Vec<FrameContext>,
 
-    // Subsystems
-    cmd_sys: CommandSubsystem,
-    rsc_sys: ResourceSubsystem,
+    // Commands & Resources
+    cmd_allocator: CommandRecorderAllocator,
+    transfer_recorder: Arc<TransferCommandRecorder>,
+    resource_factory: ResourceFactory,
+    resource_store: ResourceStore,
 
     frame_number: u64,
     time_start: Instant,
@@ -49,19 +55,52 @@ impl Renderer {
         let _ = env_logger::try_init();
 
         let mut dvc_ctx = DeviceContext::new(window)?;
-        let mut cmd_sys = CommandSubsystem::new(&dvc_ctx)?;
-        let mut rsc_sys = ResourceSubsystem::new(&dvc_ctx, &cmd_sys)?;
-        let display_ctx = dvc_ctx.create_display_context(window, &rsc_sys)?;
+        let mut cmd_allocator =
+            CommandRecorderAllocator::new(dvc_ctx.logical_device_handle())?;
+        let transfer_recorder = Arc::new(TransferCommandRecorder::new(
+            dvc_ctx.get_transfer_queue(),
+            dvc_ctx.logical_device_handle(),
+        )?);
+
+        let memory_allocator = create_memory_allocator(&dvc_ctx)?;
+        let resource_factory = ResourceFactory::new(
+            memory_allocator.clone(),
+            transfer_recorder.clone(),
+            dvc_ctx.logical_device_handle(),
+        )?;
+        let mut resource_store = ResourceStore::new(&resource_factory)?;
+        let nearest_sampler = dvc_ctx.create_vk_sampler(
+            &vk::SamplerCreateInfo::default()
+                .mag_filter(vk::Filter::NEAREST)
+                .min_filter(vk::Filter::NEAREST)
+                .mipmap_mode(vk::SamplerMipmapMode::NEAREST)
+                .address_mode_u(vk::SamplerAddressMode::REPEAT)
+                .address_mode_v(vk::SamplerAddressMode::REPEAT)
+                .address_mode_w(vk::SamplerAddressMode::REPEAT),
+        )?;
+        resource_store.add_sampler(nearest_sampler);
+
+        let display_ctx = dvc_ctx.create_display_context(window, memory_allocator)?;
         let frm_ctxs = (0..Self::FRAMES_IN_FLIGHT)
-            .map(|_| FrameContext::new(&mut dvc_ctx, &display_ctx, &mut cmd_sys, &mut rsc_sys))
+            .map(|_| {
+                FrameContext::new(
+                    &mut dvc_ctx,
+                    &display_ctx,
+                    &mut cmd_allocator,
+                    &resource_factory,
+                    &mut resource_store,
+                )
+            })
             .collect::<Result<Vec<FrameContext>>>()?;
 
         Ok(Self {
             dvc_ctx,
             display_ctx,
             frm_ctxs,
-            cmd_sys,
-            rsc_sys,
+            cmd_allocator,
+            transfer_recorder,
+            resource_factory,
+            resource_store,
             frame_number: 0,
             time_start: Instant::now(),
         })
@@ -77,7 +116,7 @@ impl Renderer {
 
         // Render the scene for the current frame
         let present_pkt = current_frame
-            .render(render_pkt, &self.dvc_ctx, &self.display_ctx, &self.rsc_sys)
+            .render(render_pkt, &self.dvc_ctx, &self.display_ctx)
             .unwrap();
 
         // Present the frame
@@ -108,7 +147,7 @@ impl Renderer {
 
         // Resize the frame contexts
         for frame in &mut self.frm_ctxs {
-            frame.resize(&size, &self.rsc_sys);
+            frame.resize(&size, &self.resource_factory);
         }
 
         Ok(())
@@ -136,7 +175,7 @@ impl Drop for Renderer {
 
         // Destroy all frames
         for frame in self.frm_ctxs.drain(..) {
-            frame.destroy(&mut self.cmd_sys).unwrap();
+            frame.destroy(&mut self.cmd_allocator).unwrap();
         }
     }
 }
