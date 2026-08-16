@@ -68,7 +68,8 @@ pub struct Texture {
     pub access_state: TextureAccess,
     pub queue_state: TextureQueueState,
 
-    /// Determines if the dtor should destroy the vk::ImageView associated with this texture
+    /// Determines if the dtor should destroy the vk::ImageView associated with this texture.
+    /// If false, this `Texture` will NOT responsible for the lifetime of the `vk::ImageView`.
     destroy_view: bool,
 
     allocation: Option<vk_mem::Allocation>, // GPU-only memory block
@@ -349,7 +350,7 @@ impl Texture {
         );
     }
 
-    pub fn blit_to(&self, dst: &Texture, cmd: vk::CommandBuffer) {
+    pub fn blit_to(&mut self, dst: &mut Texture, cmd: vk::CommandBuffer) {
         self.blit_to_vkimage(
             dst.image,
             vk::Extent2D {
@@ -358,6 +359,13 @@ impl Texture {
             },
             cmd,
         );
+
+        self.access_state.stage_mask |= vk::PipelineStageFlags2::TRANSFER;
+        self.access_state.access_mask |= vk::AccessFlags2::TRANSFER_READ;
+        dst.access_state = TextureAccess {
+            stage_mask: vk::PipelineStageFlags2::TRANSFER,
+            access_mask: vk::AccessFlags2::TRANSFER_WRITE,
+        };
     }
 
     fn upload(&mut self, data: &[u8], transfer: &TransferCommandRecorder) -> Result<()> {

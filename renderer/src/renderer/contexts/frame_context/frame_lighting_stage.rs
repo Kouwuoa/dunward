@@ -70,15 +70,14 @@ impl FrameLightingStage {
         let recorder = recorder.record(|recorder| {
             let graphics_queue = dvc.get_graphics_queue();
 
-            // Transition render target texture to GENERAL layout
-            recorder.insert_texture_memory_barrier(
+            // Transition into GENERAL layout and prepare for the CLEAR command (TRANSFER)
+            recorder.transition_texture(
                 &mut self.target_tex,
-                Some(vk::ImageLayout::GENERAL),
-                Some(TextureAccess {
-                    stage_mask: vk::PipelineStageFlags2::COMPUTE_SHADER,
-                    access_mask: vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
-                }),
-                None,
+                vk::ImageLayout::GENERAL,
+                TextureAccess {
+                    stage_mask: vk::PipelineStageFlags2::TRANSFER,
+                    access_mask: vk::AccessFlags2::TRANSFER_WRITE,
+                },
             );
 
             // Update the render target texture if it needs updating
@@ -94,26 +93,20 @@ impl FrameLightingStage {
                 self.target_tex_needs_update = false;
             }
 
-            // Clear render target texture
+            // Clear render target texture (Runs in TRANSFER stage)
             recorder.clear_storage_texture(
-                &self.target_tex,
-                vk::ImageLayout::GENERAL,
+                &mut self.target_tex,
                 &vk::ClearColorValue {
                     float32: [1.0f32, 0.0f32, 0.0f32, 1.0f32],
                 },
             )?;
 
-            // Insert memory barrier that waits until the storage texture has been fully cleared before continuing with read/write operations
+            // Synchronize: Wait for CLEAR (TRANSFER) to finish before COMPUTE_SHADER runs
             // This effectively performs a flush operation to ensure the render operations that follow do not operate on stale data
-            recorder.insert_texture_memory_barrier(
-                &mut self.target_tex,
-                None,
-                Some(TextureAccess {
-                    stage_mask: vk::PipelineStageFlags2::COMPUTE_SHADER,
-                    access_mask: vk::AccessFlags2::SHADER_STORAGE_READ | vk::AccessFlags2::SHADER_STORAGE_WRITE,
-                }),
-                None,
-            );
+            recorder.sync_texture(&mut self.target_tex, TextureAccess {
+                stage_mask: vk::PipelineStageFlags2::COMPUTE_SHADER,
+                access_mask: vk::AccessFlags2::SHADER_STORAGE_WRITE,
+            });
 
             // Compute render operations
             recorder.bind_material(&self.material);
@@ -127,11 +120,9 @@ impl FrameLightingStage {
             recorder.dispatch(group_count_x, group_count_y, 1);
 
             // Release the texture from compute onto the graphics queue to match the queue of the swapchain image
-            recorder.insert_texture_memory_barrier(
+            recorder.release_texture_to_queue(
                 &mut self.target_tex,
-                None,
-                None,
-                Some(graphics_queue.clone()),
+                graphics_queue.clone(),
             );
 
             Ok(())

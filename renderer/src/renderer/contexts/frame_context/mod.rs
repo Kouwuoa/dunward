@@ -106,26 +106,24 @@ impl FrameContext {
         let postrender_recorder = self.postrender_recorder.take().unwrap();
         let postrender_recorder = postrender_recorder.record(|recorder| {
             // Transition the image layout into TRANSFER_DST_OPTIMAL for present texture to prepare for blit
-            recorder.insert_texture_memory_barrier(
+            recorder.transition_texture(
                 &mut present_tex.texture,
-                Some(vk::ImageLayout::TRANSFER_DST_OPTIMAL),
-                Some(TextureAccess {
+                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                TextureAccess {
                     stage_mask: vk::PipelineStageFlags2::TRANSFER,
                     access_mask: vk::AccessFlags2::TRANSFER_WRITE,
-                }),
-                None,
+                },
             );
 
             // Acquire the lighting output texture from the compute queue
             // Also transition render target texture to transfer source layout to prepare for blitting onto swapchain image
-            recorder.insert_texture_memory_barrier(
+            recorder.transition_texture(
                 lighting_stage_output.target_tex,
-                Some(vk::ImageLayout::TRANSFER_SRC_OPTIMAL),
-                Some(TextureAccess {
+                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                TextureAccess {
                     stage_mask: vk::PipelineStageFlags2::TRANSFER,
                     access_mask: vk::AccessFlags2::TRANSFER_READ,
-                }),
-                None,
+                },
             );
 
             recorder.blit_texture_to_texture(
@@ -134,19 +132,12 @@ impl FrameContext {
             )?;
 
             // Prepare swapchain texture for presentation
-            recorder.insert_texture_memory_barrier(
-                &mut present_tex.texture,
-                Some(vk::ImageLayout::PRESENT_SRC_KHR),
-                None,
-                None,
-            );
+            recorder.prepare_texture_for_presentation(&mut present_tex.texture);
 
             // Release the lighting output texture back to the compute queue
-            recorder.insert_texture_memory_barrier(
+            recorder.release_texture_to_queue(
                 lighting_stage_output.target_tex,
-                Some(vk::ImageLayout::TRANSFER_SRC_OPTIMAL),
-                None,
-                Some(dvc.get_compute_queue()),
+                dvc.get_compute_queue(),
             );
 
             Ok(())

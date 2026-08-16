@@ -137,7 +137,7 @@ impl CommandRecorder<Recording> {
     /// * If attempting to release a texture that is already in a `Transferring` state without having been acquired first (Double Release).
     /// * If attempting to acquire a texture whose pending transfer was directed to a different queue family.
     /// * If attempting to use a texture owned by another queue without an ownership transfer.
-    pub fn insert_texture_memory_barrier(
+    fn insert_texture_memory_barrier(
         &self,
         texture: &mut Texture,
         dst_layout: Option<vk::ImageLayout>,
@@ -394,9 +394,92 @@ impl CommandRecorder<Recording> {
         }
     }
 
-    pub fn blit_texture_to_texture(&self, src: &Texture, dst: &Texture) -> Result<()> {
-        src.blit_to(dst, self.command_buffer);
+    /// Standard same-queue transition: changes layout and synchronizes for the next access
+    #[inline]
+    pub fn transition_texture(
+        &self,
+        texture: &mut Texture,
+        dst_layout: vk::ImageLayout,
+        dst_access: TextureAccess,
+    ) {
+        self.insert_texture_memory_barrier(texture, Some(dst_layout), Some(dst_access), None);
+    }
 
+    /// Synchronizes consecutive operations on a texture within the **same pipeline stage and access mode**,
+    /// keeping its layout and access state unchanged.
+    ///
+    /// This method inserts an execution and memory barrier where both the source and destination
+    /// synchronization scopes match the texture's current [`TextureAccess`] state (`src == dst`).
+    /// It ensures that all memory writes from previous dispatches or draws in this stage are flushed
+    /// and made visible before subsequent work in the same stage begins.
+    ///
+    /// # When to Use
+    ///
+    /// * **Consecutive Compute Dispatches**: Pass 1 writes to a storage image, and Pass 2
+    ///   reads/writes to that same storage image in `COMPUTE_SHADER` stage.
+    /// * **Iterative Algorithms**: Multi-pass compute algorithms (e.g. blur passes, particle simulation steps,
+    ///   or raymarching iterations) executing sequentially on the same texture.
+    ///
+    /// # Important
+    ///
+    /// Do **not** use this method if the pipeline stage or access mode is changing (e.g. transitioning
+    /// from a clear operation in the `TRANSFER` stage to a `COMPUTE_SHADER`). In those cases, use
+    /// [`sync_texture`](Self::sync_texture) to explicitly specify the incoming [`TextureAccess`].
+    #[inline]
+    pub fn sync_texture_same_access(&self, texture: &mut Texture) {
+        let dst_access = texture.access_state;
+        self.insert_texture_memory_barrier(texture, None, Some(dst_access), None);
+    }
+
+    /// Synchronizes access to a texture for a **new pipeline stage or access mode** on the same queue,
+    /// without changing its image layout.
+    ///
+    /// This method inserts a pipeline barrier (`vkCmdPipelineBarrier2`) that connects the texture's
+    /// previous operation (`src_stage` and `src_access` from `texture.access_state`) to the incoming
+    /// operation (`dst_access`). It halts the new stage until previous work finishes and ensures
+    /// GPU caches are properly flushed and invalidated.
+    ///
+    /// # When to Use
+    ///
+    /// * **Stage Transitions in the Same Layout**: After a `clear_storage_texture` operation
+    ///   (executing in the `TRANSFER` stage) before running a `COMPUTE_SHADER` dispatch on that texture.
+    /// * **Access Mode Changes**: Transitioning from a read-only pass (e.g. `SHADER_STORAGE_READ`)
+    ///   to a write pass (e.g. `SHADER_STORAGE_WRITE`) while keeping the image in `GENERAL` layout.
+    /// * **Inter-Stage Reads**: Switching from a `VERTEX_SHADER` reading a texture to a `COMPUTE_SHADER`
+    ///   reading the same texture in `SHADER_READ_ONLY_OPTIMAL` layout.
+    ///
+    /// # Contrast with [`transition_texture`](Self::transition_texture)
+    ///
+    /// * Use **`sync_texture`** when the texture's layout is already correct and only the stage/access mask changes.
+    /// * Use **`transition_texture`** when the texture must also transition into a new [`vk::ImageLayout`].
+    ///
+    /// # Arguments
+    ///
+    /// * `texture` - The texture being synchronized. Its internal `access_state` will be updated to `dst_access`.
+    /// * `dst_access` - The [`TextureAccess`] describing the stage and access mask of the upcoming pass.
+    #[inline]
+    pub fn sync_texture(&self, texture: &mut Texture, dst_access: TextureAccess) {
+        self.insert_texture_memory_barrier(texture, None, Some(dst_access), None);
+    }
+
+    /// Release ownership of a texture from this recorder's queue to `dst_queue`.
+    #[inline]
+    pub fn release_texture_to_queue(&self, texture: &mut Texture, dst_queue: Arc<Queue>) {
+        self.insert_texture_memory_barrier(texture, None, None, Some(dst_queue));
+    }
+
+    #[inline]
+    pub fn prepare_texture_for_presentation(&self, texture: &mut Texture) {
+        self.insert_texture_memory_barrier(
+            texture,
+            Some(vk::ImageLayout::PRESENT_SRC_KHR),
+            None,
+            None,
+        );
+    }
+
+    pub fn blit_texture_to_texture(&self, src: &mut Texture, dst: &mut Texture) -> Result<()> {
+        src.blit_to(dst, self.command_buffer);
         Ok(())
     }
 
@@ -424,15 +507,21 @@ impl CommandRecorder<Recording> {
 
     pub fn clear_storage_texture(
         &self,
-        texture: &StorageTexture,
-        current_layout: vk::ImageLayout,
+        texture: &mut StorageTexture,
         color: &vk::ClearColorValue,
     ) -> Result<()> {
+        assert!(
+            texture.layout == vk::ImageLayout::GENERAL
+                || texture.layout == vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+            "Cannot clear storage texture in {:?} layout. Texture must be in GENERAL or TRANSFER_DST_OPTIMAL layout",
+            texture.layout
+        );
+
         unsafe {
             self.device.cmd_clear_color_image(
                 self.command_buffer,
                 texture.image,
-                current_layout,
+                texture.layout,
                 color,
                 &[vk::ImageSubresourceRange {
                     aspect_mask: texture.aspect,
@@ -443,21 +532,33 @@ impl CommandRecorder<Recording> {
                 }],
             );
         }
+
+        // Update tracked state so subsequent barriers know a clear (TRANSFER_WRITE) just occurred
+        texture.access_state = TextureAccess {
+            stage_mask: vk::PipelineStageFlags2::TRANSFER,
+            access_mask: vk::AccessFlags2::TRANSFER_WRITE,
+        };
 
         Ok(())
     }
 
     pub fn clear_color_texture(
         &self,
-        texture: &ColorTexture,
-        current_layout: vk::ImageLayout,
+        texture: &mut ColorTexture,
         color: &vk::ClearColorValue,
     ) -> Result<()> {
+        assert!(
+            texture.layout == vk::ImageLayout::GENERAL
+                || texture.layout == vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+            "Cannot clear color texture in {:?} layout. Texture must be in GENERAL or TRANSFER_DST_OPTIMAL layout",
+            texture.layout
+        );
+
         unsafe {
             self.device.cmd_clear_color_image(
                 self.command_buffer,
                 texture.image,
-                current_layout,
+                texture.layout,
                 color,
                 &[vk::ImageSubresourceRange {
                     aspect_mask: texture.aspect,
@@ -469,19 +570,28 @@ impl CommandRecorder<Recording> {
             );
         }
 
+        // Update tracked state so subsequent barriers know a clear (TRANSFER_WRITE) just occurred
+        texture.access_state = TextureAccess {
+            stage_mask: vk::PipelineStageFlags2::TRANSFER,
+            access_mask: vk::AccessFlags2::TRANSFER_WRITE,
+        };
+
         Ok(())
     }
 
-    pub fn clear_depth_texture(
-        &self,
-        texture: &DepthTexture,
-        layout: vk::ImageLayout,
-    ) -> Result<()> {
+    pub fn clear_depth_texture(&self, texture: &mut DepthTexture) -> Result<()> {
+        assert!(
+            texture.layout == vk::ImageLayout::GENERAL
+                || texture.layout == vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+            "Cannot clear depth texture in {:?} layout. Texture must be in GENERAL or TRANSFER_DST_OPTIMAL layout",
+            texture.layout
+        );
+
         unsafe {
             self.device.cmd_clear_depth_stencil_image(
                 self.command_buffer,
                 texture.image,
-                layout,
+                texture.layout,
                 &vk::ClearDepthStencilValue {
                     depth: 1.0,
                     stencil: 0,
@@ -495,6 +605,12 @@ impl CommandRecorder<Recording> {
                 }],
             );
         }
+
+        // Update tracked state so subsequent barriers know a clear (TRANSFER_WRITE) just occurred
+        texture.access_state = TextureAccess {
+            stage_mask: vk::PipelineStageFlags2::TRANSFER,
+            access_mask: vk::AccessFlags2::TRANSFER_WRITE,
+        };
 
         Ok(())
     }
