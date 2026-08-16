@@ -29,7 +29,6 @@ pub(crate) struct FrameLightingStage {
     target_tex_needs_update: bool,
 
     material: Material,
-    #[allow(dead_code)]
     is_first_render: bool,
 }
 

@@ -26,7 +26,6 @@ use crate::resources::store::ResourceStore;
 use crate::resources::texture::TextureAccess;
 
 pub(crate) struct FrameContext {
-    #[allow(dead_code)]
     geometry_stage: FrameGeometryStage,
     lighting_stage: FrameLightingStage,
     present_texture_acquired_semaphore: BinarySemaphore,

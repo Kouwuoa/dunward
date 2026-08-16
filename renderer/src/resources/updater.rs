@@ -12,7 +12,6 @@ use crate::material::Material;
 
 pub(crate) struct ResourceUpdater<'a> {
     device: &'a ash::Device,
-    #[allow(dead_code)]
     command_buffer: &'a vk::CommandBuffer,
     updates: Vec<ResourceUpdate<'a>>,
 }

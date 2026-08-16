@@ -19,26 +19,18 @@ const FRAME_PER_MATERIAL_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_PER_OBJECT_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 
 pub(crate) struct FrameGeometryStage {
-    #[allow(dead_code)]
     recorder: Option<CommandRecorder<Idle>>,
 
-    #[allow(dead_code)]
     vertex_region: AllocatedMegabufferRegion,
-    #[allow(dead_code)]
     index_region: AllocatedMegabufferRegion,
-    #[allow(dead_code)]
     per_frame_region: AllocatedMegabufferRegion,
-    #[allow(dead_code)]
     per_material_region: AllocatedMegabufferRegion,
-    #[allow(dead_code)]
     per_object_region: AllocatedMegabufferRegion,
 
-    #[allow(dead_code)]
     finished_fence: vk::Fence,
 }
 
 impl FrameGeometryStage {
-    #[allow(dead_code)]
     const TIMELINE_SEM_SIGNAL_VALUE: u64 = 1; // TODO: ignored for now
 
     pub(crate) fn new(
