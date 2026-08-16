@@ -9,11 +9,11 @@ use crate::commands::allocator::CommandRecorderAllocatorExt;
 use crate::commands::recorder::{CommandRecorder, Idle};
 use crate::core::DeviceContext;
 use crate::core::semaphore::TimelineSemaphore;
-use crate::pipeline::material::Material;
-use crate::pipeline::shader_data::PerDrawData;
+use crate::display::DisplayContext;
+use crate::material::Material;
+use crate::material::shader_data::PerDrawData;
 use crate::resources::ResourceSubsystem;
 use crate::resources::texture::{StorageTexture, TextureAccess};
-use crate::swapchain::SwapchainContext;
 use ash::vk;
 use color_eyre::Result;
 
@@ -35,17 +35,17 @@ pub struct FrameLightingStage {
 impl FrameLightingStage {
     pub fn new(
         dvc_ctx: &DeviceContext,
-        swc_ctx: &SwapchainContext,
+        display_ctx: &DisplayContext,
         cmd_sys: &mut CommandSubsystem,
         rsc_sys: &mut ResourceSubsystem,
     ) -> Result<Self> {
         let compute_queue = dvc_ctx.get_compute_queue();
         let recorder = Some(cmd_sys.command_recorder_allocator.allocate(compute_queue)?);
 
-        let swc_size = swc_ctx.get_size();
+        let display_size = display_ctx.get_size();
         let target_tex = rsc_sys.resource_factory.create_storage_texture(
-            swc_size.width,
-            swc_size.height,
+            display_size.width,
+            display_size.height,
             true,
         )?;
 

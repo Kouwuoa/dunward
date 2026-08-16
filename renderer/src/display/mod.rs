@@ -1,7 +1,7 @@
-//! Window Presentation, Swapchain Context, and Frame Presentation.
+//! Window Display Presentation, Backbuffers, and Frame Presentation.
 //!
-//! Exposes [`SwapchainContext`], which manages the acquisition of next swapchain images,
-//! queuing images for presentation on the presentation queue, and handling window resizes.
+//! Exposes [`DisplayContext`], which manages the acquisition of next presentation targets,
+//! queuing backbuffer images for presentation on the presentation queue, and handling window resizes.
 
 pub(crate) mod swapchain;
 
@@ -27,29 +27,29 @@ pub struct PresentTextureBundle {
 }
 
 #[derive(Debug, Error)]
-pub enum SwapchainPresentError {
-    #[error("Swapchain is suboptimal and needs to be resized")]
-    SwapchainSuboptimal,
+pub enum DisplayPresentError {
+    #[error("Display surface is suboptimal and needs to be resized")]
+    DisplaySuboptimal,
 
     #[error("Vulkan error: {0}")]
     Vulkan(#[from] vk::Result),
 }
 
-/// Presentation target of the renderer, encapsulating the surface and swapchain
-pub struct SwapchainContext {
+/// Presentation target of the renderer, encapsulating the display surface and swapchain
+pub struct DisplayContext {
     pub(crate) swapchain: Swapchain,
     present_queue: Arc<Queue>,
     memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
     device: Arc<ash::Device>,
 }
 
-impl SwapchainContext {
+impl DisplayContext {
     pub fn new(
         window: &Window,
         dvc_ctx: &DeviceContext,
         rsc_sys: &ResourceSubsystem,
     ) -> Result<Self> {
-        log::info!("Creating SwapchainContext");
+        log::info!("Creating DisplayContext");
 
         let swapchain = Swapchain::new(&window.inner_size(), dvc_ctx, None)?;
 
@@ -115,7 +115,7 @@ impl SwapchainContext {
         &self,
         texture: PresentTextureBundle,
         wait_render_finished_sem: &BinarySemaphore,
-    ) -> core::result::Result<(), SwapchainPresentError> {
+    ) -> core::result::Result<(), DisplayPresentError> {
         let swapchain_image_index = texture.index;
         let present_info = vk::PresentInfoKHR {
             p_swapchains: &self.swapchain.swapchain,
@@ -136,8 +136,8 @@ impl SwapchainContext {
         };
         match present_result {
             Ok(false) => Ok(()),
-            Ok(true) => Err(SwapchainPresentError::SwapchainSuboptimal),
-            Err(err) => Err(SwapchainPresentError::Vulkan(err)),
+            Ok(true) => Err(DisplayPresentError::DisplaySuboptimal),
+            Err(err) => Err(DisplayPresentError::Vulkan(err)),
         }
     }
 

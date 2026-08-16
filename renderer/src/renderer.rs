@@ -1,15 +1,15 @@
 //! Top-level Vulkan Renderer engine orchestrator.
 //!
 //! Exposes [`Renderer`], orchestrating multi-buffered frames in flight, device initialization,
-//! swapchain presentation, resizing, and teardown.
+//! display presentation, resizing, and teardown.
 
 use crate::Camera;
 use crate::commands::CommandSubsystem;
 use crate::core::DeviceContext;
+use crate::display::{DisplayContext, DisplayPresentError};
 use crate::frame::packet::FrameRenderPacket;
 use crate::frame::FrameContext;
 use crate::resources::ResourceSubsystem;
-use crate::swapchain::{SwapchainContext, SwapchainPresentError};
 use ash::vk;
 use color_eyre::Result;
 use std::time::Instant;
@@ -17,6 +17,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum RendererError {
+    #[error("Display surface is suboptimal and needs to be resized")]
+    DisplaySuboptimal,
+
     #[error("Swapchain is suboptimal and needs to be resized")]
     SwapchainSuboptimal,
 
@@ -27,7 +30,7 @@ pub enum RendererError {
 pub struct Renderer {
     // Contexts
     dvc_ctx: DeviceContext,
-    swc_ctx: SwapchainContext,
+    display_ctx: DisplayContext,
     frm_ctxs: Vec<FrameContext>,
 
     // Subsystems
@@ -48,14 +51,14 @@ impl Renderer {
         let mut dvc_ctx = DeviceContext::new(window)?;
         let mut cmd_sys = CommandSubsystem::new(&dvc_ctx)?;
         let mut rsc_sys = ResourceSubsystem::new(&dvc_ctx, &cmd_sys)?;
-        let swc_ctx = dvc_ctx.create_swapchain_context(window, &rsc_sys)?;
+        let display_ctx = dvc_ctx.create_display_context(window, &rsc_sys)?;
         let frm_ctxs = (0..Self::FRAMES_IN_FLIGHT)
-            .map(|_| FrameContext::new(&mut dvc_ctx, &swc_ctx, &mut cmd_sys, &mut rsc_sys))
+            .map(|_| FrameContext::new(&mut dvc_ctx, &display_ctx, &mut cmd_sys, &mut rsc_sys))
             .collect::<Result<Vec<FrameContext>>>()?;
 
         Ok(Self {
             dvc_ctx,
-            swc_ctx,
+            display_ctx,
             frm_ctxs,
             cmd_sys,
             rsc_sys,
@@ -74,19 +77,19 @@ impl Renderer {
 
         // Render the scene for the current frame
         let present_pkt = current_frame
-            .render(render_pkt, &self.dvc_ctx, &self.swc_ctx, &self.rsc_sys)
+            .render(render_pkt, &self.dvc_ctx, &self.display_ctx, &self.rsc_sys)
             .unwrap();
 
         // Present the frame
-        let swapchain_suboptimal = present_pkt.texture.suboptimal;
-        let result = match current_frame.present(present_pkt, &self.swc_ctx) {
-            Err(SwapchainPresentError::SwapchainSuboptimal) => {
-                Err(RendererError::SwapchainSuboptimal)
+        let display_suboptimal = present_pkt.texture.suboptimal;
+        let result = match current_frame.present(present_pkt, &self.display_ctx) {
+            Err(DisplayPresentError::DisplaySuboptimal) => {
+                Err(RendererError::DisplaySuboptimal)
             }
-            Err(SwapchainPresentError::Vulkan(err)) => Err(RendererError::Vulkan(err)),
+            Err(DisplayPresentError::Vulkan(err)) => Err(RendererError::Vulkan(err)),
             Ok(()) => {
-                if swapchain_suboptimal {
-                    Err(RendererError::SwapchainSuboptimal)
+                if display_suboptimal {
+                    Err(RendererError::DisplaySuboptimal)
                 } else {
                     Ok(())
                 }
@@ -100,8 +103,8 @@ impl Renderer {
     }
 
     pub fn resize(&mut self, size: winit::dpi::PhysicalSize<u32>) -> Result<()> {
-        // Resize the swapchain
-        self.swc_ctx.resize(&size, &self.dvc_ctx)?;
+        // Resize the display surface
+        self.display_ctx.resize(&size, &self.dvc_ctx)?;
 
         // Resize the frame contexts
         for frame in &mut self.frm_ctxs {
@@ -112,7 +115,7 @@ impl Renderer {
     }
 
     fn update_scene<'a>(&mut self, cam: &'a Camera) -> FrameRenderPacket<'a> {
-        let target_size = self.swc_ctx.get_size();
+        let target_size = self.display_ctx.get_size();
         FrameRenderPacket {
             camera: cam,
             target_size,

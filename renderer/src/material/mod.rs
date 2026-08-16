@@ -1,13 +1,17 @@
-//! Material abstractions, binding pipelines, and per-material descriptor sets.
+//! Material abstractions, shaders, pipeline states, and per-material descriptor sets.
 //!
-//! A [`Material`] represents an instantiated pipeline ready for shader resource binding
+//! A [`Material`] represents an instantiated shader pipeline ready for GPU resource binding
 //! and push constant updates during rendering.
 
 pub mod compute;
 pub mod graphics;
+pub mod shader;
+pub mod shader_data;
 
 pub use compute::ComputeMaterialFactoryBuilder;
 pub use graphics::GraphicsMaterialFactoryBuilder;
+pub use shader::{ComputeShader, GraphicsShader};
+pub use shader_data::{PerDrawData, PerFrameData, PerMaterialData, PerObjectData, PerVertexData};
 
 use crate::resources::descriptors::DescriptorAllocator;
 use ash::vk;

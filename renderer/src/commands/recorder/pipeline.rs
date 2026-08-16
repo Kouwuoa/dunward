@@ -4,7 +4,7 @@
 //! [`bind_material`], [`update_push_constants`], [`dispatch`], and [`create_resource_updater`].
 
 use super::{CommandRecorder, Recording};
-use crate::pipeline::material::Material;
+use crate::material::Material;
 use crate::resources::updater::ResourceUpdater;
 
 impl CommandRecorder<Recording> {

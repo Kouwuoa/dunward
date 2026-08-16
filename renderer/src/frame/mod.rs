@@ -1,7 +1,7 @@
 //! Multi-buffered frame context, stage execution, synchronization, and presentation.
 //!
 //! Exposes [`FrameContext`], orchestrating per-frame synchronization fences, semaphores,
-//! stage execution ([`FrameGeometryStage`], [`FrameLightingStage`]), and blitting to swapchain images.
+//! stage execution ([`FrameGeometryStage`], [`FrameLightingStage`]), and blitting to display images.
 
 pub mod geometry_stage;
 pub mod lighting_stage;
@@ -16,9 +16,9 @@ use crate::commands::allocator::CommandRecorderAllocatorExt;
 use crate::commands::recorder::{CommandRecorder, Idle};
 use crate::core::DeviceContext;
 use crate::core::semaphore::{BinarySemaphore, TimelineSemaphore};
+use crate::display::{DisplayContext, DisplayPresentError};
 use crate::resources::ResourceSubsystem;
 use crate::resources::texture::TextureAccess;
-use crate::swapchain::{SwapchainContext, SwapchainPresentError};
 use ash::vk;
 use color_eyre::eyre::Result;
 use std::time::Duration;
@@ -38,14 +38,14 @@ pub struct FrameContext {
 impl FrameContext {
     pub fn new(
         dvc_ctx: &mut DeviceContext,
-        swc_ctx: &SwapchainContext,
+        display_ctx: &DisplayContext,
         cmd_sys: &mut CommandSubsystem,
         rsc_sys: &mut ResourceSubsystem,
     ) -> Result<Self> {
         log::info!("Creating FrameContext");
 
         let geometry_stage = FrameGeometryStage::new(dvc_ctx, cmd_sys, rsc_sys)?;
-        let lighting_stage = FrameLightingStage::new(dvc_ctx, swc_ctx, cmd_sys, rsc_sys)?;
+        let lighting_stage = FrameLightingStage::new(dvc_ctx, display_ctx, cmd_sys, rsc_sys)?;
 
         let present_image_acquired_semaphore = dvc_ctx.create_binary_semaphore()?;
         let render_finished_semaphore = dvc_ctx.create_binary_semaphore()?;
@@ -77,7 +77,7 @@ impl FrameContext {
         &mut self,
         pkt: FrameRenderPacket,
         dvc: &DeviceContext,
-        swc: &SwapchainContext,
+        display: &DisplayContext,
         _rsc: &ResourceSubsystem,
     ) -> Result<FramePresentPacket> {
         let timeout = Duration::from_secs(1);
@@ -104,9 +104,9 @@ impl FrameContext {
             lighting_timeline_signal,
         )?;
 
-        // Acquire the next image from the swapchain
+        // Acquire the next image from the display swapchain
         let mut present_tex =
-            swc.acquire_next_present_texture(&self.present_texture_acquired_semaphore, timeout)?;
+            display.acquire_next_present_texture(&self.present_texture_acquired_semaphore, timeout)?;
 
         // Perform post-render operations on the compute queue
         let postrender_recorder = self.postrender_recorder.take().unwrap();
@@ -122,7 +122,7 @@ impl FrameContext {
             );
 
             // Acquire the lighting output texture from the compute queue
-            // Also transition render target texture to transfer source layout to prepare for blitting onto swapchain image
+            // Also transition render target texture to transfer source layout to prepare for blitting onto display image
             recorder.transition_texture(
                 lighting_stage_output.target_tex,
                 vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
@@ -137,7 +137,7 @@ impl FrameContext {
                 &mut present_tex.texture,
             )?;
 
-            // Prepare swapchain texture for presentation
+            // Prepare display texture for presentation
             recorder.prepare_texture_for_presentation(&mut present_tex.texture);
 
             // Release the lighting output texture back to the compute queue
@@ -161,7 +161,7 @@ impl FrameContext {
                 self.present_texture_acquired_semaphore
                     .to_wait_semaphore(vk::PipelineStageFlags::TRANSFER),
             ],
-            // Signal that all render operations have finished, meaning the swapchain image is ready to be presented
+            // Signal that all render operations have finished, meaning the display image is ready to be presented
             &[
                 self.frame_completion_timeline
                     .to_signal_semaphore(postrender_timeline_signal),
@@ -178,9 +178,9 @@ impl FrameContext {
     pub fn present(
         &self,
         pkt: FramePresentPacket,
-        swc: &SwapchainContext,
-    ) -> core::result::Result<(), SwapchainPresentError> {
-        swc.present(pkt.texture, &self.render_finished_semaphore)
+        display: &DisplayContext,
+    ) -> core::result::Result<(), DisplayPresentError> {
+        display.present(pkt.texture, &self.render_finished_semaphore)
     }
 
     pub fn resize(&mut self, size: &winit::dpi::PhysicalSize<u32>, rsc_sys: &ResourceSubsystem) {

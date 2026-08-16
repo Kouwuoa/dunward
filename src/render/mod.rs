@@ -30,7 +30,7 @@ fn render_frame(
 ) {
     let camera = camera_qry.single().unwrap();
     match renderer.render_frame(&camera.0) {
-        Err(RendererError::SwapchainSuboptimal) => {
+        Err(RendererError::DisplaySuboptimal | RendererError::SwapchainSuboptimal) => {
             let window = window_qry.single().unwrap();
             let window_size = window.physical_size();
             let winit_size = renderer::winit::dpi::PhysicalSize::new(window_size.x, window_size.y);

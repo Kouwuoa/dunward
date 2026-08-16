@@ -14,7 +14,7 @@ pub(crate) use semaphore::{BinarySemaphore, SignalSemaphore, TimelineSemaphore, 
 
 use crate::commands::recorder::{CommandRecorder, Executable, Idle};
 use crate::resources::ResourceSubsystem;
-use crate::swapchain::SwapchainContext;
+use crate::display::DisplayContext;
 use ash::vk;
 use color_eyre::Result;
 use std::sync::Arc;
@@ -126,12 +126,12 @@ impl DeviceContext {
         Ok(unsafe { self.device.logical.device_wait_idle()? })
     }
 
-    pub fn create_swapchain_context(
+    pub fn create_display_context(
         &self,
         window: &winit::window::Window,
         rsc_sys: &ResourceSubsystem,
-    ) -> Result<SwapchainContext> {
-        SwapchainContext::new(window, self, rsc_sys)
+    ) -> Result<DisplayContext> {
+        DisplayContext::new(window, self, rsc_sys)
     }
 
     pub fn submit(

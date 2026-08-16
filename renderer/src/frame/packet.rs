@@ -3,7 +3,7 @@
 //! Exposes [`FrameRenderPacket`] containing scene, frame index, and timing data,
 //! and [`FramePresentPacket`] encapsulating the acquired swapchain target.
 
-use crate::swapchain::PresentTextureBundle;
+use crate::display::PresentTextureBundle;
 use std::time::Instant;
 
 /// This struct is used to pass all necessary data for rendering a single frame.

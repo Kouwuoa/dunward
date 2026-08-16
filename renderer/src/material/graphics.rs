@@ -1,10 +1,10 @@
-//! Graphics material factory builder and graphics pipeline creation.
+//! Graphics material factory builder and pipeline creation.
 //!
 //! Configures dynamic rendering state, depth-stencil, blending, multisampling,
 //! rasterization, vertex input layouts, and pipeline layouts for rasterization passes.
 
 use super::MaterialFactory;
-use crate::pipeline::shader::GraphicsShader;
+use super::shader::GraphicsShader;
 use crate::resources::descriptors::DescriptorAllocator;
 use crate::scene::vertex::VertexInputDescription;
 use ash::vk;

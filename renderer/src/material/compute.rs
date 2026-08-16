@@ -4,7 +4,7 @@
 //! for compute dispatch workloads.
 
 use super::MaterialFactory;
-use crate::pipeline::shader::ComputeShader;
+use super::shader::ComputeShader;
 use crate::resources::descriptors::DescriptorAllocator;
 use ash::vk;
 use color_eyre::Result;

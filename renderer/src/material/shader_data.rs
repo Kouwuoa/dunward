@@ -1,4 +1,4 @@
-//! CPU-GPU data structures for uniform buffers, storage buffers, and push constants.
+//! CPU-GPU data structures for material constants, uniform buffers, and push constants.
 //!
 //! Provides `bytemuck`-compatible `#[repr(C)]` POD structs for per-frame scene data,
 //! per-material properties, per-object instance transforms, and per-draw push constants.

@@ -3,7 +3,7 @@
 //! Provides the primary [`Vertex`] structure and helper functions to build
 //! [`VertexInputDescription`] for graphics pipeline vertex assembly.
 
-use crate::pipeline::shader_data::PerVertexData;
+use crate::material::shader_data::PerVertexData;
 use ash::vk;
 use glam::{Vec2, Vec3};
 use std::mem::offset_of;

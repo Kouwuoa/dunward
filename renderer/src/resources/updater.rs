@@ -6,7 +6,7 @@
 
 use super::descriptors::DescriptorWriter;
 use super::texture::StorageTexture;
-use crate::pipeline::material::Material;
+use crate::material::Material;
 use ash::vk;
 
 pub struct ResourceUpdater<'a> {
