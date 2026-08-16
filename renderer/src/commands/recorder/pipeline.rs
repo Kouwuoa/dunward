@@ -9,17 +9,17 @@ use crate::resources::updater::ResourceUpdater;
 
 impl CommandRecorder<Recording> {
     /// Binds material pipeline and descriptor sets to the command buffer.
-    pub(crate) fn bind_material(&self, material: &Material) {
+    pub fn bind_material(&self, material: &Material) {
         material.bind(self.command_buffer);
     }
 
     /// Updates push constant ranges on the bound pipeline layout.
-    pub(crate) fn update_push_constants(&self, material: &Material, data: &[u8]) {
+    pub fn update_push_constants(&self, material: &Material, data: &[u8]) {
         material.update_push_constants(self.command_buffer, data);
     }
 
     /// Dispatches compute shader workgroups.
-    pub(crate) fn dispatch(&self, group_count_x: u32, group_count_y: u32, group_count_z: u32) {
+    pub fn dispatch(&self, group_count_x: u32, group_count_y: u32, group_count_z: u32) {
         unsafe {
             self.device.cmd_dispatch(
                 self.command_buffer,
@@ -31,7 +31,7 @@ impl CommandRecorder<Recording> {
     }
 
     /// Creates a [`ResourceUpdater`] for batching descriptor set updates during recording.
-    pub(crate) fn create_resource_updater(&self) -> ResourceUpdater<'_> {
+    pub fn create_resource_updater(&self) -> ResourceUpdater<'_> {
         ResourceUpdater::new(&self.device, &self.command_buffer)
     }
 }

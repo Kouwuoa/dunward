@@ -26,25 +26,25 @@ pub(crate) struct Recording;
 pub(crate) struct Executable;
 
 pub(crate) struct CommandRecorder<State> {
-    pub(crate) command_buffer: vk::CommandBuffer,
-    pub(crate) queue: Arc<Queue>,
-    pub(crate) device: Arc<ash::Device>,
+    pub command_buffer: vk::CommandBuffer,
+    pub queue: Arc<Queue>,
+    pub device: Arc<ash::Device>,
     /// Note that this is only an `Option` to allow for the allocator to be dropped.
-    pub(crate) allocator: Option<CommandRecorderAllocator>,
-    pub(crate) _state: PhantomData<State>,
+    pub allocator: Option<CommandRecorderAllocator>,
+    pub _state: PhantomData<State>,
 }
 
 impl<State> CommandRecorder<State> {
-    pub(crate) fn get_queue(&self) -> Arc<Queue> {
+    pub fn get_queue(&self) -> Arc<Queue> {
         self.queue.clone()
     }
-    pub(crate) fn get_command_buffer(&self) -> vk::CommandBuffer {
+    pub fn get_command_buffer(&self) -> vk::CommandBuffer {
         self.command_buffer
     }
 }
 
 impl CommandRecorder<Idle> {
-    pub(crate) fn new(
+    pub fn new(
         command_buffer: vk::CommandBuffer,
         queue: Arc<Queue>,
         device: Arc<ash::Device>,
@@ -59,7 +59,7 @@ impl CommandRecorder<Idle> {
         }
     }
 
-    pub(crate) fn new_from_old(old: CommandRecorder<Executable>) -> Self {
+    pub fn new_from_old(old: CommandRecorder<Executable>) -> Self {
         Self {
             command_buffer: old.command_buffer,
             queue: old.queue,
@@ -69,7 +69,7 @@ impl CommandRecorder<Idle> {
         }
     }
 
-    pub(crate) fn record<F>(self, f: F) -> Result<CommandRecorder<Executable>>
+    pub fn record<F>(self, f: F) -> Result<CommandRecorder<Executable>>
     where
         F: FnOnce(&CommandRecorder<Recording>) -> Result<()>,
     {

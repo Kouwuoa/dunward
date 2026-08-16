@@ -24,7 +24,7 @@ pub(crate) struct ComputeMaterialFactoryBuilder {
 }
 
 impl ComputeMaterialFactoryBuilder {
-    pub(crate) fn new(
+    pub fn new(
         device: Arc<ash::Device>,
         descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
     ) -> Self {
@@ -37,22 +37,22 @@ impl ComputeMaterialFactoryBuilder {
         }
     }
 
-    pub(crate) fn with_shader(mut self, shader: ComputeShader) -> Self {
+    pub fn with_shader(mut self, shader: ComputeShader) -> Self {
         let _ = self.shader.replace(shader);
         self
     }
 
-    pub(crate) fn with_pipeline_layout(mut self, layout: vk::PipelineLayout) -> Self {
+    pub fn with_pipeline_layout(mut self, layout: vk::PipelineLayout) -> Self {
         let _ = self.pipeline_layout.replace(layout);
         self
     }
 
-    pub(crate) fn with_descriptor_set_layout(mut self, layout: vk::DescriptorSetLayout) -> Self {
+    pub fn with_descriptor_set_layout(mut self, layout: vk::DescriptorSetLayout) -> Self {
         let _ = self.descriptor_set_layout.replace(layout);
         self
     }
 
-    pub(crate) fn build(mut self) -> Result<MaterialFactory> {
+    pub fn build(mut self) -> Result<MaterialFactory> {
         let shader = self
             .shader
             .take()

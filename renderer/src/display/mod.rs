@@ -22,9 +22,9 @@ use crate::core::semaphore::BinarySemaphore;
 use crate::resources::texture::{ColorTexture, Texture};
 
 pub(crate) struct PresentTextureBundle {
-    pub(crate) texture: ColorTexture,
-    pub(crate) index: u32,
-    pub(crate) suboptimal: bool,
+    pub texture: ColorTexture,
+    pub index: u32,
+    pub suboptimal: bool,
 }
 
 #[derive(Debug, Error)]
@@ -38,14 +38,14 @@ pub(crate) enum DisplayPresentError {
 
 /// Presentation target of the renderer, encapsulating the display surface and swapchain
 pub(crate) struct DisplayContext {
-    pub(crate) swapchain: Swapchain,
+    pub swapchain: Swapchain,
     present_queue: Arc<Queue>,
     memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
     device: Arc<ash::Device>,
 }
 
 impl DisplayContext {
-    pub(crate) fn new(
+    pub fn new(
         window: &Window,
         dvc_ctx: &DeviceContext,
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
@@ -62,7 +62,7 @@ impl DisplayContext {
         })
     }
 
-    pub(crate) fn acquire_next_present_texture(
+    pub fn acquire_next_present_texture(
         &self,
         signal_image_acquired_sem: &BinarySemaphore,
         timeout: Duration,
@@ -112,7 +112,7 @@ impl DisplayContext {
         })
     }
 
-    pub(crate) fn present(
+    pub fn present(
         &self,
         texture: PresentTextureBundle,
         wait_render_finished_sem: &BinarySemaphore,
@@ -142,7 +142,7 @@ impl DisplayContext {
         }
     }
 
-    pub(crate) fn resize(
+    pub fn resize(
         &mut self,
         size: &winit::dpi::PhysicalSize<u32>,
         dvc_ctx: &DeviceContext,
@@ -154,7 +154,7 @@ impl DisplayContext {
         Ok(())
     }
 
-    pub(crate) fn get_size(&self) -> winit::dpi::PhysicalSize<u32> {
+    pub fn get_size(&self) -> winit::dpi::PhysicalSize<u32> {
         winit::dpi::PhysicalSize::new(
             self.swapchain.swapchain_image_extent.width,
             self.swapchain.swapchain_image_extent.height,

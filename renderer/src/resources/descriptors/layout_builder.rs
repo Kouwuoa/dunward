@@ -13,7 +13,7 @@ pub(crate) struct DescriptorSetLayoutBuilder<'a> {
 }
 
 impl DescriptorSetLayoutBuilder<'_> {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             bindings: Vec::new(),
             binding_flags: Vec::new(),
@@ -21,7 +21,7 @@ impl DescriptorSetLayoutBuilder<'_> {
         }
     }
 
-    pub(crate) fn add_binding(
+    pub fn add_binding(
         mut self,
         binding: u32,
         descriptor_type: vk::DescriptorType,
@@ -42,7 +42,7 @@ impl DescriptorSetLayoutBuilder<'_> {
         self
     }
 
-    pub(crate) fn build(
+    pub fn build(
         mut self,
         flags: vk::DescriptorSetLayoutCreateFlags,
         device: &ash::Device,

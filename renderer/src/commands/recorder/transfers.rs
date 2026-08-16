@@ -13,12 +13,12 @@ use crate::resources::texture::{
 };
 
 impl CommandRecorder<Recording> {
-    pub(crate) fn blit_texture_to_texture(&self, src: &mut Texture, dst: &mut Texture) -> Result<()> {
+    pub fn blit_texture_to_texture(&self, src: &mut Texture, dst: &mut Texture) -> Result<()> {
         src.blit_to(dst, self.command_buffer);
         Ok(())
     }
 
-    pub(crate) fn resolve_texture(
+    pub fn resolve_texture(
         &self,
         src: &Texture,
         src_layout: vk::ImageLayout,
@@ -40,7 +40,7 @@ impl CommandRecorder<Recording> {
         Ok(())
     }
 
-    pub(crate) fn clear_storage_texture(
+    pub fn clear_storage_texture(
         &self,
         texture: &mut StorageTexture,
         color: &vk::ClearColorValue,
@@ -77,7 +77,7 @@ impl CommandRecorder<Recording> {
         Ok(())
     }
 
-    pub(crate) fn clear_color_texture(
+    pub fn clear_color_texture(
         &self,
         texture: &mut ColorTexture,
         color: &vk::ClearColorValue,
@@ -114,7 +114,7 @@ impl CommandRecorder<Recording> {
         Ok(())
     }
 
-    pub(crate) fn clear_depth_texture(&self, texture: &mut DepthTexture) -> Result<()> {
+    pub fn clear_depth_texture(&self, texture: &mut DepthTexture) -> Result<()> {
         assert!(
             texture.layout == vk::ImageLayout::GENERAL
                 || texture.layout == vk::ImageLayout::TRANSFER_DST_OPTIMAL,

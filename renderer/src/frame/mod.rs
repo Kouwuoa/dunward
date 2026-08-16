@@ -37,7 +37,7 @@ pub(crate) struct FrameContext {
 }
 
 impl FrameContext {
-    pub(crate) fn new(
+    pub fn new(
         dvc_ctx: &mut DeviceContext,
         display_ctx: &DisplayContext,
         cmd_allocator: &mut CommandRecorderAllocator,
@@ -77,7 +77,7 @@ impl FrameContext {
         })
     }
 
-    pub(crate) fn render(
+    pub fn render(
         &mut self,
         pkt: FrameRenderPacket,
         dvc: &DeviceContext,
@@ -178,7 +178,7 @@ impl FrameContext {
         })
     }
 
-    pub(crate) fn present(
+    pub fn present(
         &self,
         pkt: FramePresentPacket,
         display: &DisplayContext,
@@ -186,12 +186,12 @@ impl FrameContext {
         display.present(pkt.texture, &self.render_finished_semaphore)
     }
 
-    pub(crate) fn resize(&mut self, size: &winit::dpi::PhysicalSize<u32>, resource_factory: &ResourceFactory) {
+    pub fn resize(&mut self, size: &winit::dpi::PhysicalSize<u32>, resource_factory: &ResourceFactory) {
         // TODO: Resize the geometry stage as well
         self.lighting_stage.resize(size, resource_factory);
     }
 
-    pub(crate) fn destroy(mut self, cmd_allocator: &mut CommandRecorderAllocator) -> Result<()> {
+    pub fn destroy(mut self, cmd_allocator: &mut CommandRecorderAllocator) -> Result<()> {
         if let Some(postrender_recorder) = self.postrender_recorder.take() {
             cmd_allocator.deallocate(postrender_recorder)?;
         }

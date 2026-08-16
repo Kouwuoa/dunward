@@ -17,7 +17,7 @@ pub(crate) struct ResourceUpdater<'a> {
 }
 
 impl<'a> ResourceUpdater<'a> {
-    pub(crate) fn new(device: &'a ash::Device, command_buffer: &'a vk::CommandBuffer) -> Self {
+    pub fn new(device: &'a ash::Device, command_buffer: &'a vk::CommandBuffer) -> Self {
         Self {
             device,
             command_buffer,
@@ -25,7 +25,7 @@ impl<'a> ResourceUpdater<'a> {
         }
     }
 
-    pub(crate) fn enqueue_update<F>(&mut self, build_update: F, material: &Material)
+    pub fn enqueue_update<F>(&mut self, build_update: F, material: &Material)
     where
         F: FnOnce(&mut ResourceUpdateBuilder),
     {
@@ -34,7 +34,7 @@ impl<'a> ResourceUpdater<'a> {
         self.updates.push(builder.build());
     }
 
-    pub(crate) fn execute_updates(&mut self) {
+    pub fn execute_updates(&mut self) {
         for update in self.updates.drain(..) {
             update.execute(self.device);
         }
@@ -47,7 +47,7 @@ pub(crate) struct ResourceUpdateBuilder<'a> {
 }
 
 impl<'a> ResourceUpdateBuilder<'a> {
-    pub(crate) fn new(material: &Material) -> Self {
+    pub fn new(material: &Material) -> Self {
         let descriptor_writer = DescriptorWriter::default();
         Self {
             descriptor_writer,
@@ -55,7 +55,7 @@ impl<'a> ResourceUpdateBuilder<'a> {
         }
     }
 
-    pub(crate) fn set_render_target_texture(&mut self, texture: &StorageTexture) {
+    pub fn set_render_target_texture(&mut self, texture: &StorageTexture) {
         self.descriptor_writer.write_image(
             0,
             texture.view,

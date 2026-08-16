@@ -29,7 +29,7 @@ pub(crate) struct ResourceFactory {
 }
 
 impl ResourceFactory {
-    pub(crate) fn new(
+    pub fn new(
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         transfer_command_recorder: Arc<TransferCommandRecorder>,
         device: Arc<ash::Device>,
@@ -44,7 +44,7 @@ impl ResourceFactory {
         })
     }
 
-    pub(crate) fn create_color_texture(
+    pub fn create_color_texture(
         &self,
         width: u32,
         height: u32,
@@ -64,7 +64,7 @@ impl ResourceFactory {
         )
     }
 
-    pub(crate) fn create_depth_texture(&self, width: u32, height: u32) -> Result<DepthTexture> {
+    pub fn create_depth_texture(&self, width: u32, height: u32) -> Result<DepthTexture> {
         Texture::new_depth_texture(
             width,
             height,
@@ -73,7 +73,7 @@ impl ResourceFactory {
         )
     }
 
-    pub(crate) fn create_megabuffer(
+    pub fn create_megabuffer(
         &self,
         size: u64,
         alignment: u64,
@@ -89,7 +89,7 @@ impl ResourceFactory {
         )
     }
 
-    pub(crate) fn create_storage_texture(
+    pub fn create_storage_texture(
         &self,
         width: u32,
         height: u32,
@@ -104,7 +104,7 @@ impl ResourceFactory {
         )
     }
 
-    pub(crate) fn create_compute_material_factory(&self) -> Result<MaterialFactory> {
+    pub fn create_compute_material_factory(&self) -> Result<MaterialFactory> {
         let descriptor_set_layout = self.create_compute_descriptor_set_layout()?;
         let pipeline_layout = self.create_compute_pipeline_layout(descriptor_set_layout)?;
         let compute_shader = ComputeShader::new(ShaderId::TestPattern, self.device.clone())?;

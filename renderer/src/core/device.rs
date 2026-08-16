@@ -17,8 +17,8 @@ use super::semaphore::{SemaphoreValue, SignalSemaphore, WaitSemaphore};
 
 /// Main way to submit rendering commands to the GPU.
 pub(crate) struct Device {
-    pub(crate) logical: Arc<ash::Device>,
-    pub(crate) physical: vk::PhysicalDevice,
+    pub logical: Arc<ash::Device>,
+    pub physical: vk::PhysicalDevice,
 
     /// For now, require the graphics queue to support presentation
     graphics_queue: Arc<Queue>,
@@ -27,7 +27,7 @@ pub(crate) struct Device {
 }
 
 impl Device {
-    pub(crate) fn new(
+    pub fn new(
         instance: &Instance,
         surface: Option<(&vk::SurfaceKHR, &ash::khr::surface::Instance)>,
     ) -> Result<Self> {
@@ -60,7 +60,7 @@ impl Device {
         Ok(dev)
     }
 
-    pub(crate) fn submit(
+    pub fn submit(
         &self,
         cmd: vk::CommandBuffer,
         queue: Arc<Queue>,
@@ -133,19 +133,19 @@ impl Device {
         Ok(())
     }
 
-    pub(crate) fn get_present_queue(&self) -> Arc<Queue> {
+    pub fn get_present_queue(&self) -> Arc<Queue> {
         self.graphics_queue.clone()
     }
 
-    pub(crate) fn get_graphics_queue(&self) -> Arc<Queue> {
+    pub fn get_graphics_queue(&self) -> Arc<Queue> {
         self.graphics_queue.clone()
     }
 
-    pub(crate) fn get_compute_queue(&self) -> Arc<Queue> {
+    pub fn get_compute_queue(&self) -> Arc<Queue> {
         self.compute_queue.clone()
     }
 
-    pub(crate) fn get_transfer_queue(&self) -> Arc<Queue> {
+    pub fn get_transfer_queue(&self) -> Arc<Queue> {
         self.transfer_queue.clone()
     }
 

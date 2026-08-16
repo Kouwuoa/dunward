@@ -30,7 +30,7 @@ impl Drop for DescriptorAllocator {
 }
 
 impl DescriptorAllocator {
-    pub(crate) fn new(device: Arc<ash::Device>, initial_sets_per_pool: u32) -> Result<Self> {
+    pub fn new(device: Arc<ash::Device>, initial_sets_per_pool: u32) -> Result<Self> {
         let pool_ratios = [
             DescriptorAllocatorPoolSizeRatio {
                 desc_type: vk::DescriptorType::STORAGE_IMAGE,
@@ -63,7 +63,7 @@ impl DescriptorAllocator {
         })
     }
 
-    pub(crate) fn allocate(&mut self, set_layout: vk::DescriptorSetLayout) -> Result<vk::DescriptorSet> {
+    pub fn allocate(&mut self, set_layout: vk::DescriptorSetLayout) -> Result<vk::DescriptorSet> {
         let set_layouts = [set_layout];
         let mut pool_to_use = self.get_or_create_pool()?;
 
@@ -97,7 +97,7 @@ impl DescriptorAllocator {
     }
 
     /// Reset all pools and mark all "full" pools as "ready" pools
-    pub(crate) fn reset_pools(&mut self) -> Result<()> {
+    pub fn reset_pools(&mut self) -> Result<()> {
         for pool in self.ready_pools.iter() {
             unsafe {
                 self.device
@@ -117,7 +117,7 @@ impl DescriptorAllocator {
     }
 
     /// Destroy all pools currently managed by this allocator. A new pool will need to be created the next time `allocate()` gets called.
-    pub(crate) fn destroy_pools(&mut self) {
+    pub fn destroy_pools(&mut self) {
         for pool in self.ready_pools.drain(..) {
             unsafe {
                 self.device.destroy_descriptor_pool(pool, None);

@@ -12,7 +12,7 @@ pub(crate) struct DescriptorWriter<'a> {
 }
 
 impl<'a> DescriptorWriter<'a> {
-    pub(crate) fn write_buffer(
+    pub fn write_buffer(
         &mut self,
         binding: u32,
         buffer: vk::Buffer,
@@ -31,7 +31,7 @@ impl<'a> DescriptorWriter<'a> {
         self.buffer_infos.push((buffer_info, buffer_write));
     }
 
-    pub(crate) fn write_image(
+    pub fn write_image(
         &mut self,
         binding: u32,
         view: vk::ImageView,
@@ -50,12 +50,12 @@ impl<'a> DescriptorWriter<'a> {
         self.image_infos.push((image_info, image_write));
     }
 
-    pub(crate) fn clear(&mut self) {
+    pub fn clear(&mut self) {
         self.buffer_infos.clear();
         self.image_infos.clear();
     }
 
-    pub(crate) fn update_set(&mut self, device: &ash::Device, set: vk::DescriptorSet) {
+    pub fn update_set(&mut self, device: &ash::Device, set: vk::DescriptorSet) {
         let mut writes = Vec::with_capacity(self.buffer_infos.len() + self.image_infos.len());
         writes.extend(self.buffer_infos.iter().map(|(info, write_template)| {
             vk::WriteDescriptorSet {

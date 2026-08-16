@@ -51,7 +51,7 @@ pub(crate) enum ResourceType {
 }
 
 impl ResourceType {
-    pub(crate) const ALL: &'static [Self] = &[
+    pub const ALL: &'static [Self] = &[
         Self::UniformBuffer,
         Self::StorageBuffer,
         Self::StorageImage,
@@ -59,7 +59,7 @@ impl ResourceType {
         Self::SampledImage,
     ];
 
-    pub(crate) fn descriptor_type(&self) -> vk::DescriptorType {
+    pub fn descriptor_type(&self) -> vk::DescriptorType {
         match self {
             Self::UniformBuffer => vk::DescriptorType::UNIFORM_BUFFER,
             Self::StorageBuffer => vk::DescriptorType::STORAGE_BUFFER,
@@ -69,7 +69,7 @@ impl ResourceType {
         }
     }
 
-    pub(crate) fn descriptor_binding_flags(&self) -> vk::DescriptorBindingFlags {
+    pub fn descriptor_binding_flags(&self) -> vk::DescriptorBindingFlags {
         match self {
             Self::UniformBuffer => {
                 vk::DescriptorBindingFlags::PARTIALLY_BOUND
@@ -95,7 +95,7 @@ impl ResourceType {
         }
     }
 
-    pub(crate) fn descriptor_pool_count(&self) -> u32 {
+    pub fn descriptor_pool_count(&self) -> u32 {
         match self {
             Self::UniformBuffer => 16,
             Self::StorageBuffer => 16,

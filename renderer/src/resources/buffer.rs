@@ -10,8 +10,8 @@ use color_eyre::eyre::{Result, eyre};
 use vk_mem::Alloc;
 
 pub(crate) struct Buffer {
-    pub(crate) buffer: vk::Buffer,
-    pub(crate) size: u64,
+    pub buffer: vk::Buffer,
+    pub size: u64,
     mapped: bool,
 
     allocation: Option<vk_mem::Allocation>,
@@ -20,7 +20,7 @@ pub(crate) struct Buffer {
 }
 
 impl Buffer {
-    pub(crate) fn new(
+    pub fn new(
         size: u64,
         alignment: u64,
         buf_usage: vk::BufferUsageFlags,
@@ -64,7 +64,7 @@ impl Buffer {
         })
     }
 
-    pub(crate) fn write<T>(
+    pub fn write<T>(
         &mut self,
         data: &[T],
         start_offset: usize,

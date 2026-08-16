@@ -29,7 +29,7 @@ impl Instance {
     const ENABLE_VALIDATION_LAYERS: bool = cfg!(debug_assertions);
     const REQUIRED_VALIDATION_LAYERS: &'static [&'static CStr] = &[c"VK_LAYER_KHRONOS_validation"];
 
-    pub(crate) fn new(window: Option<&Window>) -> Result<Self> {
+    pub fn new(window: Option<&Window>) -> Result<Self> {
         let entry = unsafe { ash::Entry::load() }?;
 
         let instance = Self::create_instance(&entry, window)?;
@@ -49,15 +49,15 @@ impl Instance {
         })
     }
 
-    pub(crate) fn inner(&self) -> &ash::Instance {
+    pub fn inner(&self) -> &ash::Instance {
         &self.instance
     }
 
-    pub(crate) fn create_device(&self, surface: &Surface) -> Result<Device> {
+    pub fn create_device(&self, surface: &Surface) -> Result<Device> {
         Device::new(self, Some((&surface.surface, &surface.surface_loader)))
     }
 
-    pub(crate) fn create_surface(&self, window: &Window) -> Result<Surface> {
+    pub fn create_surface(&self, window: &Window) -> Result<Surface> {
         let surface = unsafe {
             ash_window::create_surface(
                 &self.entry,

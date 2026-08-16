@@ -16,7 +16,7 @@ use crate::commands::transfer::TransferCommandRecorder;
 use crate::core::queue::Queue;
 
 #[repr(transparent)]
-pub(crate) struct ColorTexture(pub(crate) Texture);
+pub(crate) struct ColorTexture(pub Texture);
 impl Deref for ColorTexture {
     type Target = Texture;
     fn deref(&self) -> &Self::Target {
@@ -30,7 +30,7 @@ impl DerefMut for ColorTexture {
 }
 
 #[repr(transparent)]
-pub(crate) struct DepthTexture(pub(crate) Texture);
+pub(crate) struct DepthTexture(pub Texture);
 impl Deref for DepthTexture {
     type Target = Texture;
     fn deref(&self) -> &Self::Target {
@@ -44,7 +44,7 @@ impl DerefMut for DepthTexture {
 }
 
 #[repr(transparent)]
-pub(crate) struct StorageTexture(pub(crate) Texture);
+pub(crate) struct StorageTexture(pub Texture);
 impl Deref for StorageTexture {
     type Target = Texture;
     fn deref(&self) -> &Self::Target {
@@ -67,14 +67,14 @@ struct TextureCreateInfo {
 }
 
 pub(crate) struct Texture {
-    pub(crate) image: vk::Image,
-    pub(crate) view: vk::ImageView,
-    pub(crate) format: vk::Format,
-    pub(crate) extent: vk::Extent3D,
-    pub(crate) aspect: vk::ImageAspectFlags,
-    pub(crate) layout: vk::ImageLayout,
-    pub(crate) access_state: TextureAccess,
-    pub(crate) queue_state: TextureQueueState,
+    pub image: vk::Image,
+    pub view: vk::ImageView,
+    pub format: vk::Format,
+    pub extent: vk::Extent3D,
+    pub aspect: vk::ImageAspectFlags,
+    pub layout: vk::ImageLayout,
+    pub access_state: TextureAccess,
+    pub queue_state: TextureQueueState,
 
     /// Determines if the dtor should destroy the vk::ImageView associated with this texture.
     /// If false, this `Texture` will NOT responsible for the lifetime of the `vk::ImageView`.
@@ -100,8 +100,8 @@ pub(crate) enum TextureQueueState {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct TextureAccess {
-    pub(crate) stage_mask: vk::PipelineStageFlags2,
-    pub(crate) access_mask: vk::AccessFlags2,
+    pub stage_mask: vk::PipelineStageFlags2,
+    pub access_mask: vk::AccessFlags2,
 }
 
 impl Texture {
@@ -176,7 +176,7 @@ impl Texture {
     }
 
     /// Create a 32-bit shader-readable texture from a byte array
-    pub(crate) fn new_color_texture_from_bytes(
+    pub fn new_color_texture_from_bytes(
         width: u32,
         height: u32,
         data: Option<&[u8]>,
@@ -210,7 +210,7 @@ impl Texture {
         Ok(ColorTexture(image))
     }
 
-    pub(crate) fn new_color_texture_from_image(
+    pub fn new_color_texture_from_image(
         image: &image::DynamicImage,
         use_dedicated_memory: bool,
         usage: vk::ImageUsageFlags,
@@ -235,7 +235,7 @@ impl Texture {
 
     /// # Arguments
     /// * `destroy_view` - If false, this function creates a `ColorTexture` that is NOT responsible for the lifetime of the `vk::ImageView`
-    pub(crate) fn new_color_texture_from_vkimage(
+    pub fn new_color_texture_from_vkimage(
         image: &vk::Image,
         view: &vk::ImageView,
         format: &vk::Format,
@@ -269,7 +269,7 @@ impl Texture {
     }
 
     /// Create a special type of texture used for the depth buffer
-    pub(crate) fn new_depth_texture(
+    pub fn new_depth_texture(
         width: u32,
         height: u32,
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
@@ -294,7 +294,7 @@ impl Texture {
     }
 
     /// Create a special type of texture likely used by compute shaders
-    pub(crate) fn new_storage_texture(
+    pub fn new_storage_texture(
         width: u32,
         height: u32,
         use_dedicated_memory: bool,
@@ -323,15 +323,15 @@ impl Texture {
         Ok(StorageTexture(image))
     }
 
-    pub(crate) fn width(&self) -> u32 {
+    pub fn width(&self) -> u32 {
         self.extent.width
     }
 
-    pub(crate) fn height(&self) -> u32 {
+    pub fn height(&self) -> u32 {
         self.extent.height
     }
 
-    pub(crate) fn blit_to_vkimage(
+    pub fn blit_to_vkimage(
         &self,
         dst_image: vk::Image,
         dst_image_extent: vk::Extent2D,
@@ -350,7 +350,7 @@ impl Texture {
         );
     }
 
-    pub(crate) fn blit_to(&mut self, dst: &mut Texture, cmd: vk::CommandBuffer) {
+    pub fn blit_to(&mut self, dst: &mut Texture, cmd: vk::CommandBuffer) {
         self.blit_to_vkimage(
             dst.image,
             vk::Extent2D {

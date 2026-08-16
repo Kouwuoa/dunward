@@ -14,13 +14,13 @@ use crate::display::PresentTextureBundle;
 /// context and storage are used, and it is lightweight enough to be cheap to create and pass around.
 /// It is not meant to be stored or used outside the scope of a single frame render call
 pub(crate) struct FrameRenderPacket<'a> {
-    pub(crate) camera: &'a crate::Camera,
-    pub(crate) target_size: winit::dpi::PhysicalSize<u32>,
-    pub(crate) frame_index: usize,
-    pub(crate) frame_number: u64,
-    pub(crate) time_start: Instant,
+    pub camera: &'a crate::Camera,
+    pub target_size: winit::dpi::PhysicalSize<u32>,
+    pub frame_index: usize,
+    pub frame_number: u64,
+    pub time_start: Instant,
 }
 
 pub(crate) struct FramePresentPacket {
-    pub(crate) texture: PresentTextureBundle,
+    pub texture: PresentTextureBundle,
 }

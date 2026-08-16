@@ -29,12 +29,12 @@ pub(crate) struct TransferCommandRecorder {
     command_pool: vk::CommandPool,
     command_buffer: vk::CommandBuffer,
 
-    pub(crate) transfer_queue: Arc<Queue>,
+    pub transfer_queue: Arc<Queue>,
     device: Arc<ash::Device>,
 }
 
 impl TransferCommandRecorder {
-    pub(crate) fn new(transfer_queue: Arc<Queue>, device: Arc<ash::Device>) -> Result<Self> {
+    pub fn new(transfer_queue: Arc<Queue>, device: Arc<ash::Device>) -> Result<Self> {
         assert!(transfer_queue.family.supports_transfer());
 
         let transfer_fence_info = vk::FenceCreateInfo::default();
@@ -63,7 +63,7 @@ impl TransferCommandRecorder {
 
     // Instantly execute some commands to the GPU without dealing with the render loop and other synchronization
     // This is great for compute calculations and can be used from a background thread separated from the render loop
-    pub(crate) fn immediate_submit<F>(&self, func: F) -> Result<()>
+    pub fn immediate_submit<F>(&self, func: F) -> Result<()>
     where
         F: FnOnce(vk::CommandBuffer, &ash::Device) -> Result<()>,
     {

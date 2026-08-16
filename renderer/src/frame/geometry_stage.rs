@@ -31,9 +31,10 @@ pub(crate) struct FrameGeometryStage {
 }
 
 impl FrameGeometryStage {
+    #[allow(dead_code)]
     const TIMELINE_SEM_SIGNAL_VALUE: u64 = 1; // TODO: ignored for now
 
-    pub(crate) fn new(
+    pub fn new(
         dvc_ctx: &DeviceContext,
         cmd_allocator: &mut CommandRecorderAllocator,
         resource_store: &ResourceStore,

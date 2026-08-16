@@ -25,15 +25,15 @@ use crate::resources::descriptors::DescriptorAllocator;
 /// You only need to create a Material once, and then you can use it to render multiple objects.
 /// You only need to switch the Material when you want to change the shader or pipeline.
 pub(crate) struct Material {
-    pub(crate) pipeline: vk::Pipeline,
-    pub(crate) pipeline_layout: vk::PipelineLayout,
-    pub(crate) pipeline_bind_point: vk::PipelineBindPoint,
-    pub(crate) descriptor_set: vk::DescriptorSet,
+    pub pipeline: vk::Pipeline,
+    pub pipeline_layout: vk::PipelineLayout,
+    pub pipeline_bind_point: vk::PipelineBindPoint,
+    pub descriptor_set: vk::DescriptorSet,
     device: Arc<ash::Device>,
 }
 
 impl Material {
-    pub(crate) fn update_push_constants(&self, command_buffer: vk::CommandBuffer, data: &[u8]) {
+    pub fn update_push_constants(&self, command_buffer: vk::CommandBuffer, data: &[u8]) {
         unsafe {
             self.device.cmd_push_constants(
                 command_buffer,
@@ -45,7 +45,7 @@ impl Material {
         }
     }
 
-    pub(crate) fn bind(&self, command_buffer: vk::CommandBuffer) {
+    pub fn bind(&self, command_buffer: vk::CommandBuffer) {
         unsafe {
             self.device.cmd_bind_pipeline(
                 command_buffer,
@@ -66,17 +66,17 @@ impl Material {
 }
 
 pub(crate) struct MaterialFactory {
-    pub(crate) pipeline: vk::Pipeline,
-    pub(crate) pipeline_layout: vk::PipelineLayout,
-    pub(crate) pipeline_bind_point: vk::PipelineBindPoint,
-    pub(crate) descriptor_set_layout: vk::DescriptorSetLayout,
+    pub pipeline: vk::Pipeline,
+    pub pipeline_layout: vk::PipelineLayout,
+    pub pipeline_bind_point: vk::PipelineBindPoint,
+    pub descriptor_set_layout: vk::DescriptorSetLayout,
 
     device: Arc<ash::Device>,
     descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
 }
 
 impl MaterialFactory {
-    pub(crate) fn create_material(&'_ mut self) -> Result<Material> {
+    pub fn create_material(&'_ mut self) -> Result<Material> {
         let descriptor_set = self.allocate_descriptor_set()?;
         Ok(Material {
             pipeline: self.pipeline,

@@ -19,7 +19,7 @@ use crate::resources::store::ResourceStore;
 use crate::resources::texture::{StorageTexture, TextureAccess};
 
 pub(crate) struct FrameLightingStageOutput<'a> {
-    pub(crate) target_tex: &'a mut StorageTexture,
+    pub target_tex: &'a mut StorageTexture,
 }
 
 pub(crate) struct FrameLightingStage {
@@ -33,7 +33,7 @@ pub(crate) struct FrameLightingStage {
 }
 
 impl FrameLightingStage {
-    pub(crate) fn new(
+    pub fn new(
         dvc_ctx: &DeviceContext,
         display_ctx: &DisplayContext,
         cmd_allocator: &mut CommandRecorderAllocator,
@@ -63,7 +63,7 @@ impl FrameLightingStage {
         })
     }
 
-    pub(crate) fn render(
+    pub fn render(
         &mut self,
         pkt: FrameRenderPacket,
         dvc: &DeviceContext,
@@ -155,7 +155,7 @@ impl FrameLightingStage {
         })
     }
 
-    pub(crate) fn resize(&mut self, size: &winit::dpi::PhysicalSize<u32>, resource_factory: &ResourceFactory) {
+    pub fn resize(&mut self, size: &winit::dpi::PhysicalSize<u32>, resource_factory: &ResourceFactory) {
         self.target_tex = resource_factory
             .create_storage_texture(size.width, size.height, true)
             .unwrap();

@@ -12,16 +12,16 @@ use crate::material::shader_data::PerVertexData;
 
 #[derive(Debug)]
 pub(crate) struct Vertex {
-    pub(crate) position: Vec3,
-    pub(crate) normal: Vec3,
-    pub(crate) color: Vec3,
-    pub(crate) texcoord: Vec2,
+    pub position: Vec3,
+    pub normal: Vec3,
+    pub color: Vec3,
+    pub texcoord: Vec2,
 }
 
 pub(crate) struct VertexInputDescription {
-    pub(crate) bindings: Vec<vk::VertexInputBindingDescription>,
-    pub(crate) attributes: Vec<vk::VertexInputAttributeDescription>,
-    pub(crate) flags: vk::PipelineVertexInputStateCreateFlags,
+    pub bindings: Vec<vk::VertexInputBindingDescription>,
+    pub attributes: Vec<vk::VertexInputAttributeDescription>,
+    pub flags: vk::PipelineVertexInputStateCreateFlags,
 }
 
 impl Default for VertexInputDescription {
@@ -31,14 +31,14 @@ impl Default for VertexInputDescription {
 }
 
 impl Vertex {
-    pub(crate) fn as_shader_data(&self) -> PerVertexData {
+    pub fn as_shader_data(&self) -> PerVertexData {
         PerVertexData {
             position: self.position,
             texcoord: self.texcoord,
         }
     }
 
-    pub(crate) fn get_input_description() -> VertexInputDescription {
+    pub fn get_input_description() -> VertexInputDescription {
         let bindings = vec![vk::VertexInputBindingDescription {
             binding: 0,
             stride: size_of::<Vertex>() as u32,

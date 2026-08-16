@@ -20,27 +20,27 @@ pub(crate) enum SemaphoreValue {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct WaitSemaphore {
-    pub(crate) semaphore: vk::Semaphore,
-    pub(crate) stage_mask: vk::PipelineStageFlags,
-    pub(crate) value: SemaphoreValue,
+    pub semaphore: vk::Semaphore,
+    pub stage_mask: vk::PipelineStageFlags,
+    pub value: SemaphoreValue,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct SignalSemaphore {
-    pub(crate) semaphore: vk::Semaphore,
-    pub(crate) value: SemaphoreValue,
+    pub semaphore: vk::Semaphore,
+    pub value: SemaphoreValue,
 }
 
 impl BinarySemaphore {
-    pub(crate) fn new(sem: vk::Semaphore) -> Self {
+    pub fn new(sem: vk::Semaphore) -> Self {
         Self(sem)
     }
 
-    pub(crate) fn raw(&self) -> vk::Semaphore {
+    pub fn raw(&self) -> vk::Semaphore {
         self.0
     }
 
-    pub(crate) fn to_wait_semaphore(&self, stage_mask: vk::PipelineStageFlags) -> WaitSemaphore {
+    pub fn to_wait_semaphore(&self, stage_mask: vk::PipelineStageFlags) -> WaitSemaphore {
         WaitSemaphore {
             semaphore: self.0,
             stage_mask,
@@ -48,7 +48,7 @@ impl BinarySemaphore {
         }
     }
 
-    pub(crate) fn to_signal_semaphore(&self) -> SignalSemaphore {
+    pub fn to_signal_semaphore(&self) -> SignalSemaphore {
         SignalSemaphore {
             semaphore: self.0,
             value: SemaphoreValue::Binary,
@@ -57,15 +57,15 @@ impl BinarySemaphore {
 }
 
 impl TimelineSemaphore {
-    pub(crate) fn new(sem: vk::Semaphore) -> Self {
+    pub fn new(sem: vk::Semaphore) -> Self {
         Self(sem)
     }
 
-    pub(crate) fn raw(&self) -> vk::Semaphore {
+    pub fn raw(&self) -> vk::Semaphore {
         self.0
     }
 
-    pub(crate) fn to_wait_semaphore(
+    pub fn to_wait_semaphore(
         &self,
         stage_mask: vk::PipelineStageFlags,
         value: u64,
@@ -77,7 +77,7 @@ impl TimelineSemaphore {
         }
     }
 
-    pub(crate) fn to_signal_semaphore(&self, value: u64) -> SignalSemaphore {
+    pub fn to_signal_semaphore(&self, value: u64) -> SignalSemaphore {
         SignalSemaphore {
             semaphore: self.0,
             value: SemaphoreValue::Timeline(value),

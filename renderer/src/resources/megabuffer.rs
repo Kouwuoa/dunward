@@ -341,14 +341,14 @@ pub(crate) struct AllocatedMegabufferRegion {
 }
 
 impl AllocatedMegabufferRegion {
-    pub(crate) fn write<T>(&mut self, data: &[T]) -> Result<presser::CopyRecord>
+    pub fn write<T>(&mut self, data: &[T]) -> Result<presser::CopyRecord>
     where
         T: Copy,
     {
         self.parent_megabuffer.as_ref().unwrap().write(data, self)
     }
 
-    pub(crate) fn suballocate_region(&mut self, size: u64) -> Result<AllocatedMegabufferRegion> {
+    pub fn suballocate_region(&mut self, size: u64) -> Result<AllocatedMegabufferRegion> {
         let size = self
             .parent_megabuffer
             .as_ref()
@@ -375,15 +375,15 @@ impl AllocatedMegabufferRegion {
         Ok(subregion)
     }
 
-    pub(crate) fn belongs_to_same_megabuffer(&self, other: &Self) -> bool {
+    pub fn belongs_to_same_megabuffer(&self, other: &Self) -> bool {
         self.parent_megabuffer == other.parent_megabuffer
     }
 
-    pub(crate) fn belongs_to_megabuffer(&self, megabuffer: &Megabuffer) -> bool {
+    pub fn belongs_to_megabuffer(&self, megabuffer: &Megabuffer) -> bool {
         self.parent_megabuffer.as_ref().unwrap() == megabuffer
     }
 
-    pub(crate) fn is_adjacent_to(&self, other: &Self) -> bool {
+    pub fn is_adjacent_to(&self, other: &Self) -> bool {
         if !self.belongs_to_same_megabuffer(other) {
             return false;
         }
@@ -397,7 +397,7 @@ impl AllocatedMegabufferRegion {
         left_offset + left_size == right_offset
     }
 
-    pub(crate) fn merge_adjacent_region(&mut self, other: Self) -> Result<()> {
+    pub fn merge_adjacent_region(&mut self, other: Self) -> Result<()> {
         if self.belongs_to_same_megabuffer(&other) {
             return Err(eyre!(
                 "Cannot combine regions belonging to different megabuffers"

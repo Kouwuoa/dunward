@@ -23,21 +23,21 @@ const UNIFORM_BUFFER_ALIGNMENT: u64 = 256;
 
 /// Owns resource lifetimes/data
 pub(crate) struct ResourceStore {
-    pub(crate) storage_textures: Vec<StorageTexture>,
-    pub(crate) sampled_textures: Vec<ColorTexture>,
-    pub(crate) samplers: Vec<vk::Sampler>,
+    pub storage_textures: Vec<StorageTexture>,
+    pub sampled_textures: Vec<ColorTexture>,
+    pub samplers: Vec<vk::Sampler>,
 
-    pub(crate) vertex_megabuffer: Megabuffer,
-    pub(crate) index_megabuffer: Megabuffer,
-    pub(crate) per_frame_megabuffer: Megabuffer,
-    pub(crate) per_material_megabuffer: Megabuffer,
-    pub(crate) per_object_megabuffer: Megabuffer,
+    pub vertex_megabuffer: Megabuffer,
+    pub index_megabuffer: Megabuffer,
+    pub per_frame_megabuffer: Megabuffer,
+    pub per_material_megabuffer: Megabuffer,
+    pub per_object_megabuffer: Megabuffer,
 
-    pub(crate) compute_material_factory: MaterialFactory,
+    pub compute_material_factory: MaterialFactory,
 }
 
 impl ResourceStore {
-    pub(crate) fn new(factory: &ResourceFactory) -> Result<Self> {
+    pub fn new(factory: &ResourceFactory) -> Result<Self> {
         log::info!("Creating ResourceStore");
 
         let vertex_megabuffer = factory.create_megabuffer(
@@ -87,7 +87,7 @@ impl ResourceStore {
         })
     }
 
-    pub(crate) fn add_sampler(&mut self, sampler: vk::Sampler) {
+    pub fn add_sampler(&mut self, sampler: vk::Sampler) {
         self.samplers.push(sampler);
     }
 }

@@ -29,7 +29,7 @@ pub(crate) struct DeviceContext {
 }
 
 impl DeviceContext {
-    pub(crate) fn new(window: &winit::window::Window) -> Result<Self> {
+    pub fn new(window: &winit::window::Window) -> Result<Self> {
         log::info!("Creating DeviceContext");
 
         let instance = instance::Instance::new(Some(window))?;
@@ -45,35 +45,35 @@ impl DeviceContext {
         })
     }
 
-    pub(crate) fn instance_handle(&self) -> ash::Instance {
+    pub fn instance_handle(&self) -> ash::Instance {
         self.instance.inner().clone()
     }
 
-    pub(crate) fn logical_device_handle(&self) -> Arc<ash::Device> {
+    pub fn logical_device_handle(&self) -> Arc<ash::Device> {
         self.device.logical.clone()
     }
 
-    pub(crate) fn physical_device_handle(&self) -> vk::PhysicalDevice {
+    pub fn physical_device_handle(&self) -> vk::PhysicalDevice {
         self.device.physical
     }
 
-    pub(crate) fn get_graphics_queue(&self) -> Arc<Queue> {
+    pub fn get_graphics_queue(&self) -> Arc<Queue> {
         self.device.get_graphics_queue()
     }
 
-    pub(crate) fn get_present_queue(&self) -> Arc<Queue> {
+    pub fn get_present_queue(&self) -> Arc<Queue> {
         self.device.get_present_queue()
     }
 
-    pub(crate) fn get_compute_queue(&self) -> Arc<Queue> {
+    pub fn get_compute_queue(&self) -> Arc<Queue> {
         self.device.get_compute_queue()
     }
 
-    pub(crate) fn get_transfer_queue(&self) -> Arc<Queue> {
+    pub fn get_transfer_queue(&self) -> Arc<Queue> {
         self.device.get_transfer_queue()
     }
 
-    pub(crate) fn create_binary_semaphore(&self) -> Result<BinarySemaphore> {
+    pub fn create_binary_semaphore(&self) -> Result<BinarySemaphore> {
         Ok(BinarySemaphore::new(unsafe {
             self.device
                 .logical
@@ -81,7 +81,7 @@ impl DeviceContext {
         }))
     }
 
-    pub(crate) fn create_timeline_semaphore(&self) -> Result<TimelineSemaphore> {
+    pub fn create_timeline_semaphore(&self) -> Result<TimelineSemaphore> {
         Ok(TimelineSemaphore::new(unsafe {
             self.device.logical.create_semaphore(
                 &vk::SemaphoreCreateInfo::default().push_next(&mut vk::SemaphoreTypeCreateInfo {
@@ -94,7 +94,7 @@ impl DeviceContext {
         }))
     }
 
-    pub(crate) fn wait_timeline_semaphore(
+    pub fn wait_timeline_semaphore(
         &self,
         semaphore: vk::Semaphore,
         value: u64,
@@ -112,7 +112,7 @@ impl DeviceContext {
         Ok(())
     }
 
-    pub(crate) fn wait_and_reset_fence(&self, fence: vk::Fence, timeout: Duration) -> Result<()> {
+    pub fn wait_and_reset_fence(&self, fence: vk::Fence, timeout: Duration) -> Result<()> {
         unsafe {
             let fences = [fence];
             self.device
@@ -123,11 +123,11 @@ impl DeviceContext {
         Ok(())
     }
 
-    pub(crate) fn wait_device_idle(&self) -> Result<()> {
+    pub fn wait_device_idle(&self) -> Result<()> {
         Ok(unsafe { self.device.logical.device_wait_idle()? })
     }
 
-    pub(crate) fn create_display_context(
+    pub fn create_display_context(
         &self,
         window: &winit::window::Window,
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
@@ -135,7 +135,7 @@ impl DeviceContext {
         DisplayContext::new(window, self, memory_allocator)
     }
 
-    pub(crate) fn submit(
+    pub fn submit(
         &self,
         cmd_recorder: CommandRecorder<Executable>,
         wait_semaphores: &[WaitSemaphore],
@@ -151,19 +151,19 @@ impl DeviceContext {
         Ok(CommandRecorder::<Idle>::new_from_old(cmd_recorder))
     }
 
-    pub(crate) fn create_vk_image_view(&self, info: &vk::ImageViewCreateInfo) -> Result<vk::ImageView> {
+    pub fn create_vk_image_view(&self, info: &vk::ImageViewCreateInfo) -> Result<vk::ImageView> {
         Ok(unsafe { self.device.logical.create_image_view(info, None)? })
     }
 
-    pub(crate) fn create_vk_sampler(&self, info: &vk::SamplerCreateInfo) -> Result<vk::Sampler> {
+    pub fn create_vk_sampler(&self, info: &vk::SamplerCreateInfo) -> Result<vk::Sampler> {
         Ok(unsafe { self.device.logical.create_sampler(info, None)? })
     }
 
-    pub(crate) fn create_vk_fence(&self, info: &vk::FenceCreateInfo) -> Result<vk::Fence> {
+    pub fn create_vk_fence(&self, info: &vk::FenceCreateInfo) -> Result<vk::Fence> {
         Ok(unsafe { self.device.logical.create_fence(info, None)? })
     }
 
-    pub(crate) fn create_vk_swapchain_loader(&self) -> ash::khr::swapchain::Device {
+    pub fn create_vk_swapchain_loader(&self) -> ash::khr::swapchain::Device {
         ash::khr::swapchain::Device::new(self.instance.inner(), &self.device.logical)
     }
 }

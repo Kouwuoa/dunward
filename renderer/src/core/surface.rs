@@ -11,14 +11,14 @@ use crate::core::DeviceContext;
 use crate::core::device::Device;
 
 pub(crate) struct Surface {
-    pub(crate) surface: vk::SurfaceKHR,
-    pub(crate) surface_loader: ash::khr::surface::Instance,
-    pub(crate) surface_formats: Vec<vk::SurfaceFormatKHR>,
-    pub(crate) surface_present_modes: Vec<vk::PresentModeKHR>,
+    pub surface: vk::SurfaceKHR,
+    pub surface_loader: ash::khr::surface::Instance,
+    pub surface_formats: Vec<vk::SurfaceFormatKHR>,
+    pub surface_present_modes: Vec<vk::PresentModeKHR>,
 }
 
 impl Surface {
-    pub(crate) fn generate_surface_present_modes(
+    pub fn generate_surface_present_modes(
         &mut self,
         dev: &Device,
     ) -> Result<&Vec<vk::PresentModeKHR>> {
@@ -34,7 +34,7 @@ impl Surface {
         Ok(&self.surface_present_modes)
     }
 
-    pub(crate) fn generate_surface_formats(
+    pub fn generate_surface_formats(
         &mut self,
         dev: &Device,
     ) -> Result<&Vec<vk::SurfaceFormatKHR>> {
@@ -53,11 +53,11 @@ impl Surface {
 
 /// Surface-related methods for DeviceContext
 impl DeviceContext {
-    pub(crate) fn raw_surface_handle(&self) -> vk::SurfaceKHR {
+    pub fn raw_surface_handle(&self) -> vk::SurfaceKHR {
         self.surface.surface
     }
 
-    pub(crate) fn get_physical_device_surface_capabilities(
+    pub fn get_physical_device_surface_capabilities(
         &self,
     ) -> Result<vk::SurfaceCapabilitiesKHR> {
         Ok(unsafe {
@@ -70,7 +70,7 @@ impl DeviceContext {
         })
     }
 
-    pub(crate) fn find_suitable_surface_format(&self) -> Result<vk::SurfaceFormatKHR> {
+    pub fn find_suitable_surface_format(&self) -> Result<vk::SurfaceFormatKHR> {
         self.surface
             .surface_formats
             .iter()
@@ -82,7 +82,7 @@ impl DeviceContext {
             .ok_or_eyre("No suitable surface format found")
     }
 
-    pub(crate) fn find_suitable_surface_present_mode(&self) -> vk::PresentModeKHR {
+    pub fn find_suitable_surface_present_mode(&self) -> vk::PresentModeKHR {
         *self
             .surface
             .surface_present_modes

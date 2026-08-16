@@ -20,7 +20,7 @@ pub(crate) struct FullscreenQuad {
 }
 
 impl FullscreenQuad {
-    pub(crate) fn new(
+    pub fn new(
         vertex_megabuffer: &Megabuffer,
         index_megabuffer: &Megabuffer,
         display: &DisplayContext,
@@ -37,7 +37,7 @@ impl FullscreenQuad {
         Ok(quad)
     }
 
-    pub(crate) fn resize_to_display(
+    pub fn resize_to_display(
         &mut self,
         display_ctx: &DisplayContext,
         vertex_megabuffer: &Megabuffer,
@@ -87,7 +87,7 @@ pub(crate) struct Model {
 }
 
 impl Model {
-    pub(crate) fn new(
+    pub fn new(
         meshes: Vec<Mesh>,
         vertex_megabuffer: &Megabuffer,
         index_megabuffer: &Megabuffer,
@@ -147,7 +147,7 @@ impl Model {
         })
     }
 
-    pub(crate) fn write_vertex_buffer(
+    pub fn write_vertex_buffer(
         &mut self,
         vertices: &[PerVertexData],
         vertex_megabuffer: &Megabuffer,
@@ -166,11 +166,11 @@ impl Model {
         Ok(())
     }
 
-    pub(crate) fn get_vertices_merged(&self) -> Vec<&Vertex> {
+    pub fn get_vertices_merged(&self) -> Vec<&Vertex> {
         self.meshes.iter().flat_map(|m| m.vertices.iter()).collect()
     }
 
-    pub(crate) fn get_indices_merged(&self) -> Option<Vec<&u32>> {
+    pub fn get_indices_merged(&self) -> Option<Vec<&u32>> {
         if self.index_megabuffer_region.is_some() {
             Some(
                 self.meshes
@@ -183,7 +183,7 @@ impl Model {
         }
     }
 
-    pub(crate) fn get_meshes(&self) -> &Vec<Mesh> {
+    pub fn get_meshes(&self) -> &Vec<Mesh> {
         &self.meshes
     }
 }
