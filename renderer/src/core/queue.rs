@@ -6,26 +6,26 @@
 use ash::vk;
 use std::hash::Hash;
 
-pub struct Queue {
-    pub family: QueueFamily,
-    pub handle: vk::Queue,
+pub(crate) struct Queue {
+    pub(crate) family: QueueFamily,
+    pub(crate) handle: vk::Queue,
 }
 
 impl Queue {
-    pub fn new(family: QueueFamily, handle: vk::Queue) -> Self {
+    pub(crate) fn new(family: QueueFamily, handle: vk::Queue) -> Self {
         Self { family, handle }
     }
 }
 
 #[derive(Clone)]
-pub struct QueueFamily {
-    pub index: u32,
-    pub properties: vk::QueueFamilyProperties,
+pub(crate) struct QueueFamily {
+    pub(crate) index: u32,
+    pub(crate) properties: vk::QueueFamilyProperties,
     supports_present: bool,
 }
 
 impl QueueFamily {
-    pub fn new(index: u32, properties: vk::QueueFamilyProperties, supports_present: bool) -> Self {
+    pub(crate) fn new(index: u32, properties: vk::QueueFamilyProperties, supports_present: bool) -> Self {
         Self {
             index,
             properties,
@@ -33,29 +33,29 @@ impl QueueFamily {
         }
     }
 
-    pub fn supports_present(&self) -> bool {
+    pub(crate) fn supports_present(&self) -> bool {
         self.supports_present
     }
 
-    pub fn supports_graphics(&self) -> bool {
+    pub(crate) fn supports_graphics(&self) -> bool {
         self.properties
             .queue_flags
             .contains(vk::QueueFlags::GRAPHICS)
     }
 
-    pub fn supports_compute(&self) -> bool {
+    pub(crate) fn supports_compute(&self) -> bool {
         self.properties
             .queue_flags
             .contains(vk::QueueFlags::COMPUTE)
     }
 
-    pub fn supports_transfer(&self) -> bool {
+    pub(crate) fn supports_transfer(&self) -> bool {
         self.properties
             .queue_flags
             .contains(vk::QueueFlags::TRANSFER)
     }
 
-    pub fn supports_sparse_binding(&self) -> bool {
+    pub(crate) fn supports_sparse_binding(&self) -> bool {
         self.properties
             .queue_flags
             .contains(vk::QueueFlags::SPARSE_BINDING)

@@ -3,18 +3,19 @@
 //! Manages multiple pooled [`ash::vk::DescriptorPool`] instances, automatically
 //! allocating new pools when full and reusing pools across frames.
 
+use std::sync::Arc;
+
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
-use std::sync::Arc;
 
 #[derive(Debug, Clone)]
-pub struct DescriptorAllocatorPoolSizeRatio {
-    pub desc_type: vk::DescriptorType,
-    pub ratio: f32,
+struct DescriptorAllocatorPoolSizeRatio {
+    desc_type: vk::DescriptorType,
+    ratio: f32,
 }
 
-pub struct DescriptorAllocator {
+pub(crate) struct DescriptorAllocator {
     pool_ratios: Vec<DescriptorAllocatorPoolSizeRatio>, // Needed to reallocate pools
     full_pools: Vec<vk::DescriptorPool>,                // Pools that cannot allocate more sets
     ready_pools: Vec<vk::DescriptorPool>,               // Pools that can allocate more sets
@@ -29,7 +30,7 @@ impl Drop for DescriptorAllocator {
 }
 
 impl DescriptorAllocator {
-    pub fn new(device: Arc<ash::Device>, initial_sets_per_pool: u32) -> Result<Self> {
+    pub(crate) fn new(device: Arc<ash::Device>, initial_sets_per_pool: u32) -> Result<Self> {
         let pool_ratios = [
             DescriptorAllocatorPoolSizeRatio {
                 desc_type: vk::DescriptorType::STORAGE_IMAGE,
@@ -62,7 +63,7 @@ impl DescriptorAllocator {
         })
     }
 
-    pub fn allocate(&mut self, set_layout: vk::DescriptorSetLayout) -> Result<vk::DescriptorSet> {
+    pub(crate) fn allocate(&mut self, set_layout: vk::DescriptorSetLayout) -> Result<vk::DescriptorSet> {
         let set_layouts = [set_layout];
         let mut pool_to_use = self.get_or_create_pool()?;
 
@@ -96,7 +97,7 @@ impl DescriptorAllocator {
     }
 
     /// Reset all pools and mark all "full" pools as "ready" pools
-    pub fn reset_pools(&mut self) -> Result<()> {
+    pub(crate) fn reset_pools(&mut self) -> Result<()> {
         for pool in self.ready_pools.iter() {
             unsafe {
                 self.device
@@ -116,7 +117,7 @@ impl DescriptorAllocator {
     }
 
     /// Destroy all pools currently managed by this allocator. A new pool will need to be created the next time `allocate()` gets called.
-    pub fn destroy_pools(&mut self) {
+    pub(crate) fn destroy_pools(&mut self) {
         for pool in self.ready_pools.drain(..) {
             unsafe {
                 self.device.destroy_descriptor_pool(pool, None);

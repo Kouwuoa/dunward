@@ -1,9 +1,9 @@
 //! Vulkan descriptor set allocators, layout builders, and write helpers.
 
-pub mod allocator;
-pub mod layout_builder;
-pub mod writer;
+pub(crate) mod allocator;
+pub(crate) mod layout_builder;
+pub(crate) mod writer;
 
-pub use allocator::DescriptorAllocator;
-pub use layout_builder::DescriptorSetLayoutBuilder;
-pub use writer::DescriptorWriter;
+pub(crate) use allocator::DescriptorAllocator;
+pub(crate) use layout_builder::DescriptorSetLayoutBuilder;
+pub(crate) use writer::DescriptorWriter;

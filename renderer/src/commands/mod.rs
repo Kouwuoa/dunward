@@ -3,10 +3,10 @@
 //! Exposes [`CommandRecorderAllocator`] for command pool and buffer management,
 //! [`CommandRecorder`] for recording GPU commands, and [`TransferCommandRecorder`] for synchronous GPU uploads.
 
-pub mod allocator;
-pub mod recorder;
-pub mod transfer;
+pub(crate) mod allocator;
+pub(crate) mod recorder;
+pub(crate) mod transfer;
 
-pub use allocator::CommandRecorderAllocator;
-pub use recorder::{CommandRecorder, Executable, Idle, Recording};
-pub use transfer::TransferCommandRecorder;
+pub(crate) use allocator::CommandRecorderAllocator;
+pub(crate) use recorder::{CommandRecorder, Executable, Idle, Recording};
+pub(crate) use transfer::TransferCommandRecorder;

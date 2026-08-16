@@ -10,16 +10,16 @@
 //! - [`frame`]: Per-frame synchronization, multi-buffering, and rendering stages.
 //! - [`renderer`]: Top-level engine orchestrator ([`Renderer`]).
 
-pub mod camera;
-pub mod commands;
-pub mod core;
-pub mod display;
-pub mod frame;
-pub mod material;
-pub mod renderer;
-pub mod resources;
-pub mod scene;
-pub mod utils;
+pub(crate) mod camera;
+pub(crate) mod commands;
+pub(crate) mod core;
+pub(crate) mod display;
+pub(crate) mod frame;
+pub(crate) mod material;
+pub(crate) mod renderer;
+pub(crate) mod resources;
+pub(crate) mod scene;
+pub(crate) mod utils;
 
 pub use camera::Camera;
 pub use glam;

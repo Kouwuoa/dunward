@@ -3,13 +3,18 @@
 //! Exposes [`FrameContext`], orchestrating per-frame synchronization fences, semaphores,
 //! stage execution ([`FrameGeometryStage`], [`FrameLightingStage`]), and blitting to display images.
 
-pub mod geometry_stage;
-pub mod lighting_stage;
-pub mod packet;
+pub(crate) mod geometry_stage;
+pub(crate) mod lighting_stage;
+pub(crate) mod packet;
 
-pub use geometry_stage::FrameGeometryStage;
-pub use lighting_stage::FrameLightingStage;
-pub use packet::{FramePresentPacket, FrameRenderPacket};
+pub(crate) use geometry_stage::FrameGeometryStage;
+pub(crate) use lighting_stage::FrameLightingStage;
+pub(crate) use packet::{FramePresentPacket, FrameRenderPacket};
+
+use std::time::Duration;
+
+use ash::vk;
+use color_eyre::eyre::Result;
 
 use crate::commands::allocator::{CommandRecorderAllocator, CommandRecorderAllocatorExt};
 use crate::commands::recorder::{CommandRecorder, Idle};
@@ -19,11 +24,8 @@ use crate::display::{DisplayContext, DisplayPresentError};
 use crate::resources::factory::ResourceFactory;
 use crate::resources::store::ResourceStore;
 use crate::resources::texture::TextureAccess;
-use ash::vk;
-use color_eyre::eyre::Result;
-use std::time::Duration;
 
-pub struct FrameContext {
+pub(crate) struct FrameContext {
     #[allow(dead_code)]
     geometry_stage: FrameGeometryStage,
     lighting_stage: FrameLightingStage,
@@ -36,7 +38,7 @@ pub struct FrameContext {
 }
 
 impl FrameContext {
-    pub fn new(
+    pub(crate) fn new(
         dvc_ctx: &mut DeviceContext,
         display_ctx: &DisplayContext,
         cmd_allocator: &mut CommandRecorderAllocator,
@@ -76,7 +78,7 @@ impl FrameContext {
         })
     }
 
-    pub fn render(
+    pub(crate) fn render(
         &mut self,
         pkt: FrameRenderPacket,
         dvc: &DeviceContext,
@@ -177,7 +179,7 @@ impl FrameContext {
         })
     }
 
-    pub fn present(
+    pub(crate) fn present(
         &self,
         pkt: FramePresentPacket,
         display: &DisplayContext,
@@ -185,12 +187,12 @@ impl FrameContext {
         display.present(pkt.texture, &self.render_finished_semaphore)
     }
 
-    pub fn resize(&mut self, size: &winit::dpi::PhysicalSize<u32>, resource_factory: &ResourceFactory) {
+    pub(crate) fn resize(&mut self, size: &winit::dpi::PhysicalSize<u32>, resource_factory: &ResourceFactory) {
         // TODO: Resize the geometry stage as well
         self.lighting_stage.resize(size, resource_factory);
     }
 
-    pub fn destroy(mut self, cmd_allocator: &mut CommandRecorderAllocator) -> Result<()> {
+    pub(crate) fn destroy(mut self, cmd_allocator: &mut CommandRecorderAllocator) -> Result<()> {
         if let Some(postrender_recorder) = self.postrender_recorder.take() {
             cmd_allocator.deallocate(postrender_recorder)?;
         }

@@ -3,8 +3,9 @@
 //! Provides traits like [`GuardResultExt`] for converting poisoned lock errors
 //! on [`std::sync::Mutex`] and [`std::sync::RwLock`] into [`color_eyre::Result`].
 
-use color_eyre::eyre::{Result, eyre};
 use std::sync::{MutexGuard, PoisonError, RwLockReadGuard, RwLockWriteGuard};
+
+use color_eyre::eyre::{Result, eyre};
 
 /// Extension trait for handling results of mutex and rwlock guards, converting poison errors to eyre errors.
 pub(crate) trait GuardResultExt<'a, T> {

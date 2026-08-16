@@ -3,16 +3,18 @@
 //! Configures compute shaders, pipeline layouts, and descriptor set layouts
 //! for compute dispatch workloads.
 
-use super::MaterialFactory;
-use super::shader::ComputeShader;
-use crate::resources::descriptors::DescriptorAllocator;
-use ash::vk;
-use color_eyre::Result;
-use color_eyre::eyre::{OptionExt, eyre};
 use std::ffi::CString;
 use std::sync::{Arc, Mutex};
 
-pub struct ComputeMaterialFactoryBuilder {
+use ash::vk;
+use color_eyre::Result;
+use color_eyre::eyre::{OptionExt, eyre};
+
+use super::MaterialFactory;
+use super::shader::ComputeShader;
+use crate::resources::descriptors::DescriptorAllocator;
+
+pub(crate) struct ComputeMaterialFactoryBuilder {
     shader: Option<ComputeShader>,
     pipeline_layout: Option<vk::PipelineLayout>,
     descriptor_set_layout: Option<vk::DescriptorSetLayout>,
@@ -22,7 +24,7 @@ pub struct ComputeMaterialFactoryBuilder {
 }
 
 impl ComputeMaterialFactoryBuilder {
-    pub fn new(
+    pub(crate) fn new(
         device: Arc<ash::Device>,
         descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
     ) -> Self {
@@ -35,22 +37,22 @@ impl ComputeMaterialFactoryBuilder {
         }
     }
 
-    pub fn with_shader(mut self, shader: ComputeShader) -> Self {
+    pub(crate) fn with_shader(mut self, shader: ComputeShader) -> Self {
         let _ = self.shader.replace(shader);
         self
     }
 
-    pub fn with_pipeline_layout(mut self, layout: vk::PipelineLayout) -> Self {
+    pub(crate) fn with_pipeline_layout(mut self, layout: vk::PipelineLayout) -> Self {
         let _ = self.pipeline_layout.replace(layout);
         self
     }
 
-    pub fn with_descriptor_set_layout(mut self, layout: vk::DescriptorSetLayout) -> Self {
+    pub(crate) fn with_descriptor_set_layout(mut self, layout: vk::DescriptorSetLayout) -> Self {
         let _ = self.descriptor_set_layout.replace(layout);
         self
     }
 
-    pub fn build(mut self) -> Result<MaterialFactory> {
+    pub(crate) fn build(mut self) -> Result<MaterialFactory> {
         let shader = self
             .shader
             .take()

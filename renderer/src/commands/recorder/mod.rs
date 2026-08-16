@@ -9,21 +9,23 @@ mod barriers;
 mod pipeline;
 mod transfers;
 
-use crate::commands::allocator::CommandRecorderAllocator;
-use crate::core::queue::Queue;
-use ash::vk;
-use color_eyre::Result;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-/// Ready to record
-pub struct Idle;
-/// Currently recording
-pub struct Recording;
-/// Recording finished; can submit
-pub struct Executable;
+use ash::vk;
+use color_eyre::Result;
 
-pub struct CommandRecorder<State> {
+use crate::commands::allocator::CommandRecorderAllocator;
+use crate::core::queue::Queue;
+
+/// Ready to record
+pub(crate) struct Idle;
+/// Currently recording
+pub(crate) struct Recording;
+/// Recording finished; can submit
+pub(crate) struct Executable;
+
+pub(crate) struct CommandRecorder<State> {
     pub(crate) command_buffer: vk::CommandBuffer,
     pub(crate) queue: Arc<Queue>,
     pub(crate) device: Arc<ash::Device>,
@@ -33,16 +35,16 @@ pub struct CommandRecorder<State> {
 }
 
 impl<State> CommandRecorder<State> {
-    pub fn get_queue(&self) -> Arc<Queue> {
+    pub(crate) fn get_queue(&self) -> Arc<Queue> {
         self.queue.clone()
     }
-    pub fn get_command_buffer(&self) -> vk::CommandBuffer {
+    pub(crate) fn get_command_buffer(&self) -> vk::CommandBuffer {
         self.command_buffer
     }
 }
 
 impl CommandRecorder<Idle> {
-    pub fn new(
+    pub(crate) fn new(
         command_buffer: vk::CommandBuffer,
         queue: Arc<Queue>,
         device: Arc<ash::Device>,
@@ -57,7 +59,7 @@ impl CommandRecorder<Idle> {
         }
     }
 
-    pub fn new_from_old(old: CommandRecorder<Executable>) -> Self {
+    pub(crate) fn new_from_old(old: CommandRecorder<Executable>) -> Self {
         Self {
             command_buffer: old.command_buffer,
             queue: old.queue,
@@ -67,7 +69,7 @@ impl CommandRecorder<Idle> {
         }
     }
 
-    pub fn record<F>(self, f: F) -> Result<CommandRecorder<Executable>>
+    pub(crate) fn record<F>(self, f: F) -> Result<CommandRecorder<Executable>>
     where
         F: FnOnce(&CommandRecorder<Recording>) -> Result<()>,
     {

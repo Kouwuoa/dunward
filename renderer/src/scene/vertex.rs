@@ -3,23 +3,25 @@
 //! Provides the primary [`Vertex`] structure and helper functions to build
 //! [`VertexInputDescription`] for graphics pipeline vertex assembly.
 
-use crate::material::shader_data::PerVertexData;
-use ash::vk;
-use glam::{Vec2, Vec3};
 use std::mem::offset_of;
 
+use ash::vk;
+use glam::{Vec2, Vec3};
+
+use crate::material::shader_data::PerVertexData;
+
 #[derive(Debug)]
-pub struct Vertex {
-    pub position: Vec3,
-    pub normal: Vec3,
-    pub color: Vec3,
-    pub texcoord: Vec2,
+pub(crate) struct Vertex {
+    pub(crate) position: Vec3,
+    pub(crate) normal: Vec3,
+    pub(crate) color: Vec3,
+    pub(crate) texcoord: Vec2,
 }
 
-pub struct VertexInputDescription {
-    pub bindings: Vec<vk::VertexInputBindingDescription>,
-    pub attributes: Vec<vk::VertexInputAttributeDescription>,
-    pub flags: vk::PipelineVertexInputStateCreateFlags,
+pub(crate) struct VertexInputDescription {
+    pub(crate) bindings: Vec<vk::VertexInputBindingDescription>,
+    pub(crate) attributes: Vec<vk::VertexInputAttributeDescription>,
+    pub(crate) flags: vk::PipelineVertexInputStateCreateFlags,
 }
 
 impl Default for VertexInputDescription {
@@ -29,14 +31,14 @@ impl Default for VertexInputDescription {
 }
 
 impl Vertex {
-    pub fn as_shader_data(&self) -> PerVertexData {
+    pub(crate) fn as_shader_data(&self) -> PerVertexData {
         PerVertexData {
             position: self.position,
             texcoord: self.texcoord,
         }
     }
 
-    pub fn get_input_description() -> VertexInputDescription {
+    pub(crate) fn get_input_description() -> VertexInputDescription {
         let bindings = vec![vk::VertexInputBindingDescription {
             binding: 0,
             stride: size_of::<Vertex>() as u32,

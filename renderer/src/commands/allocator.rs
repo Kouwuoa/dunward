@@ -3,17 +3,18 @@
 //! Exposes [`CommandRecorderAllocator`], managing a [`ash::vk::CommandPool`] for each
 //! queue family and allocating recyclable [`CommandRecorder`] instances.
 
-use super::recorder::{CommandRecorder, Idle};
-use crate::core::queue::{Queue, QueueFamily};
-use ash::vk;
-use color_eyre::Result;
-use color_eyre::eyre::OptionExt;
-use color_eyre::eyre::eyre;
 use std::collections::{HashMap, hash_map};
 use std::sync::{Arc, Mutex};
 
+use ash::vk;
+use color_eyre::Result;
+use color_eyre::eyre::{OptionExt, eyre};
+
+use super::recorder::{CommandRecorder, Idle};
+use crate::core::queue::{Queue, QueueFamily};
+
 #[repr(transparent)]
-pub struct CommandRecorderAllocator(Arc<Mutex<CommandRecorderAllocatorInner>>);
+pub(crate) struct CommandRecorderAllocator(Arc<Mutex<CommandRecorderAllocatorInner>>);
 
 impl Clone for CommandRecorderAllocator {
     fn clone(&self) -> Self {

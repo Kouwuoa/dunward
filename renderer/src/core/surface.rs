@@ -3,17 +3,18 @@
 //! Manages [`ash::vk::SurfaceKHR`], surface capabilities, supported color formats,
 //! and presentation modes (FIFO, Mailbox) for the window.
 
+use ash::vk;
+use color_eyre::Result;
+use color_eyre::eyre::{OptionExt, eyre};
+
 use crate::core::DeviceContext;
 use crate::core::device::Device;
-use ash::vk;
-use color_eyre::eyre::OptionExt;
-use color_eyre::{Result, eyre::eyre};
 
 pub(crate) struct Surface {
-    pub(super) surface: vk::SurfaceKHR,
-    pub(super) surface_loader: ash::khr::surface::Instance,
-    pub(super) surface_formats: Vec<vk::SurfaceFormatKHR>,
-    pub(super) surface_present_modes: Vec<vk::PresentModeKHR>,
+    pub(crate) surface: vk::SurfaceKHR,
+    pub(crate) surface_loader: ash::khr::surface::Instance,
+    pub(crate) surface_formats: Vec<vk::SurfaceFormatKHR>,
+    pub(crate) surface_present_modes: Vec<vk::PresentModeKHR>,
 }
 
 impl Surface {

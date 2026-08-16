@@ -3,20 +3,21 @@
 //! Exposes [`Mesh`], containing CPU vertex/index buffers and procedural constructors
 //! like `new_triangle()` and `new_quad()`.
 
-use super::vertex::Vertex;
 use std::sync::atomic::AtomicU32;
+
+use super::vertex::Vertex;
 
 static MESH_ID_COUNTER: AtomicU32 = AtomicU32::new(0);
 
 #[derive(Debug)]
-pub struct Mesh {
-    pub vertices: Vec<Vertex>,
-    pub indices: Option<Vec<u32>>,
+pub(crate) struct Mesh {
+    pub(crate) vertices: Vec<Vertex>,
+    pub(crate) indices: Option<Vec<u32>>,
     id: u32,
 }
 
 impl Mesh {
-    pub fn new(vertices: Vec<Vertex>, indices: Option<Vec<u32>>) -> Self {
+    pub(crate) fn new(vertices: Vec<Vertex>, indices: Option<Vec<u32>>) -> Self {
         let id = MESH_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         Self {
@@ -26,7 +27,7 @@ impl Mesh {
         }
     }
 
-    pub fn new_triangle() -> Self {
+    pub(crate) fn new_triangle() -> Self {
         let vertices = vec![
             Vertex {
                 // Bottom left
@@ -56,7 +57,7 @@ impl Mesh {
         Self::new(vertices, Some(indices))
     }
 
-    pub fn new_quad() -> Self {
+    pub(crate) fn new_quad() -> Self {
         let vertices = vec![
             Vertex {
                 // Top left

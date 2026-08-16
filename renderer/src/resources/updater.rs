@@ -4,12 +4,13 @@
 //! to queue descriptor set updates (e.g. updating render target storage textures)
 //! and commit them prior to shader dispatches.
 
+use ash::vk;
+
 use super::descriptors::DescriptorWriter;
 use super::texture::StorageTexture;
 use crate::material::Material;
-use ash::vk;
 
-pub struct ResourceUpdater<'a> {
+pub(crate) struct ResourceUpdater<'a> {
     device: &'a ash::Device,
     #[allow(dead_code)]
     command_buffer: &'a vk::CommandBuffer,
@@ -17,7 +18,7 @@ pub struct ResourceUpdater<'a> {
 }
 
 impl<'a> ResourceUpdater<'a> {
-    pub fn new(device: &'a ash::Device, command_buffer: &'a vk::CommandBuffer) -> Self {
+    pub(crate) fn new(device: &'a ash::Device, command_buffer: &'a vk::CommandBuffer) -> Self {
         Self {
             device,
             command_buffer,
@@ -25,7 +26,7 @@ impl<'a> ResourceUpdater<'a> {
         }
     }
 
-    pub fn enqueue_update<F>(&mut self, build_update: F, material: &Material)
+    pub(crate) fn enqueue_update<F>(&mut self, build_update: F, material: &Material)
     where
         F: FnOnce(&mut ResourceUpdateBuilder),
     {
@@ -34,20 +35,20 @@ impl<'a> ResourceUpdater<'a> {
         self.updates.push(builder.build());
     }
 
-    pub fn execute_updates(&mut self) {
+    pub(crate) fn execute_updates(&mut self) {
         for update in self.updates.drain(..) {
             update.execute(self.device);
         }
     }
 }
 
-pub struct ResourceUpdateBuilder<'a> {
+pub(crate) struct ResourceUpdateBuilder<'a> {
     descriptor_writer: DescriptorWriter<'a>,
     descriptor_set: vk::DescriptorSet,
 }
 
 impl<'a> ResourceUpdateBuilder<'a> {
-    pub fn new(material: &Material) -> Self {
+    pub(crate) fn new(material: &Material) -> Self {
         let descriptor_writer = DescriptorWriter::default();
         Self {
             descriptor_writer,
@@ -55,7 +56,7 @@ impl<'a> ResourceUpdateBuilder<'a> {
         }
     }
 
-    pub fn set_render_target_texture(&mut self, texture: &StorageTexture) {
+    pub(crate) fn set_render_target_texture(&mut self, texture: &StorageTexture) {
         self.descriptor_writer.write_image(
             0,
             texture.view,

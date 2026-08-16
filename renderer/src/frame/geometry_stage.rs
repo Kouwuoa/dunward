@@ -3,13 +3,14 @@
 //! Owns per-frame megabuffer regions (vertex, index, per-frame uniform, per-material, per-object)
 //! and records rasterization commands for 3D meshes.
 
+use ash::vk;
+use color_eyre::Result;
+
 use crate::commands::allocator::{CommandRecorderAllocator, CommandRecorderAllocatorExt};
 use crate::commands::recorder::{CommandRecorder, Idle};
 use crate::core::DeviceContext;
 use crate::resources::megabuffer::{AllocatedMegabufferRegion, MegabufferExt};
 use crate::resources::store::ResourceStore;
-use ash::vk;
-use color_eyre::Result;
 
 const FRAME_VERTEX_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_INDEX_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
@@ -17,7 +18,7 @@ const FRAME_PER_FRAME_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_PER_MATERIAL_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_PER_OBJECT_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 
-pub struct FrameGeometryStage {
+pub(crate) struct FrameGeometryStage {
     #[allow(dead_code)]
     recorder: Option<CommandRecorder<Idle>>,
 
@@ -40,7 +41,7 @@ impl FrameGeometryStage {
     #[allow(dead_code)]
     const TIMELINE_SEM_SIGNAL_VALUE: u64 = 1; // TODO: ignored for now
 
-    pub fn new(
+    pub(crate) fn new(
         dvc_ctx: &DeviceContext,
         cmd_allocator: &mut CommandRecorderAllocator,
         resource_store: &ResourceStore,

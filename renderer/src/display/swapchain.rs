@@ -3,10 +3,11 @@
 //! Wraps [`ash::vk::SwapchainKHR`], querying surface capabilities, selecting
 //! extent/formats, and constructing swapchain image views for window presentation.
 
-use crate::core::DeviceContext;
 use ash::vk;
 use color_eyre::Result;
 use winit::dpi::PhysicalSize;
+
+use crate::core::DeviceContext;
 
 pub(crate) type SwapchainImage = vk::Image;
 #[allow(dead_code)]
@@ -14,22 +15,22 @@ pub(crate) type SwapchainImageIndex = u32;
 pub(crate) type SwapchainImageExtent = vk::Extent2D;
 
 pub(crate) struct Swapchain {
-    pub swapchain: vk::SwapchainKHR,
-    pub swapchain_loader: ash::khr::swapchain::Device,
+    pub(crate) swapchain: vk::SwapchainKHR,
+    pub(crate) swapchain_loader: ash::khr::swapchain::Device,
     #[allow(dead_code)]
-    pub swapchain_present_mode: vk::PresentModeKHR,
-    pub swapchain_images: Vec<SwapchainImage>,
+    pub(crate) swapchain_present_mode: vk::PresentModeKHR,
+    pub(crate) swapchain_images: Vec<SwapchainImage>,
     #[allow(dead_code)]
-    pub swapchain_image_count: u32,
-    pub swapchain_image_views: Vec<vk::ImageView>,
-    pub swapchain_image_extent: SwapchainImageExtent,
-    pub swapchain_image_format: vk::Format,
+    pub(crate) swapchain_image_count: u32,
+    pub(crate) swapchain_image_views: Vec<vk::ImageView>,
+    pub(crate) swapchain_image_extent: SwapchainImageExtent,
+    pub(crate) swapchain_image_format: vk::Format,
     #[allow(dead_code)]
-    pub swapchain_image_color_space: vk::ColorSpaceKHR,
+    pub(crate) swapchain_image_color_space: vk::ColorSpaceKHR,
     #[allow(dead_code)]
-    pub swapchain_image_usage: vk::ImageUsageFlags,
+    pub(crate) swapchain_image_usage: vk::ImageUsageFlags,
     #[allow(dead_code)]
-    pub swapchain_image_sharing_mode: vk::SharingMode,
+    pub(crate) swapchain_image_sharing_mode: vk::SharingMode,
 }
 
 impl Drop for Swapchain {
@@ -42,7 +43,7 @@ impl Drop for Swapchain {
 }
 
 impl Swapchain {
-    pub(super) fn new(
+    pub(crate) fn new(
         size: &PhysicalSize<u32>,
         dvc_ctx: &DeviceContext,
         old_swapchain: Option<&Self>,

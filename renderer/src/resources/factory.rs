@@ -3,23 +3,25 @@
 //! Exposes [`ResourceFactory`], providing creation methods for [`Megabuffer`],
 //! [`Texture`], [`ColorTexture`], [`DepthTexture`], and [`StorageTexture`].
 
-use super::descriptors::{DescriptorAllocator, DescriptorSetLayoutBuilder};
-use super::megabuffer::{Megabuffer, MegabufferExt};
-use super::texture::{ColorTexture, DepthTexture, StorageTexture, Texture};
-use super::ResourceType;
-use crate::commands::transfer::TransferCommandRecorder;
-use crate::material::{ComputeMaterialFactoryBuilder, MaterialFactory};
-use crate::material::shader::ComputeShader;
-use crate::material::shader_data::PerDrawData;
+use std::sync::{Arc, Mutex};
+
 use ash::vk;
 use color_eyre::Result;
 use shaderpack::ShaderId;
-use std::sync::{Arc, Mutex};
+
+use super::ResourceType;
+use super::descriptors::{DescriptorAllocator, DescriptorSetLayoutBuilder};
+use super::megabuffer::{Megabuffer, MegabufferExt};
+use super::texture::{ColorTexture, DepthTexture, StorageTexture, Texture};
+use crate::commands::transfer::TransferCommandRecorder;
+use crate::material::shader::ComputeShader;
+use crate::material::shader_data::PerDrawData;
+use crate::material::{ComputeMaterialFactoryBuilder, MaterialFactory};
 
 /// `ResourceFactory` is responsible only for construction (`create_*` APIs)
 /// such as buffers, textures, and materials as needed.
 /// It does not own long-lived storage, caching, or lookup tables.
-pub struct ResourceFactory {
+pub(crate) struct ResourceFactory {
     memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
     transfer_command_recorder: Arc<TransferCommandRecorder>,
     descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
@@ -27,7 +29,7 @@ pub struct ResourceFactory {
 }
 
 impl ResourceFactory {
-    pub fn new(
+    pub(crate) fn new(
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
         transfer_command_recorder: Arc<TransferCommandRecorder>,
         device: Arc<ash::Device>,
@@ -42,7 +44,7 @@ impl ResourceFactory {
         })
     }
 
-    pub fn create_color_texture(
+    pub(crate) fn create_color_texture(
         &self,
         width: u32,
         height: u32,
@@ -62,7 +64,7 @@ impl ResourceFactory {
         )
     }
 
-    pub fn create_depth_texture(&self, width: u32, height: u32) -> Result<DepthTexture> {
+    pub(crate) fn create_depth_texture(&self, width: u32, height: u32) -> Result<DepthTexture> {
         Texture::new_depth_texture(
             width,
             height,
@@ -71,7 +73,7 @@ impl ResourceFactory {
         )
     }
 
-    pub fn create_megabuffer(
+    pub(crate) fn create_megabuffer(
         &self,
         size: u64,
         alignment: u64,
@@ -87,7 +89,7 @@ impl ResourceFactory {
         )
     }
 
-    pub fn create_storage_texture(
+    pub(crate) fn create_storage_texture(
         &self,
         width: u32,
         height: u32,
@@ -102,7 +104,7 @@ impl ResourceFactory {
         )
     }
 
-    pub fn create_compute_material_factory(&self) -> Result<MaterialFactory> {
+    pub(crate) fn create_compute_material_factory(&self) -> Result<MaterialFactory> {
         let descriptor_set_layout = self.create_compute_descriptor_set_layout()?;
         let pipeline_layout = self.create_compute_pipeline_layout(descriptor_set_layout)?;
         let compute_shader = ComputeShader::new(ShaderId::TestPattern, self.device.clone())?;

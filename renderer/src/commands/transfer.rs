@@ -3,10 +3,12 @@
 //! Exposes [`TransferCommandRecorder`], providing immediate GPU submission
 //! for buffer and texture uploads outside the main render loop.
 
-use crate::core::queue::Queue;
+use std::sync::Arc;
+
 use ash::vk;
 use color_eyre::eyre::Result;
-use std::sync::Arc;
+
+use crate::core::queue::Queue;
 
 /// This is a specialized command recorder designed for performing one-off GPU transfer operations.
 ///
@@ -22,7 +24,7 @@ use std::sync::Arc;
 /// - The `TransferCommandRecorder` assumes exclusive access to its internal command buffer.
 /// - It is not thread-safe to call `immediate_submit()` concurrently.
 /// - The queue passed in the constructor must support transfer operations.
-pub struct TransferCommandRecorder {
+pub(crate) struct TransferCommandRecorder {
     transfer_fence: vk::Fence,
     command_pool: vk::CommandPool,
     command_buffer: vk::CommandBuffer,
@@ -32,7 +34,7 @@ pub struct TransferCommandRecorder {
 }
 
 impl TransferCommandRecorder {
-    pub fn new(transfer_queue: Arc<Queue>, device: Arc<ash::Device>) -> Result<Self> {
+    pub(crate) fn new(transfer_queue: Arc<Queue>, device: Arc<ash::Device>) -> Result<Self> {
         assert!(transfer_queue.family.supports_transfer());
 
         let transfer_fence_info = vk::FenceCreateInfo::default();
@@ -61,7 +63,7 @@ impl TransferCommandRecorder {
 
     // Instantly execute some commands to the GPU without dealing with the render loop and other synchronization
     // This is great for compute calculations and can be used from a background thread separated from the render loop
-    pub fn immediate_submit<F>(&self, func: F) -> Result<()>
+    pub(crate) fn immediate_submit<F>(&self, func: F) -> Result<()>
     where
         F: FnOnce(vk::CommandBuffer, &ash::Device) -> Result<()>,
     {

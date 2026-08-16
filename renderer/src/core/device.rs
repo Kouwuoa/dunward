@@ -3,19 +3,22 @@
 //! Handles GPU feature querying (Vulkan 1.3, Dynamic Rendering, Synchronization2,
 //! Buffer Device Address, Bindless Descriptors), physical device rating, and command submission.
 
-use super::instance::Instance;
-use super::queue::{Queue, QueueFamily};
-use super::semaphore::{SemaphoreValue, SignalSemaphore, WaitSemaphore};
-use ash::vk;
-use color_eyre::{Result, eyre::OptionExt};
 use std::ffi::{CStr, c_char};
 use std::str::Utf8Error;
 use std::sync::Arc;
 
+use ash::vk;
+use color_eyre::Result;
+use color_eyre::eyre::OptionExt;
+
+use super::instance::Instance;
+use super::queue::{Queue, QueueFamily};
+use super::semaphore::{SemaphoreValue, SignalSemaphore, WaitSemaphore};
+
 /// Main way to submit rendering commands to the GPU.
 pub(crate) struct Device {
-    pub(super) logical: Arc<ash::Device>,
-    pub(super) physical: vk::PhysicalDevice,
+    pub(crate) logical: Arc<ash::Device>,
+    pub(crate) physical: vk::PhysicalDevice,
 
     /// For now, require the graphics queue to support presentation
     graphics_queue: Arc<Queue>,
@@ -24,7 +27,7 @@ pub(crate) struct Device {
 }
 
 impl Device {
-    pub fn new(
+    pub(crate) fn new(
         instance: &Instance,
         surface: Option<(&vk::SurfaceKHR, &ash::khr::surface::Instance)>,
     ) -> Result<Self> {
@@ -57,7 +60,7 @@ impl Device {
         Ok(dev)
     }
 
-    pub fn submit(
+    pub(crate) fn submit(
         &self,
         cmd: vk::CommandBuffer,
         queue: Arc<Queue>,
@@ -130,19 +133,19 @@ impl Device {
         Ok(())
     }
 
-    pub fn get_present_queue(&self) -> Arc<Queue> {
+    pub(crate) fn get_present_queue(&self) -> Arc<Queue> {
         self.graphics_queue.clone()
     }
 
-    pub fn get_graphics_queue(&self) -> Arc<Queue> {
+    pub(crate) fn get_graphics_queue(&self) -> Arc<Queue> {
         self.graphics_queue.clone()
     }
 
-    pub fn get_compute_queue(&self) -> Arc<Queue> {
+    pub(crate) fn get_compute_queue(&self) -> Arc<Queue> {
         self.compute_queue.clone()
     }
 
-    pub fn get_transfer_queue(&self) -> Arc<Queue> {
+    pub(crate) fn get_transfer_queue(&self) -> Arc<Queue> {
         self.transfer_queue.clone()
     }
 

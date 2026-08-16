@@ -3,15 +3,15 @@
 //! Wraps [`ash::vk::Buffer`] and [`vk_mem::Allocation`], supporting host-visible
 //! memory-mapped writes via [`presser`].
 
-use ash::vk;
-use color_eyre::eyre::Result;
-use color_eyre::eyre::eyre;
 use std::sync::{Arc, Mutex};
+
+use ash::vk;
+use color_eyre::eyre::{Result, eyre};
 use vk_mem::Alloc;
 
-pub struct Buffer {
-    pub buffer: vk::Buffer,
-    pub size: u64,
+pub(crate) struct Buffer {
+    pub(crate) buffer: vk::Buffer,
+    pub(crate) size: u64,
     mapped: bool,
 
     allocation: Option<vk_mem::Allocation>,
@@ -20,7 +20,7 @@ pub struct Buffer {
 }
 
 impl Buffer {
-    pub fn new(
+    pub(crate) fn new(
         size: u64,
         alignment: u64,
         buf_usage: vk::BufferUsageFlags,
@@ -64,7 +64,7 @@ impl Buffer {
         })
     }
 
-    pub fn write<T>(
+    pub(crate) fn write<T>(
         &mut self,
         data: &[T],
         start_offset: usize,

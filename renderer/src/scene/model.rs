@@ -3,15 +3,16 @@
 //! Exposes [`Model`] for aggregating meshes into megabuffer regions, and [`FullscreenQuad`]
 //! for aspect-ratio corrected postprocessing and viewport presentation.
 
+use color_eyre::eyre::{Result, eyre};
+use glam::Vec3;
+
 use super::mesh::Mesh;
 use super::vertex::Vertex;
 use crate::display::DisplayContext;
 use crate::material::shader_data::PerVertexData;
 use crate::resources::megabuffer::{AllocatedMegabufferRegion, Megabuffer, MegabufferExt};
-use color_eyre::eyre::{Result, eyre};
-use glam::Vec3;
 
-pub struct FullscreenQuad {
+pub(crate) struct FullscreenQuad {
     quad_model: Model,
     // Image width and height determine the aspect ratio of an image to be displayed on the quad
     image_width: f32,
@@ -19,7 +20,7 @@ pub struct FullscreenQuad {
 }
 
 impl FullscreenQuad {
-    pub fn new(
+    pub(crate) fn new(
         vertex_megabuffer: &Megabuffer,
         index_megabuffer: &Megabuffer,
         display: &DisplayContext,
@@ -36,7 +37,7 @@ impl FullscreenQuad {
         Ok(quad)
     }
 
-    pub fn resize_to_display(
+    pub(crate) fn resize_to_display(
         &mut self,
         display_ctx: &DisplayContext,
         vertex_megabuffer: &Megabuffer,
@@ -79,14 +80,14 @@ impl FullscreenQuad {
     }
 }
 
-pub struct Model {
+pub(crate) struct Model {
     meshes: Vec<Mesh>,
     vertex_megabuffer_region: Option<AllocatedMegabufferRegion>,
     index_megabuffer_region: Option<AllocatedMegabufferRegion>,
 }
 
 impl Model {
-    pub fn new(
+    pub(crate) fn new(
         meshes: Vec<Mesh>,
         vertex_megabuffer: &Megabuffer,
         index_megabuffer: &Megabuffer,
@@ -146,7 +147,7 @@ impl Model {
         })
     }
 
-    pub fn write_vertex_buffer(
+    pub(crate) fn write_vertex_buffer(
         &mut self,
         vertices: &[PerVertexData],
         vertex_megabuffer: &Megabuffer,
@@ -165,11 +166,11 @@ impl Model {
         Ok(())
     }
 
-    pub fn get_vertices_merged(&self) -> Vec<&Vertex> {
+    pub(crate) fn get_vertices_merged(&self) -> Vec<&Vertex> {
         self.meshes.iter().flat_map(|m| m.vertices.iter()).collect()
     }
 
-    pub fn get_indices_merged(&self) -> Option<Vec<&u32>> {
+    pub(crate) fn get_indices_merged(&self) -> Option<Vec<&u32>> {
         if self.index_megabuffer_region.is_some() {
             Some(
                 self.meshes
@@ -182,7 +183,7 @@ impl Model {
         }
     }
 
-    pub fn get_meshes(&self) -> &Vec<Mesh> {
+    pub(crate) fn get_meshes(&self) -> &Vec<Mesh> {
         &self.meshes
     }
 }

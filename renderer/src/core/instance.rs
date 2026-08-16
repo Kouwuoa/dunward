@@ -3,14 +3,16 @@
 //! Responsible for creating the root [`ash::Instance`], loading Vulkan entry points,
 //! enabling validation layers in debug builds, and routing validation messages to `log`.
 
-use super::device::Device;
-use super::surface::Surface;
+use std::ffi::{CStr, FromBytesUntilNulError, c_char, c_void};
+
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
-use std::ffi::{CStr, FromBytesUntilNulError, c_char, c_void};
 use winit::window::Window;
+
+use super::device::Device;
+use super::surface::Surface;
 
 /// Initializes Vulkan and keeps the Vulkan instance alive
 pub(crate) struct Instance {
@@ -27,7 +29,7 @@ impl Instance {
     const ENABLE_VALIDATION_LAYERS: bool = cfg!(debug_assertions);
     const REQUIRED_VALIDATION_LAYERS: &'static [&'static CStr] = &[c"VK_LAYER_KHRONOS_validation"];
 
-    pub fn new(window: Option<&Window>) -> Result<Self> {
+    pub(crate) fn new(window: Option<&Window>) -> Result<Self> {
         let entry = unsafe { ash::Entry::load() }?;
 
         let instance = Self::create_instance(&entry, window)?;
@@ -47,15 +49,15 @@ impl Instance {
         })
     }
 
-    pub fn inner(&self) -> &ash::Instance {
+    pub(crate) fn inner(&self) -> &ash::Instance {
         &self.instance
     }
 
-    pub fn create_device(&self, surface: &Surface) -> Result<Device> {
+    pub(crate) fn create_device(&self, surface: &Surface) -> Result<Device> {
         Device::new(self, Some((&surface.surface, &surface.surface_loader)))
     }
 
-    pub fn create_surface(&self, window: &Window) -> Result<Surface> {
+    pub(crate) fn create_surface(&self, window: &Window) -> Result<Surface> {
         let surface = unsafe {
             ash_window::create_surface(
                 &self.entry,

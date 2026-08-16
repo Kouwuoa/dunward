@@ -3,12 +3,13 @@
 //! Exposes [`ResourceStore`], owning pooled megabuffers (vertex, index, per-frame,
 //! per-material, per-object), textures, and managed samplers.
 
+use ash::vk;
+use color_eyre::Result;
+
 use super::factory::ResourceFactory;
 use super::megabuffer::Megabuffer;
 use super::texture::{ColorTexture, StorageTexture};
 use crate::material::MaterialFactory;
-use ash::vk;
-use color_eyre::Result;
 
 const VERTEX_BUFFER_SIZE: u64 = 1024 * 1024 * 256; // 256 MB
 const INDEX_BUFFER_SIZE: u64 = 1024 * 1024 * 64; // 64 MB
@@ -21,22 +22,22 @@ const STORAGE_BUFFER_ALIGNMENT: u64 = 16;
 const UNIFORM_BUFFER_ALIGNMENT: u64 = 256;
 
 /// Owns resource lifetimes/data
-pub struct ResourceStore {
-    pub storage_textures: Vec<StorageTexture>,
-    pub sampled_textures: Vec<ColorTexture>,
-    pub samplers: Vec<vk::Sampler>,
+pub(crate) struct ResourceStore {
+    pub(crate) storage_textures: Vec<StorageTexture>,
+    pub(crate) sampled_textures: Vec<ColorTexture>,
+    pub(crate) samplers: Vec<vk::Sampler>,
 
-    pub vertex_megabuffer: Megabuffer,
-    pub index_megabuffer: Megabuffer,
-    pub per_frame_megabuffer: Megabuffer,
-    pub per_material_megabuffer: Megabuffer,
-    pub per_object_megabuffer: Megabuffer,
+    pub(crate) vertex_megabuffer: Megabuffer,
+    pub(crate) index_megabuffer: Megabuffer,
+    pub(crate) per_frame_megabuffer: Megabuffer,
+    pub(crate) per_material_megabuffer: Megabuffer,
+    pub(crate) per_object_megabuffer: Megabuffer,
 
-    pub compute_material_factory: MaterialFactory,
+    pub(crate) compute_material_factory: MaterialFactory,
 }
 
 impl ResourceStore {
-    pub fn new(factory: &ResourceFactory) -> Result<Self> {
+    pub(crate) fn new(factory: &ResourceFactory) -> Result<Self> {
         log::info!("Creating ResourceStore");
 
         let vertex_megabuffer = factory.create_megabuffer(
@@ -86,7 +87,7 @@ impl ResourceStore {
         })
     }
 
-    pub fn add_sampler(&mut self, sampler: vk::Sampler) {
+    pub(crate) fn add_sampler(&mut self, sampler: vk::Sampler) {
         self.samplers.push(sampler);
     }
 }

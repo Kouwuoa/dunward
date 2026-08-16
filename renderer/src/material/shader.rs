@@ -2,24 +2,25 @@
 //!
 //! Wraps [`ash::vk::ShaderModule`] and loads built SPIR-V binaries via [`shaderpack`].
 
-use ash::vk;
-use color_eyre::Result;
-use shaderpack::*;
 use std::sync::Arc;
 
-pub struct GraphicsShader {
-    pub vert_mod: vk::ShaderModule,
-    pub frag_mod: vk::ShaderModule,
+use ash::vk;
+use color_eyre::Result;
+use shaderpack::{ShaderId, get_shader_spv};
+
+pub(crate) struct GraphicsShader {
+    pub(crate) vert_mod: vk::ShaderModule,
+    pub(crate) frag_mod: vk::ShaderModule,
     device: Arc<ash::Device>,
 }
 
-pub struct ComputeShader {
-    pub comp_mod: vk::ShaderModule,
+pub(crate) struct ComputeShader {
+    pub(crate) comp_mod: vk::ShaderModule,
     device: Arc<ash::Device>,
 }
 
 impl GraphicsShader {
-    pub fn new(vert_id: ShaderId, frag_id: ShaderId, device: Arc<ash::Device>) -> Result<Self> {
+    pub(crate) fn new(vert_id: ShaderId, frag_id: ShaderId, device: Arc<ash::Device>) -> Result<Self> {
         let vert_mod = create_shader_module(vert_id, &device)?;
         let frag_mod = create_shader_module(frag_id, &device)?;
         Ok(Self {
@@ -31,7 +32,7 @@ impl GraphicsShader {
 }
 
 impl ComputeShader {
-    pub fn new(id: ShaderId, device: Arc<ash::Device>) -> Result<Self> {
+    pub(crate) fn new(id: ShaderId, device: Arc<ash::Device>) -> Result<Self> {
         let comp_mod = create_shader_module(id, &device)?;
         Ok(Self { comp_mod, device })
     }

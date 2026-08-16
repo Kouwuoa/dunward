@@ -1,9 +1,9 @@
 //! Scene graph, geometric meshes, vertices, and models.
 
-pub mod mesh;
-pub mod model;
-pub mod vertex;
+pub(crate) mod mesh;
+pub(crate) mod model;
+pub(crate) mod vertex;
 
-pub use mesh::Mesh;
-pub use model::{FullscreenQuad, Model};
-pub use vertex::{Vertex, VertexInputDescription};
+pub(crate) use mesh::Mesh;
+pub(crate) use model::{FullscreenQuad, Model};
+pub(crate) use vertex::{Vertex, VertexInputDescription};

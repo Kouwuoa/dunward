@@ -20,13 +20,13 @@ This guide provides architectural context, codebase layout, and implementation d
 The [`renderer`](file:///C:/Users/koada/workspace/dunward/renderer) crate is structured into clean, 2-level domain-driven modules with top-level file documentation across all source files:
 
 ### Public API (`renderer/src/`)
-* [`lib.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/lib.rs): Exports public domain modules and primary engine types:
-  * [`Renderer`](file:///C:/Users/koada/workspace/dunward/renderer/src/renderer.rs#L25) & [`RendererError`](file:///C:/Users/koada/workspace/dunward/renderer/src/renderer.rs#L17)
-  * [`Camera`](file:///C:/Users/koada/workspace/dunward/renderer/src/camera.rs#L6)
+* [`lib.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/lib.rs): Completely opaque crate interface exposing only top-level engine types:
+  * [`Renderer`](file:///C:/Users/koada/workspace/dunward/renderer/src/renderer.rs#L36) & [`RendererError`](file:///C:/Users/koada/workspace/dunward/renderer/src/renderer.rs#L25)
+  * [`Camera`](file:///C:/Users/koada/workspace/dunward/renderer/src/camera.rs#L10)
   * Re-exports [`glam`](file:///C:/Users/koada/workspace/dunward/renderer/Cargo.toml#L12) and [`winit`](file:///C:/Users/koada/workspace/dunward/renderer/Cargo.toml#L20).
 * [`renderer.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/renderer.rs): Top-level engine orchestrator managing multi-buffered frames in flight, context lifecycle, and delegating frame workload to domain contexts and subsystems.
 * [`camera.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/camera.rs): Right-handed camera matrix calculations, view/projection matrix creation, and orbit/mouse transformation helpers (`mouse_rotate`, `mouse_zoom`).
-* [`utils.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/utils.rs): General synchronization and lock-guard utilities.
+* All domain modules (`core/`, `display/`, `commands/`, `resources/`, `material/`, `scene/`, `frame/`, `utils.rs`) are internal (`pub(crate)`) to keep the renderer encapsulated as a black box.
 
 ---
 

@@ -3,6 +3,9 @@
 //! Manages fullscreen render targets ([`StorageTexture`]), clears images,
 //! synchronizes compute dispatches, and transfers output textures to the graphics queue.
 
+use ash::vk;
+use color_eyre::Result;
+
 use super::packet::FrameRenderPacket;
 use crate::commands::allocator::{CommandRecorderAllocator, CommandRecorderAllocatorExt};
 use crate::commands::recorder::{CommandRecorder, Idle};
@@ -14,14 +17,12 @@ use crate::material::shader_data::PerDrawData;
 use crate::resources::factory::ResourceFactory;
 use crate::resources::store::ResourceStore;
 use crate::resources::texture::{StorageTexture, TextureAccess};
-use ash::vk;
-use color_eyre::Result;
 
-pub struct FrameLightingStageOutput<'a> {
-    pub target_tex: &'a mut StorageTexture,
+pub(crate) struct FrameLightingStageOutput<'a> {
+    pub(crate) target_tex: &'a mut StorageTexture,
 }
 
-pub struct FrameLightingStage {
+pub(crate) struct FrameLightingStage {
     recorder: Option<CommandRecorder<Idle>>,
 
     target_tex: StorageTexture,
@@ -33,7 +34,7 @@ pub struct FrameLightingStage {
 }
 
 impl FrameLightingStage {
-    pub fn new(
+    pub(crate) fn new(
         dvc_ctx: &DeviceContext,
         display_ctx: &DisplayContext,
         cmd_allocator: &mut CommandRecorderAllocator,
@@ -63,7 +64,7 @@ impl FrameLightingStage {
         })
     }
 
-    pub fn render(
+    pub(crate) fn render(
         &mut self,
         pkt: FrameRenderPacket,
         dvc: &DeviceContext,
@@ -155,7 +156,7 @@ impl FrameLightingStage {
         })
     }
 
-    pub fn resize(&mut self, size: &winit::dpi::PhysicalSize<u32>, resource_factory: &ResourceFactory) {
+    pub(crate) fn resize(&mut self, size: &winit::dpi::PhysicalSize<u32>, resource_factory: &ResourceFactory) {
         self.target_tex = resource_factory
             .create_storage_texture(size.width, size.height, true)
             .unwrap();

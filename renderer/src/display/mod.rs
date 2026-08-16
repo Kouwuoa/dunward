@@ -7,26 +7,28 @@ pub(crate) mod swapchain;
 
 pub(crate) use swapchain::Swapchain;
 
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use ash::vk;
+use color_eyre::Result;
+use color_eyre::eyre::{OptionExt, eyre};
+use thiserror::Error;
+use winit::window::Window;
+
 use crate::core::DeviceContext;
 use crate::core::queue::Queue;
 use crate::core::semaphore::BinarySemaphore;
 use crate::resources::texture::{ColorTexture, Texture};
-use ash::vk;
-use color_eyre::Result;
-use color_eyre::eyre::{OptionExt, eyre};
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use thiserror::Error;
-use winit::window::Window;
 
-pub struct PresentTextureBundle {
-    pub texture: ColorTexture,
-    pub index: u32,
-    pub suboptimal: bool,
+pub(crate) struct PresentTextureBundle {
+    pub(crate) texture: ColorTexture,
+    pub(crate) index: u32,
+    pub(crate) suboptimal: bool,
 }
 
 #[derive(Debug, Error)]
-pub enum DisplayPresentError {
+pub(crate) enum DisplayPresentError {
     #[error("Display surface is suboptimal and needs to be resized")]
     DisplaySuboptimal,
 
@@ -35,7 +37,7 @@ pub enum DisplayPresentError {
 }
 
 /// Presentation target of the renderer, encapsulating the display surface and swapchain
-pub struct DisplayContext {
+pub(crate) struct DisplayContext {
     pub(crate) swapchain: Swapchain,
     present_queue: Arc<Queue>,
     memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
@@ -43,7 +45,7 @@ pub struct DisplayContext {
 }
 
 impl DisplayContext {
-    pub fn new(
+    pub(crate) fn new(
         window: &Window,
         dvc_ctx: &DeviceContext,
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
@@ -60,7 +62,7 @@ impl DisplayContext {
         })
     }
 
-    pub fn acquire_next_present_texture(
+    pub(crate) fn acquire_next_present_texture(
         &self,
         signal_image_acquired_sem: &BinarySemaphore,
         timeout: Duration,
@@ -110,7 +112,7 @@ impl DisplayContext {
         })
     }
 
-    pub fn present(
+    pub(crate) fn present(
         &self,
         texture: PresentTextureBundle,
         wait_render_finished_sem: &BinarySemaphore,
@@ -140,7 +142,7 @@ impl DisplayContext {
         }
     }
 
-    pub fn resize(
+    pub(crate) fn resize(
         &mut self,
         size: &winit::dpi::PhysicalSize<u32>,
         dvc_ctx: &DeviceContext,
@@ -152,7 +154,7 @@ impl DisplayContext {
         Ok(())
     }
 
-    pub fn get_size(&self) -> winit::dpi::PhysicalSize<u32> {
+    pub(crate) fn get_size(&self) -> winit::dpi::PhysicalSize<u32> {
         winit::dpi::PhysicalSize::new(
             self.swapchain.swapchain_image_extent.width,
             self.swapchain.swapchain_image_extent.height,

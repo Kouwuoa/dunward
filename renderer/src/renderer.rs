@@ -3,21 +3,23 @@
 //! Exposes [`Renderer`], orchestrating multi-buffered frames in flight, device initialization,
 //! display presentation, resizing, and teardown.
 
-use crate::Camera;
+use std::sync::Arc;
+use std::time::Instant;
+
+use ash::vk;
+use color_eyre::Result;
+use thiserror::Error;
+
 use crate::commands::allocator::{CommandRecorderAllocator, CommandRecorderAllocatorExt};
 use crate::commands::transfer::TransferCommandRecorder;
 use crate::core::DeviceContext;
 use crate::display::{DisplayContext, DisplayPresentError};
-use crate::frame::FrameContext;
 use crate::frame::packet::FrameRenderPacket;
+use crate::frame::FrameContext;
 use crate::resources::create_memory_allocator;
 use crate::resources::factory::ResourceFactory;
 use crate::resources::store::ResourceStore;
-use ash::vk;
-use color_eyre::Result;
-use std::sync::Arc;
-use std::time::Instant;
-use thiserror::Error;
+use crate::Camera;
 
 #[derive(Debug, Error)]
 pub enum RendererError {

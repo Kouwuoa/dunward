@@ -3,8 +3,9 @@
 //! Provides right-handed view and projection matrix calculations,
 //! orbit controls (`mouse_rotate`, `mouse_zoom`), and camera frustum parameters.
 
-use glam::{Mat4, Vec2, Vec3, Vec4};
 use std::f32::consts::PI;
+
+use glam::{Mat4, Vec2, Vec3, Vec4};
 
 pub struct Camera {
     position: Vec3,

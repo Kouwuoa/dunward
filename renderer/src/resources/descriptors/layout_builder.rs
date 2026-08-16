@@ -6,14 +6,14 @@
 use ash::vk;
 use color_eyre::Result;
 
-pub struct DescriptorSetLayoutBuilder<'a> {
+pub(crate) struct DescriptorSetLayoutBuilder<'a> {
     bindings: Vec<vk::DescriptorSetLayoutBinding<'a>>,
     binding_flags: Vec<vk::DescriptorBindingFlags>,
     immutable_samplers: Vec<Option<Vec<vk::Sampler>>>,
 }
 
 impl DescriptorSetLayoutBuilder<'_> {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             bindings: Vec::new(),
             binding_flags: Vec::new(),
@@ -21,7 +21,7 @@ impl DescriptorSetLayoutBuilder<'_> {
         }
     }
 
-    pub fn add_binding(
+    pub(crate) fn add_binding(
         mut self,
         binding: u32,
         descriptor_type: vk::DescriptorType,
@@ -42,7 +42,7 @@ impl DescriptorSetLayoutBuilder<'_> {
         self
     }
 
-    pub fn build(
+    pub(crate) fn build(
         mut self,
         flags: vk::DescriptorSetLayoutCreateFlags,
         device: &ash::Device,

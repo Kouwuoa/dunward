@@ -3,18 +3,18 @@
 //! Configures dynamic rendering state, depth-stencil, blending, multisampling,
 //! rasterization, vertex input layouts, and pipeline layouts for rasterization passes.
 
+use std::ffi::CString;
+use std::sync::{Arc, Mutex};
+
+use ash::vk;
+use color_eyre::eyre::{OptionExt, Result, eyre};
+
 use super::MaterialFactory;
 use super::shader::GraphicsShader;
 use crate::resources::descriptors::DescriptorAllocator;
 use crate::scene::vertex::VertexInputDescription;
-use ash::vk;
-use color_eyre::eyre::OptionExt;
-use color_eyre::eyre::Result;
-use color_eyre::eyre::eyre;
-use std::ffi::CString;
-use std::sync::{Arc, Mutex};
 
-pub struct GraphicsMaterialFactoryBuilder<'a> {
+pub(crate) struct GraphicsMaterialFactoryBuilder<'a> {
     vertex_input_description: VertexInputDescription,
     input_assembly: vk::PipelineInputAssemblyStateCreateInfo<'a>,
     rasterization: vk::PipelineRasterizationStateCreateInfo<'a>,
@@ -32,7 +32,7 @@ pub struct GraphicsMaterialFactoryBuilder<'a> {
 }
 
 impl<'a> GraphicsMaterialFactoryBuilder<'a> {
-    pub fn new(
+    pub(crate) fn new(
         device: Arc<ash::Device>,
         descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
     ) -> Self {
@@ -66,27 +66,27 @@ impl<'a> GraphicsMaterialFactoryBuilder<'a> {
         }
     }
 
-    pub fn with_shader(mut self, shader: GraphicsShader) -> Self {
+    pub(crate) fn with_shader(mut self, shader: GraphicsShader) -> Self {
         let _ = self.shader.replace(shader);
         self
     }
 
-    pub fn with_pipeline_layout(mut self, layout: vk::PipelineLayout) -> Self {
+    pub(crate) fn with_pipeline_layout(mut self, layout: vk::PipelineLayout) -> Self {
         let _ = self.pipeline_layout.replace(layout);
         self
     }
 
-    pub fn with_descriptor_set_layout(mut self, layout: vk::DescriptorSetLayout) -> Self {
+    pub(crate) fn with_descriptor_set_layout(mut self, layout: vk::DescriptorSetLayout) -> Self {
         let _ = self.descriptor_set_layout.replace(layout);
         self
     }
 
-    pub fn with_color_attachment_format(mut self, format: vk::Format) -> Self {
+    pub(crate) fn with_color_attachment_format(mut self, format: vk::Format) -> Self {
         self.color_attachment_format = format;
         self
     }
 
-    pub fn build(mut self) -> Result<MaterialFactory> {
+    pub(crate) fn build(mut self) -> Result<MaterialFactory> {
         let shader = self
             .shader
             .take()

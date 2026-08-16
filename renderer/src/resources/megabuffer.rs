@@ -3,17 +3,19 @@
 //! Sub-allocates subregions for vertex, index, uniform, and storage buffer needs
 //! out of large pre-allocated GPU buffers with staging transfer synchronization.
 
-use super::buffer::Buffer;
-use crate::commands::transfer::TransferCommandRecorder;
-use ash::vk;
-use color_eyre::Result;
-use color_eyre::eyre::{OptionExt, eyre};
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Mutex};
 
+use ash::vk;
+use color_eyre::Result;
+use color_eyre::eyre::{OptionExt, eyre};
+
+use super::buffer::Buffer;
+use crate::commands::transfer::TransferCommandRecorder;
+
 static MEGABUFFER_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-pub struct Megabuffer {
+pub(crate) struct Megabuffer {
     inner: Arc<Mutex<MegabufferInner>>,
     id: usize,
 }
@@ -33,7 +35,7 @@ impl PartialEq for Megabuffer {
     }
 }
 
-pub trait MegabufferExt {
+pub(crate) trait MegabufferExt {
     fn new(
         size: u64,
         alignment: u64,
@@ -323,12 +325,12 @@ impl PartialEq for MegabufferInner {
 }
 
 #[derive(Debug)]
-pub struct FreeMegabufferRegion {
+struct FreeMegabufferRegion {
     offset: u64,
     size: u64,
 }
 
-pub struct AllocatedMegabufferRegion {
+pub(crate) struct AllocatedMegabufferRegion {
     offset: u64,
     /// Size of the allocated region. This is 0 when the region is deallocated.
     size: u64,
@@ -339,14 +341,14 @@ pub struct AllocatedMegabufferRegion {
 }
 
 impl AllocatedMegabufferRegion {
-    pub fn write<T>(&mut self, data: &[T]) -> Result<presser::CopyRecord>
+    pub(crate) fn write<T>(&mut self, data: &[T]) -> Result<presser::CopyRecord>
     where
         T: Copy,
     {
         self.parent_megabuffer.as_ref().unwrap().write(data, self)
     }
 
-    pub fn suballocate_region(&mut self, size: u64) -> Result<AllocatedMegabufferRegion> {
+    pub(crate) fn suballocate_region(&mut self, size: u64) -> Result<AllocatedMegabufferRegion> {
         let size = self
             .parent_megabuffer
             .as_ref()
@@ -373,15 +375,15 @@ impl AllocatedMegabufferRegion {
         Ok(subregion)
     }
 
-    pub fn belongs_to_same_megabuffer(&self, other: &Self) -> bool {
+    pub(crate) fn belongs_to_same_megabuffer(&self, other: &Self) -> bool {
         self.parent_megabuffer == other.parent_megabuffer
     }
 
-    pub fn belongs_to_megabuffer(&self, megabuffer: &Megabuffer) -> bool {
+    pub(crate) fn belongs_to_megabuffer(&self, megabuffer: &Megabuffer) -> bool {
         self.parent_megabuffer.as_ref().unwrap() == megabuffer
     }
 
-    pub fn is_adjacent_to(&self, other: &Self) -> bool {
+    pub(crate) fn is_adjacent_to(&self, other: &Self) -> bool {
         if !self.belongs_to_same_megabuffer(other) {
             return false;
         }
@@ -395,7 +397,7 @@ impl AllocatedMegabufferRegion {
         left_offset + left_size == right_offset
     }
 
-    pub fn merge_adjacent_region(&mut self, other: Self) -> Result<()> {
+    pub(crate) fn merge_adjacent_region(&mut self, other: Self) -> Result<()> {
         if self.belongs_to_same_megabuffer(&other) {
             return Err(eyre!(
                 "Cannot combine regions belonging to different megabuffers"

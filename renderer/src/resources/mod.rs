@@ -3,31 +3,33 @@
 //! Exposes [`ResourceStore`] for managing long-lived GPU assets, [`ResourceFactory`]
 //! for constructing GPU memory allocations and textures, and [`Megabuffer`] for pooled sub-allocations.
 
-pub mod buffer;
-pub mod descriptors;
-pub mod factory;
-pub mod megabuffer;
-pub mod store;
-pub mod texture;
-pub mod updater;
+pub(crate) mod buffer;
+pub(crate) mod descriptors;
+pub(crate) mod factory;
+pub(crate) mod megabuffer;
+pub(crate) mod store;
+pub(crate) mod texture;
+pub(crate) mod updater;
 
-pub use buffer::Buffer;
-pub use descriptors::DescriptorAllocator;
-pub use factory::ResourceFactory;
-pub use megabuffer::{AllocatedMegabufferRegion, Megabuffer, MegabufferExt};
-pub use store::ResourceStore;
-pub use texture::{
+pub(crate) use buffer::Buffer;
+pub(crate) use descriptors::DescriptorAllocator;
+pub(crate) use factory::ResourceFactory;
+pub(crate) use megabuffer::{AllocatedMegabufferRegion, Megabuffer, MegabufferExt};
+pub(crate) use store::ResourceStore;
+pub(crate) use texture::{
     ColorTexture, DepthTexture, StorageTexture, Texture, TextureAccess, TextureQueueState,
 };
-pub use updater::{ResourceUpdateBuilder, ResourceUpdater};
+pub(crate) use updater::{ResourceUpdateBuilder, ResourceUpdater};
 
-use crate::core::DeviceContext;
-use ash::vk;
-use color_eyre::eyre::Result;
 use std::sync::{Arc, Mutex};
 
+use ash::vk;
+use color_eyre::eyre::Result;
+
+use crate::core::DeviceContext;
+
 /// Helper function to instantiate the `vk_mem::Allocator` instance.
-pub fn create_memory_allocator(
+pub(crate) fn create_memory_allocator(
     dvc_ctx: &DeviceContext,
 ) -> Result<Arc<Mutex<vk_mem::Allocator>>> {
     Ok(Arc::new(Mutex::new(unsafe {
@@ -40,7 +42,7 @@ pub fn create_memory_allocator(
 }
 
 #[derive(PartialEq)]
-pub enum ResourceType {
+pub(crate) enum ResourceType {
     UniformBuffer,
     StorageBuffer,
     StorageImage,
@@ -49,7 +51,7 @@ pub enum ResourceType {
 }
 
 impl ResourceType {
-    pub const ALL: &'static [Self] = &[
+    pub(crate) const ALL: &'static [Self] = &[
         Self::UniformBuffer,
         Self::StorageBuffer,
         Self::StorageImage,
@@ -57,7 +59,7 @@ impl ResourceType {
         Self::SampledImage,
     ];
 
-    pub fn descriptor_type(&self) -> vk::DescriptorType {
+    pub(crate) fn descriptor_type(&self) -> vk::DescriptorType {
         match self {
             Self::UniformBuffer => vk::DescriptorType::UNIFORM_BUFFER,
             Self::StorageBuffer => vk::DescriptorType::STORAGE_BUFFER,
@@ -67,7 +69,7 @@ impl ResourceType {
         }
     }
 
-    pub fn descriptor_binding_flags(&self) -> vk::DescriptorBindingFlags {
+    pub(crate) fn descriptor_binding_flags(&self) -> vk::DescriptorBindingFlags {
         match self {
             Self::UniformBuffer => {
                 vk::DescriptorBindingFlags::PARTIALLY_BOUND
@@ -93,7 +95,7 @@ impl ResourceType {
         }
     }
 
-    pub fn descriptor_pool_count(&self) -> u32 {
+    pub(crate) fn descriptor_pool_count(&self) -> u32 {
         match self {
             Self::UniformBuffer => 16,
             Self::StorageBuffer => 16,

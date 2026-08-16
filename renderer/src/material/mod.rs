@@ -3,35 +3,37 @@
 //! A [`Material`] represents an instantiated shader pipeline ready for GPU resource binding
 //! and push constant updates during rendering.
 
-pub mod compute;
-pub mod graphics;
-pub mod shader;
-pub mod shader_data;
+pub(crate) mod compute;
+pub(crate) mod graphics;
+pub(crate) mod shader;
+pub(crate) mod shader_data;
 
-pub use compute::ComputeMaterialFactoryBuilder;
-pub use graphics::GraphicsMaterialFactoryBuilder;
-pub use shader::{ComputeShader, GraphicsShader};
-pub use shader_data::{PerDrawData, PerFrameData, PerMaterialData, PerObjectData, PerVertexData};
+pub(crate) use compute::ComputeMaterialFactoryBuilder;
+pub(crate) use graphics::GraphicsMaterialFactoryBuilder;
+pub(crate) use shader::{ComputeShader, GraphicsShader};
+pub(crate) use shader_data::{PerDrawData, PerFrameData, PerMaterialData, PerObjectData, PerVertexData};
 
-use crate::resources::descriptors::DescriptorAllocator;
+use std::sync::{Arc, Mutex};
+
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
-use std::sync::{Arc, Mutex};
+
+use crate::resources::descriptors::DescriptorAllocator;
 
 /// You can think of a Material as a shader instance that you can bind resources and data to.
 /// You only need to create a Material once, and then you can use it to render multiple objects.
 /// You only need to switch the Material when you want to change the shader or pipeline.
-pub struct Material {
-    pub pipeline: vk::Pipeline,
-    pub pipeline_layout: vk::PipelineLayout,
-    pub pipeline_bind_point: vk::PipelineBindPoint,
-    pub descriptor_set: vk::DescriptorSet,
+pub(crate) struct Material {
+    pub(crate) pipeline: vk::Pipeline,
+    pub(crate) pipeline_layout: vk::PipelineLayout,
+    pub(crate) pipeline_bind_point: vk::PipelineBindPoint,
+    pub(crate) descriptor_set: vk::DescriptorSet,
     device: Arc<ash::Device>,
 }
 
 impl Material {
-    pub fn update_push_constants(&self, command_buffer: vk::CommandBuffer, data: &[u8]) {
+    pub(crate) fn update_push_constants(&self, command_buffer: vk::CommandBuffer, data: &[u8]) {
         unsafe {
             self.device.cmd_push_constants(
                 command_buffer,
@@ -43,16 +45,14 @@ impl Material {
         }
     }
 
-    pub fn bind_pipeline(&self, command_buffer: vk::CommandBuffer) {
+    pub(crate) fn bind(&self, command_buffer: vk::CommandBuffer) {
         unsafe {
-            self.device
-                .cmd_bind_pipeline(command_buffer, self.pipeline_bind_point, self.pipeline);
-        }
-    }
-
-    pub fn bind_descriptor_sets(&self, command_buffer: vk::CommandBuffer) {
-        let descriptor_sets = [self.descriptor_set];
-        unsafe {
+            self.device.cmd_bind_pipeline(
+                command_buffer,
+                self.pipeline_bind_point,
+                self.pipeline,
+            );
+            let descriptor_sets = [self.descriptor_set];
             self.device.cmd_bind_descriptor_sets(
                 command_buffer,
                 self.pipeline_bind_point,
@@ -65,18 +65,18 @@ impl Material {
     }
 }
 
-pub struct MaterialFactory {
-    pipeline: vk::Pipeline,
-    pipeline_layout: vk::PipelineLayout,
-    pipeline_bind_point: vk::PipelineBindPoint,
-    descriptor_set_layout: vk::DescriptorSetLayout,
+pub(crate) struct MaterialFactory {
+    pub(crate) pipeline: vk::Pipeline,
+    pub(crate) pipeline_layout: vk::PipelineLayout,
+    pub(crate) pipeline_bind_point: vk::PipelineBindPoint,
+    pub(crate) descriptor_set_layout: vk::DescriptorSetLayout,
 
     device: Arc<ash::Device>,
     descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
 }
 
 impl MaterialFactory {
-    pub fn create_material(&'_ mut self) -> Result<Material> {
+    pub(crate) fn create_material(&'_ mut self) -> Result<Material> {
         let descriptor_set = self.allocate_descriptor_set()?;
         Ok(Material {
             pipeline: self.pipeline,

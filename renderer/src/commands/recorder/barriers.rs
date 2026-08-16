@@ -4,11 +4,13 @@
 //! ([`transition_texture`], [`sync_texture`], [`sync_texture_same_access`],
 //! [`release_texture_to_queue`], [`prepare_texture_for_presentation`]).
 
+use std::sync::Arc;
+
+use ash::vk;
+
 use super::{CommandRecorder, Recording};
 use crate::core::queue::Queue;
 use crate::resources::texture::{Texture, TextureAccess, TextureQueueState};
-use ash::vk;
-use std::sync::Arc;
 
 impl CommandRecorder<Recording> {
     /// Records a Vulkan pipeline barrier (`vkCmdPipelineBarrier2`) for an image subresource,
@@ -311,7 +313,7 @@ impl CommandRecorder<Recording> {
 
     /// Standard same-queue transition: changes layout and synchronizes for the next access
     #[inline]
-    pub fn transition_texture(
+    pub(crate) fn transition_texture(
         &self,
         texture: &mut Texture,
         dst_layout: vk::ImageLayout,
@@ -341,7 +343,7 @@ impl CommandRecorder<Recording> {
     /// from a clear operation in the `TRANSFER` stage to a `COMPUTE_SHADER`). In those cases, use
     /// [`sync_texture`](Self::sync_texture) to explicitly specify the incoming [`TextureAccess`].
     #[inline]
-    pub fn sync_texture_same_access(&self, texture: &mut Texture) {
+    pub(crate) fn sync_texture_same_access(&self, texture: &mut Texture) {
         let dst_access = texture.access_state;
         self.insert_texture_memory_barrier(texture, None, Some(dst_access), None);
     }
@@ -373,18 +375,18 @@ impl CommandRecorder<Recording> {
     /// * `texture` - The texture being synchronized. Its internal `access_state` will be updated to `dst_access`.
     /// * `dst_access` - The [`TextureAccess`] describing the stage and access mask of the upcoming pass.
     #[inline]
-    pub fn sync_texture(&self, texture: &mut Texture, dst_access: TextureAccess) {
+    pub(crate) fn sync_texture(&self, texture: &mut Texture, dst_access: TextureAccess) {
         self.insert_texture_memory_barrier(texture, None, Some(dst_access), None);
     }
 
     /// Release ownership of a texture from this recorder's queue to `dst_queue`.
     #[inline]
-    pub fn release_texture_to_queue(&self, texture: &mut Texture, dst_queue: Arc<Queue>) {
+    pub(crate) fn release_texture_to_queue(&self, texture: &mut Texture, dst_queue: Arc<Queue>) {
         self.insert_texture_memory_barrier(texture, None, None, Some(dst_queue));
     }
 
     #[inline]
-    pub fn prepare_texture_for_presentation(&self, texture: &mut Texture) {
+    pub(crate) fn prepare_texture_for_presentation(&self, texture: &mut Texture) {
         self.insert_texture_memory_barrier(
             texture,
             Some(vk::ImageLayout::PRESENT_SRC_KHR),

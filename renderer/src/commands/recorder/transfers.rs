@@ -4,20 +4,21 @@
 //! [`blit_texture_to_texture`], [`resolve_texture`], [`clear_storage_texture`],
 //! [`clear_color_texture`], and [`clear_depth_texture`].
 
+use ash::vk;
+use color_eyre::Result;
+
 use super::{CommandRecorder, Recording};
 use crate::resources::texture::{
     ColorTexture, DepthTexture, StorageTexture, Texture, TextureAccess,
 };
-use ash::vk;
-use color_eyre::Result;
 
 impl CommandRecorder<Recording> {
-    pub fn blit_texture_to_texture(&self, src: &mut Texture, dst: &mut Texture) -> Result<()> {
+    pub(crate) fn blit_texture_to_texture(&self, src: &mut Texture, dst: &mut Texture) -> Result<()> {
         src.blit_to(dst, self.command_buffer);
         Ok(())
     }
 
-    pub fn resolve_texture(
+    pub(crate) fn resolve_texture(
         &self,
         src: &Texture,
         src_layout: vk::ImageLayout,
@@ -39,7 +40,7 @@ impl CommandRecorder<Recording> {
         Ok(())
     }
 
-    pub fn clear_storage_texture(
+    pub(crate) fn clear_storage_texture(
         &self,
         texture: &mut StorageTexture,
         color: &vk::ClearColorValue,
@@ -76,7 +77,7 @@ impl CommandRecorder<Recording> {
         Ok(())
     }
 
-    pub fn clear_color_texture(
+    pub(crate) fn clear_color_texture(
         &self,
         texture: &mut ColorTexture,
         color: &vk::ClearColorValue,
@@ -113,7 +114,7 @@ impl CommandRecorder<Recording> {
         Ok(())
     }
 
-    pub fn clear_depth_texture(&self, texture: &mut DepthTexture) -> Result<()> {
+    pub(crate) fn clear_depth_texture(&self, texture: &mut DepthTexture) -> Result<()> {
         assert!(
             texture.layout == vk::ImageLayout::GENERAL
                 || texture.layout == vk::ImageLayout::TRANSFER_DST_OPTIMAL,
