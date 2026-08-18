@@ -23,17 +23,23 @@ const UNIFORM_BUFFER_ALIGNMENT: u64 = 256;
 
 /// Owns resource lifetimes/data
 pub(crate) struct ResourceStore {
+    /// Offscreen compute render targets and G-buffers
     pub storage_textures: Vec<StorageTexture>,
+    /// Albedo, normal, and material texture maps
     pub sampled_textures: Vec<ColorTexture>,
+    /// Nearest, Linear, Repeat, Clamp texture sampling configs
     pub samplers: Vec<vk::Sampler>,
 
     pub vertex_megabuffer: Megabuffer,
     pub index_megabuffer: Megabuffer,
-    pub per_frame_megabuffer: Megabuffer,
     pub per_material_megabuffer: Megabuffer,
+    pub per_frame_megabuffer: Megabuffer,
     pub per_object_megabuffer: Megabuffer,
 
+    /// Compute pipeline factory that creates material instances for compute passes
     pub compute_material_factory: MaterialFactory,
+    /// Rasterization pipeline factory that creates material instances for rasterizing 3D geometry
+    pub graphics_material_factory: MaterialFactory,
 }
 
 impl ResourceStore {

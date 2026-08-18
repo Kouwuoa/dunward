@@ -11,15 +11,9 @@ pub(crate) mod store;
 pub(crate) mod texture;
 pub(crate) mod updater;
 
-pub(crate) use buffer::Buffer;
-pub(crate) use descriptors::DescriptorAllocator;
 pub(crate) use factory::ResourceFactory;
-pub(crate) use megabuffer::{AllocatedMegabufferRegion, Megabuffer, MegabufferExt};
+pub(crate) use megabuffer::{Megabuffer, MegabufferExt};
 pub(crate) use store::ResourceStore;
-pub(crate) use texture::{
-    ColorTexture, DepthTexture, StorageTexture, Texture, TextureAccess, TextureQueueState,
-};
-pub(crate) use updater::{ResourceUpdateBuilder, ResourceUpdater};
 
 use std::sync::{Arc, Mutex};
 
