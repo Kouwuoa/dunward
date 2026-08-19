@@ -10,12 +10,13 @@ use color_eyre::eyre::{Result, eyre};
 use vk_mem::Alloc;
 
 pub(crate) struct Buffer {
-    pub buffer: vk::Buffer,
-    pub size: u64,
+    buffer: vk::Buffer,
+    size: u64,
+    alignment: u64,
     mapped: bool,
 
     allocation: Option<vk_mem::Allocation>,
-    memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
+    mem_allocator: Arc<Mutex<vk_mem::Allocator>>,
     device: Arc<ash::Device>,
 }
 
@@ -26,7 +27,6 @@ impl Buffer {
         buf_usage: vk::BufferUsageFlags,
         mem_usage: vk_mem::MemoryUsage,
         mapped: bool,
-
         mem_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
     ) -> Result<Self> {
@@ -56,10 +56,10 @@ impl Buffer {
         Ok(Self {
             buffer,
             size,
+            alignment,
             mapped,
-
             allocation: Some(allocation),
-            memory_allocator: mem_allocator,
+            mem_allocator,
             device,
         })
     }
@@ -82,7 +82,7 @@ impl Buffer {
             .expect("Allocation does not exist");
 
         let allocation_info = self
-            .memory_allocator
+            .mem_allocator
             .lock()
             .map_err(|e| eyre!(e.to_string()))?
             .get_allocation_info(allocation);
@@ -101,6 +101,10 @@ impl Buffer {
 
         Ok(copy_record)
     }
+
+    pub fn alignment(&self) -> u64 {
+        self.alignment
+    }
 }
 
 impl Drop for Buffer {
@@ -110,7 +114,7 @@ impl Drop for Buffer {
                 .allocation
                 .as_mut()
                 .expect("Allocation does not exist");
-            self.memory_allocator
+            self.mem_allocator
                 .lock()
                 .expect("Failed to acquire lock for memory allocator")
                 .destroy_buffer(self.buffer, allocation);

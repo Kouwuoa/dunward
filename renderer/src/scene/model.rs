@@ -10,7 +10,7 @@ use super::mesh::Mesh;
 use super::vertex::Vertex;
 use crate::display::DisplayContext;
 use crate::material::shader_data::PerVertexData;
-use crate::resources::megabuffer::{AllocatedMegabufferRegion, Megabuffer, MegabufferExt};
+use crate::resources::r#mod::{AllocatedMegabufferRegion, Megabuffer, MegabufferExt};
 
 pub(crate) struct FullscreenQuad {
     quad_model: Model,

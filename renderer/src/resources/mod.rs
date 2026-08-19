@@ -11,10 +11,6 @@ pub(crate) mod store;
 pub(crate) mod texture;
 pub(crate) mod updater;
 
-pub(crate) use factory::ResourceFactory;
-pub(crate) use megabuffer::{Megabuffer, MegabufferExt};
-pub(crate) use store::ResourceStore;
-
 use std::sync::{Arc, Mutex};
 
 use ash::vk;

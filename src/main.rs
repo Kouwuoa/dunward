@@ -3,9 +3,9 @@
 
 use bevy::{prelude::*, window::WindowResolution};
 
-//mod game;
-//mod ui;
-//mod assets;
+//megabuffer game;
+//megabuffer ui;
+//megabuffer assets;
 mod render;
 
 fn main() {

@@ -11,7 +11,7 @@ use shaderpack::ShaderId;
 
 use super::ResourceType;
 use super::descriptors::{DescriptorAllocator, DescriptorSetLayoutBuilder};
-use super::megabuffer::{Megabuffer, MegabufferExt};
+use super::r#mod::{Megabuffer, MegabufferExt};
 use super::texture::{ColorTexture, DepthTexture, StorageTexture, Texture};
 use crate::commands::transfer::TransferCommandRecorder;
 use crate::material::shader::ComputeShader;

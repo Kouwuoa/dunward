@@ -9,7 +9,7 @@ use color_eyre::Result;
 use crate::commands::allocator::{CommandRecorderAllocator, CommandRecorderAllocatorExt};
 use crate::commands::recorder::{CommandRecorder, Idle};
 use crate::core::DeviceContext;
-use crate::resources::megabuffer::{AllocatedMegabufferRegion, MegabufferExt};
+use crate::resources::r#mod::{AllocatedMegabufferRegion, MegabufferExt};
 use crate::resources::store::ResourceStore;
 
 const FRAME_VERTEX_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB

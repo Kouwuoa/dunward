@@ -43,7 +43,7 @@
 //! memory range to the parent `Megabuffer`'s free-list.
 
 use std::sync::atomic::AtomicU32;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use ash::vk;
 use color_eyre::Result;
@@ -169,6 +169,14 @@ impl MegabufferState {
         Ok(())
     }
 
+    pub fn queue_upload(&mut self, staging_buffer: Buffer, dst_offset: u64, data_size: u64) {
+        self.pending_uploads.push(PendingMegabufferUpload {
+            staging_buffer,
+            dst_offset,
+            size: data_size,
+        });
+    }
+
     fn defragment_free_regions(&mut self) -> Result<()> {
         self.free_regions.sort_by_key(|r| r.offset);
 
@@ -254,7 +262,7 @@ impl Megabuffer {
     /// Find a fitting free region, split it, and return the allocated region (locks the free-list)
     pub fn allocate_region(&self, size: u64) -> Result<AllocatedMegabufferRegion> {
         let aligned_size = self.aligned_size(size);
-        let mut state = self.state.lock().map_err(|e| eyre!(e.to_string()))?;
+        let mut state = self.lock()?;
         // Find fitting free region
         let free_region = state
             .carve_free_region(aligned_size)
@@ -275,25 +283,25 @@ impl Megabuffer {
             ));
         }
 
-        let mut state = self.state.lock().map_err(|e| eyre!(e.to_string()))?;
+        let mut state = self.lock()?;
         state.reclaim_region(region)
     }
 
     pub fn defragment(&self) -> Result<()> {
-        let mut state = self.state.lock().map_err(|e| eyre!(e.to_string()))?;
+        let mut state = self.lock()?;
         state.defragment_free_regions()
     }
 
-    fn upload(&self) -> Result<()> {
-        let mut guard = self.inner.lock().map_err(|e| eyre!(e.to_string()))?;
+    pub fn upload(&self) -> Result<()> {
+        let state = self.lock()?;
 
         // Don't upload if there are no pending uploads
-        if guard.pending_uploads.is_empty() {
-            return Ok(());
+        if !state.has_pending_uploads() {
+            return Err(eyre!("No pending uploads to upload"));
         }
 
         // Drain all queued pending uploads
-        let uploads = std::mem::take(&mut guard.pending_uploads);
+        let uploads = state.drain_pending_uploads();
 
         // Record all copies into ONE single transfer command buffer
         guard.upload_recorder.immediate_submit(
@@ -331,31 +339,31 @@ impl Megabuffer {
             return Err(eyre!("Data too large for region"));
         }
 
-        let mut inner_guard = self.inner.lock().map_err(|e| eyre!(e.to_string()))?;
-
         // Allocate a temporary staging buffer ONLY for this data
         let mut staging_buffer = Buffer::new(
             data_size,
-            inner_guard.alignment,
+            self.alignment,
             vk::BufferUsageFlags::TRANSFER_SRC,
             vk_mem::MemoryUsage::AutoPreferHost,
             true,
-            inner_guard.mem_allocator.clone(),
-            inner_guard.device.clone(),
+            self.mem_allocator.clone(),
+            self.device.clone(),
         )?;
 
         let _ = staging_buffer.write(data, 0)?;
-        inner_guard.pending_uploads.push(PendingMegabufferUpload {
-            staging_buffer,
-            dst_offset: region.offset,
-            size: data_size,
-        });
+
+        let mut state = self.lock()?;
+        state.queue_upload(staging_buffer, region.offset, data_size);
 
         Ok(())
     }
 
     fn aligned_size(&self, size: u64) -> u64 {
         (size + self.alignment - 1) & !(self.alignment - 1)
+    }
+
+    fn lock(&self) -> Result<MutexGuard<MegabufferState>> {
+        self.state.lock().map_err(|e| eyre!(e.to_string()))
     }
 }
 

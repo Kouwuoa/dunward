@@ -7,7 +7,7 @@ use ash::vk;
 use color_eyre::Result;
 
 use super::factory::ResourceFactory;
-use super::megabuffer::Megabuffer;
+use super::r#mod::Megabuffer;
 use super::texture::{ColorTexture, StorageTexture};
 use crate::material::MaterialFactory;
 
