@@ -3,23 +3,21 @@
 //! Exposes [`Renderer`], orchestrating multi-buffered frames in flight, device initialization,
 //! display presentation, resizing, and teardown.
 
-use std::sync::Arc;
 use std::time::Instant;
 
 use ash::vk;
 use color_eyre::Result;
 use thiserror::Error;
 
+use crate::Camera;
 use crate::commands::allocator::{CommandRecorderAllocator, CommandRecorderAllocatorExt};
-use crate::commands::transfer::TransferCommandRecorder;
-use crate::core::DeviceContext;
-use crate::display::{DisplayContext, DisplayPresentError};
+use crate::core::{DeviceContext, device, instance};
+use crate::display::{Display, DisplayPresentError};
+use crate::frame::Frame;
 use crate::frame::packet::FrameRenderPacket;
-use crate::frame::FrameContext;
 use crate::resources::create_memory_allocator;
 use crate::resources::factory::ResourceFactory;
 use crate::resources::store::ResourceStore;
-use crate::Camera;
 
 #[derive(Debug, Error)]
 pub enum RendererError {
@@ -34,14 +32,15 @@ pub enum RendererError {
 }
 
 pub struct Renderer {
+    instance: instance::Instance,
+    device: device::Device,
+
     // Hardware & Presentation
-    dvc_ctx: DeviceContext,
-    display_ctx: DisplayContext,
-    frm_ctxs: Vec<FrameContext>,
+    display: Display,
+    frames: Vec<Frame>,
 
     // Commands & Resources
     cmd_allocator: CommandRecorderAllocator,
-    transfer_recorder: Arc<TransferCommandRecorder>,
     resource_factory: ResourceFactory,
     resource_store: ResourceStore,
 
@@ -56,18 +55,18 @@ impl Renderer {
         let _ = color_eyre::install();
         let _ = env_logger::try_init();
 
-        let mut dvc_ctx = DeviceContext::new(window)?;
+        let instance = instance::Instance::new(Some(window))?;
+        let mut surface = instance.create_surface(window)?;
+        let device = instance.create_device(&surface)?;
+        surface.init_surface_formats(&device)?;
+        surface.init_surface_present_modes(&device)?;
+        let display = Display::new(window, device, surface)?;
+
         let mut cmd_allocator =
             CommandRecorderAllocator::new(dvc_ctx.logical_device_handle())?;
-        let transfer_recorder = Arc::new(TransferCommandRecorder::new(
-            dvc_ctx.get_transfer_queue(),
-            dvc_ctx.logical_device_handle(),
-        )?);
-
         let memory_allocator = create_memory_allocator(&dvc_ctx)?;
         let resource_factory = ResourceFactory::new(
             memory_allocator.clone(),
-            transfer_recorder.clone(),
             dvc_ctx.logical_device_handle(),
         )?;
         let mut resource_store = ResourceStore::new(&resource_factory)?;
@@ -85,7 +84,7 @@ impl Renderer {
         let display_ctx = dvc_ctx.create_display_context(window, memory_allocator)?;
         let frm_ctxs = (0..Self::FRAMES_IN_FLIGHT)
             .map(|_| {
-                FrameContext::new(
+                Frame::new(
                     &mut dvc_ctx,
                     &display_ctx,
                     &mut cmd_allocator,
@@ -93,7 +92,7 @@ impl Renderer {
                     &mut resource_store,
                 )
             })
-            .collect::<Result<Vec<FrameContext>>>()?;
+            .collect::<Result<Vec<Frame>>>()?;
 
         Ok(Self {
             dvc_ctx,

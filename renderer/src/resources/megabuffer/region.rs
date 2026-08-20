@@ -1,4 +1,4 @@
-use super::MegabufferWriter;
+use super::{MegabufferId, MegabufferWriter};
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -76,6 +76,10 @@ impl AllocatedMegabufferRegion {
 
     pub fn belongs_to_megabuffer(&self, megabuffer: &Megabuffer) -> bool {
         self.parent_megabuffer.as_ref().unwrap() == megabuffer
+    }
+
+    pub fn belongs_to_megabuffer_id(&self, megabuffer_id: MegabufferId) -> bool {
+        self.parent_megabuffer.as_ref().unwrap().id == megabuffer_id
     }
 
     pub fn is_adjacent_to(&self, other: &Self) -> bool {

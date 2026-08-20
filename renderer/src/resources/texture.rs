@@ -81,8 +81,6 @@ pub(crate) struct Texture {
     destroy_view: bool,
 
     allocation: Option<vk_mem::Allocation>, // GPU-only memory block
-    memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
-    device: Arc<ash::Device>,
 }
 
 pub(crate) enum TextureQueueState {

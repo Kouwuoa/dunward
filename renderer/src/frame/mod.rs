@@ -1,6 +1,6 @@
 //! Multi-buffered frame context, stage execution, synchronization, and presentation.
 //!
-//! Exposes [`FrameContext`], orchestrating per-frame synchronization fences, semaphores,
+//! Exposes [`Frame`], orchestrating per-frame synchronization fences, semaphores,
 //! stage execution ([`FrameGeometryStage`], [`FrameLightingStage`]), and blitting to display images.
 
 pub(crate) mod geometry_stage;
@@ -20,12 +20,12 @@ use crate::commands::allocator::{CommandRecorderAllocator, CommandRecorderAlloca
 use crate::commands::recorder::{CommandRecorder, Idle};
 use crate::core::DeviceContext;
 use crate::core::semaphore::{BinarySemaphore, TimelineSemaphore};
-use crate::display::{DisplayContext, DisplayPresentError};
+use crate::display::{Display, DisplayPresentError};
 use crate::resources::factory::ResourceFactory;
 use crate::resources::store::ResourceStore;
 use crate::resources::texture::TextureAccess;
 
-pub(crate) struct FrameContext {
+pub(crate) struct Frame {
     geometry_stage: FrameGeometryStage,
     lighting_stage: FrameLightingStage,
     present_texture_acquired_semaphore: BinarySemaphore,
@@ -36,10 +36,10 @@ pub(crate) struct FrameContext {
     postrender_recorder: Option<CommandRecorder<Idle>>,
 }
 
-impl FrameContext {
+impl Frame {
     pub fn new(
         dvc_ctx: &mut DeviceContext,
-        display_ctx: &DisplayContext,
+        display_ctx: &Display,
         cmd_allocator: &mut CommandRecorderAllocator,
         resource_factory: &ResourceFactory,
         resource_store: &mut ResourceStore,
@@ -81,7 +81,7 @@ impl FrameContext {
         &mut self,
         pkt: FrameRenderPacket,
         dvc: &DeviceContext,
-        display: &DisplayContext,
+        display: &Display,
     ) -> Result<FramePresentPacket> {
         let timeout = Duration::from_secs(1);
 
@@ -181,7 +181,7 @@ impl FrameContext {
     pub fn present(
         &self,
         pkt: FramePresentPacket,
-        display: &DisplayContext,
+        display: &Display,
     ) -> core::result::Result<(), DisplayPresentError> {
         display.present(pkt.texture, &self.render_finished_semaphore)
     }

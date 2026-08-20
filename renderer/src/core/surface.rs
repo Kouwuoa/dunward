@@ -7,72 +7,54 @@ use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
 
-use crate::core::DeviceContext;
 use crate::core::device::Device;
 
 pub(crate) struct Surface {
-    pub surface: vk::SurfaceKHR,
-    pub surface_loader: ash::khr::surface::Instance,
-    pub surface_formats: Vec<vk::SurfaceFormatKHR>,
-    pub surface_present_modes: Vec<vk::PresentModeKHR>,
+    surface: vk::SurfaceKHR,
+    surface_loader: ash::khr::surface::Instance,
+    surface_formats: Vec<vk::SurfaceFormatKHR>,
+    surface_present_modes: Vec<vk::PresentModeKHR>,
 }
 
 impl Surface {
-    pub fn generate_surface_present_modes(
-        &mut self,
-        dev: &Device,
-    ) -> Result<&Vec<vk::PresentModeKHR>> {
+    pub fn init_surface_present_modes(&mut self, device: &Device) -> Result<()> {
         if !self.surface_present_modes.is_empty() {
             return Err(eyre!("Surface present modes have already been generated"));
         }
 
         self.surface_present_modes = unsafe {
             self.surface_loader
-                .get_physical_device_surface_present_modes(dev.physical, self.surface)?
+                .get_physical_device_surface_present_modes(device.raw_physical(), self.surface)?
         };
 
-        Ok(&self.surface_present_modes)
+        Ok(())
     }
 
-    pub fn generate_surface_formats(
-        &mut self,
-        dev: &Device,
-    ) -> Result<&Vec<vk::SurfaceFormatKHR>> {
+    pub fn init_surface_formats(&mut self, device: &Device) -> Result<()> {
         if !self.surface_formats.is_empty() {
             return Err(eyre!("Surface formats have already been generated"));
         }
 
         self.surface_formats = unsafe {
             self.surface_loader
-                .get_physical_device_surface_formats(dev.physical, self.surface)?
+                .get_physical_device_surface_formats(device.raw_physical(), self.surface)?
         };
 
-        Ok(&self.surface_formats)
-    }
-}
-
-/// Surface-related methods for DeviceContext
-impl DeviceContext {
-    pub fn raw_surface_handle(&self) -> vk::SurfaceKHR {
-        self.surface.surface
+        Ok(())
     }
 
     pub fn get_physical_device_surface_capabilities(
         &self,
+        device: &Device,
     ) -> Result<vk::SurfaceCapabilitiesKHR> {
         Ok(unsafe {
-            self.surface
-                .surface_loader
-                .get_physical_device_surface_capabilities(
-                    self.device.physical,
-                    self.surface.surface,
-                )?
+            self.surface_loader
+                .get_physical_device_surface_capabilities(device.raw_physical(), self.surface)?
         })
     }
 
     pub fn find_suitable_surface_format(&self) -> Result<vk::SurfaceFormatKHR> {
-        self.surface
-            .surface_formats
+        self.surface_formats
             .iter()
             .find(|format| {
                 format.format == vk::Format::B8G8R8A8_SRGB
@@ -84,10 +66,13 @@ impl DeviceContext {
 
     pub fn find_suitable_surface_present_mode(&self) -> vk::PresentModeKHR {
         *self
-            .surface
             .surface_present_modes
             .iter()
             .find(|mode| **mode == vk::PresentModeKHR::MAILBOX)
             .unwrap_or(&vk::PresentModeKHR::FIFO)
+    }
+
+    pub fn raw(&self) -> vk::SurfaceKHR {
+        self.surface
     }
 }

@@ -11,7 +11,7 @@ use crate::commands::allocator::{CommandRecorderAllocator, CommandRecorderAlloca
 use crate::commands::recorder::{CommandRecorder, Idle};
 use crate::core::DeviceContext;
 use crate::core::semaphore::TimelineSemaphore;
-use crate::display::DisplayContext;
+use crate::display::Display;
 use crate::material::Material;
 use crate::material::shader_data::PerDrawData;
 use crate::resources::factory::ResourceFactory;
@@ -35,7 +35,7 @@ pub(crate) struct FrameLightingStage {
 impl FrameLightingStage {
     pub fn new(
         dvc_ctx: &DeviceContext,
-        display_ctx: &DisplayContext,
+        display_ctx: &Display,
         cmd_allocator: &mut CommandRecorderAllocator,
         resource_factory: &ResourceFactory,
         resource_store: &mut ResourceStore,

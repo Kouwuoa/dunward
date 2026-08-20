@@ -1,14 +1,18 @@
+use super::MegabufferId;
 use super::region::{AllocatedMegabufferRegion, FreeMegabufferRegion};
+use color_eyre::eyre::{Result, eyre};
 
 /// Mutex-guarded CPU state of the [`Megabuffer`]
 pub(crate) struct MegabufferFreeList {
+    megabuffer_id: MegabufferId,
     free_regions: Vec<FreeMegabufferRegion>,
 }
 
 impl MegabufferFreeList {
     /// Initialize a single free region covering the entire capacity
-    pub fn new(total_capacity: u64) -> Self {
+    pub fn new(megabuffer_id: MegabufferId, total_capacity: u64) -> Self {
         Self {
+            megabuffer_id,
             free_regions: vec![FreeMegabufferRegion {
                 offset: 0,
                 size: total_capacity,
@@ -56,9 +60,17 @@ impl MegabufferFreeList {
         Some(new_region)
     }
 
-    pub fn reclaim_region(&mut self, region: &mut AllocatedMegabufferRegion) {
+    pub fn reclaim_region(&mut self, region: &mut AllocatedMegabufferRegion) -> Result<()> {
+        if !region.belongs_to_megabuffer_id(self.megabuffer_id) {
+            return Err(eyre!(
+                "Attempted to reclaim a region that does not belong to this megabuffer"
+            ));
+        }
+
         self.reclaim(region.offset, region.size);
         region.size = 0; // Mark the region as invalid by setting size to 0
+
+        Ok(())
     }
 
     fn reclaim(&mut self, offset: u64, size: u64) {
@@ -94,10 +106,7 @@ impl MegabufferFreeList {
             }
             // Case D: No adjacent free regions, so insert and keep sorted by offset
             (None, None) => {
-                let region = FreeMegabufferRegion {
-                    offset,
-                    size,
-                };
+                let region = FreeMegabufferRegion { offset, size };
                 self.free_regions.push(region);
                 self.free_regions.sort_by_key(|r| r.offset);
             }
@@ -126,9 +135,11 @@ impl MegabufferFreeList {
 mod tests {
     use super::*;
 
+    static MEGABUFFER_ID: MegabufferId = MegabufferId(0);
+
     #[test]
     fn test_new_freelist() {
-        let freelist = MegabufferFreeList::new(1024);
+        let freelist = MegabufferFreeList::new(MEGABUFFER_ID, 1024);
         assert_eq!(freelist.free_regions.len(), 1);
         assert_eq!(freelist.free_regions[0].offset, 0);
         assert_eq!(freelist.free_regions[0].size, 1024);
@@ -136,7 +147,7 @@ mod tests {
 
     #[test]
     fn test_carve_free_region() {
-        let mut freelist = MegabufferFreeList::new(1024);
+        let mut freelist = MegabufferFreeList::new(MEGABUFFER_ID, 1024);
         let carved = freelist.carve_free_region(256);
         assert!(carved.is_some());
         let carved = carved.unwrap();
@@ -146,7 +157,7 @@ mod tests {
 
     #[test]
     fn test_carve_out_of_memory() {
-        let mut freelist = MegabufferFreeList::new(512);
+        let mut freelist = MegabufferFreeList::new(MEGABUFFER_ID, 512);
         let carved = freelist.carve_free_region(1024);
         assert!(carved.is_none());
     }
@@ -154,9 +165,16 @@ mod tests {
     #[test]
     fn test_reclaim_isolated() {
         let mut freelist = MegabufferFreeList {
+            megabuffer_id: MEGABUFFER_ID,
             free_regions: vec![
-                FreeMegabufferRegion { offset: 0, size: 100 },
-                FreeMegabufferRegion { offset: 500, size: 100 },
+                FreeMegabufferRegion {
+                    offset: 0,
+                    size: 100,
+                },
+                FreeMegabufferRegion {
+                    offset: 500,
+                    size: 100,
+                },
             ],
         };
 
@@ -173,9 +191,16 @@ mod tests {
     #[test]
     fn test_reclaim_merge_left() {
         let mut freelist = MegabufferFreeList {
+            megabuffer_id: MEGABUFFER_ID,
             free_regions: vec![
-                FreeMegabufferRegion { offset: 0, size: 100 },
-                FreeMegabufferRegion { offset: 500, size: 100 },
+                FreeMegabufferRegion {
+                    offset: 0,
+                    size: 100,
+                },
+                FreeMegabufferRegion {
+                    offset: 500,
+                    size: 100,
+                },
             ],
         };
 
@@ -191,9 +216,16 @@ mod tests {
     #[test]
     fn test_reclaim_merge_right() {
         let mut freelist = MegabufferFreeList {
+            megabuffer_id: MEGABUFFER_ID,
             free_regions: vec![
-                FreeMegabufferRegion { offset: 0, size: 100 },
-                FreeMegabufferRegion { offset: 500, size: 100 },
+                FreeMegabufferRegion {
+                    offset: 0,
+                    size: 100,
+                },
+                FreeMegabufferRegion {
+                    offset: 500,
+                    size: 100,
+                },
             ],
         };
 
@@ -210,9 +242,16 @@ mod tests {
     #[test]
     fn test_reclaim_merge_both() {
         let mut freelist = MegabufferFreeList {
+            megabuffer_id: MEGABUFFER_ID,
             free_regions: vec![
-                FreeMegabufferRegion { offset: 0, size: 100 },
-                FreeMegabufferRegion { offset: 200, size: 100 },
+                FreeMegabufferRegion {
+                    offset: 0,
+                    size: 100,
+                },
+                FreeMegabufferRegion {
+                    offset: 200,
+                    size: 100,
+                },
             ],
         };
 
@@ -227,10 +266,20 @@ mod tests {
     #[test]
     fn test_defragment_free_regions() {
         let mut freelist = MegabufferFreeList {
+            megabuffer_id: MEGABUFFER_ID,
             free_regions: vec![
-                FreeMegabufferRegion { offset: 200, size: 100 },
-                FreeMegabufferRegion { offset: 0, size: 100 },
-                FreeMegabufferRegion { offset: 100, size: 100 },
+                FreeMegabufferRegion {
+                    offset: 200,
+                    size: 100,
+                },
+                FreeMegabufferRegion {
+                    offset: 0,
+                    size: 100,
+                },
+                FreeMegabufferRegion {
+                    offset: 100,
+                    size: 100,
+                },
             ],
         };
 
@@ -241,4 +290,3 @@ mod tests {
         assert_eq!(freelist.free_regions[0].size, 300);
     }
 }
-

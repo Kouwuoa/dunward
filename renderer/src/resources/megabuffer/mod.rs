@@ -1,16 +1,16 @@
 mod freelist;
 mod region;
 mod writer;
+mod uploader;
 
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
 use std::sync::atomic::AtomicU32;
 use std::sync::mpsc::Receiver;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, mpsc};
 
 use super::buffer::Buffer;
-use crate::commands::transfer::TransferCommandRecorder;
 use freelist::MegabufferFreeList;
 use region::AllocatedMegabufferRegion;
 use writer::{MegabufferWriteRecord, MegabufferWriter};
@@ -34,7 +34,6 @@ pub(crate) struct Megabuffer {
     write_receiver: Receiver<MegabufferWriteRecord>,
 
     device: Arc<ash::Device>,
-    upload_recorder: Arc<TransferCommandRecorder>,
 }
 
 impl PartialEq for Megabuffer {
@@ -48,9 +47,8 @@ impl Megabuffer {
         size: u64,
         alignment: u64,
         buf_usage: vk::BufferUsageFlags,
-        memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
+        mem_allocator: Arc<Mutex<vk_mem::Allocator>>,
         device: Arc<ash::Device>,
-        upload_recorder: Arc<TransferCommandRecorder>,
     ) -> Result<Megabuffer> {
         log::info!(
             "Creating Megabuffer with size: {}, alignment: {}, usage: {:?}",
@@ -66,21 +64,28 @@ impl Megabuffer {
             buf_usage,
             mem_usage,
             false,
-            memory_allocator.clone(),
+            mem_allocator.clone(),
             device.clone(),
         )?);
 
+        let id = MegabufferId::generate();
+        let free_list = Arc::new(Mutex::new(MegabufferFreeList::new(id, size)));
+        let (write_sender, write_receiver) = mpsc::channel();
+        let writer = Arc::new(MegabufferWriter::new(
+            id,
+            alignment,
+            write_sender,
+            device.clone(),
+            mem_allocator.clone(),
+        ));
+
         Ok(Megabuffer {
-            id: MegabufferId::generate(),
-
+            id,
             buffer,
-            state: Arc::new(Mutex::new(MegabufferState {
-                free_regions: vec![FreeMegabufferRegion { offset: 0, size }],
-                pending_uploads: vec![],
-            })),
-
+            free_list,
+            writer,
+            write_receiver,
             device,
-            upload_recorder,
         })
     }
 
@@ -172,4 +177,3 @@ impl Megabuffer {
         self.state.lock().map_err(|e| eyre!(e.to_string()))
     }
 }
-

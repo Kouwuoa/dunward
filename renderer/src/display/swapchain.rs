@@ -3,11 +3,11 @@
 //! Wraps [`ash::vk::SwapchainKHR`], querying surface capabilities, selecting
 //! extent/formats, and constructing swapchain image views for window presentation.
 
+use crate::core::device::Device;
+use crate::core::surface::Surface;
 use ash::vk;
 use color_eyre::Result;
 use winit::dpi::PhysicalSize;
-
-use crate::core::DeviceContext;
 
 pub(crate) type SwapchainImage = vk::Image;
 pub(crate) type SwapchainImageIndex = u32;
@@ -39,12 +39,13 @@ impl Drop for Swapchain {
 impl Swapchain {
     pub fn new(
         size: &PhysicalSize<u32>,
-        dvc_ctx: &DeviceContext,
+        device: &Device,
+        surface: &Surface,
         old_swapchain: Option<&Self>,
     ) -> Result<Self> {
-        let surface_format = dvc_ctx.find_suitable_surface_format()?;
-        let surface_present_mode = dvc_ctx.find_suitable_surface_present_mode();
-        let surface_capabilities = dvc_ctx.get_physical_device_surface_capabilities()?;
+        let surface_format = surface.find_suitable_surface_format()?;
+        let surface_present_mode = surface.find_suitable_surface_present_mode();
+        let surface_capabilities = surface.get_physical_device_surface_capabilities(device)?;
 
         let image_extent = {
             if surface_capabilities.current_extent.width != u32::MAX {
@@ -71,8 +72,8 @@ impl Swapchain {
         };
 
         let queue_family_indices = [
-            dvc_ctx.get_graphics_queue().family.index,
-            dvc_ctx.get_present_queue().family.index,
+            device.get_graphics_queue().family.index,
+            device.get_present_queue().family.index,
         ];
         let image_sharing_mode = if queue_family_indices[0] != queue_family_indices[1] {
             vk::SharingMode::CONCURRENT
@@ -85,10 +86,10 @@ impl Swapchain {
             None => vk::SwapchainKHR::null(),
         };
 
-        let swapchain_loader = dvc_ctx.create_vk_swapchain_loader();
+        let swapchain_loader = device.create_vk_swapchain_loader();
         let swapchain = unsafe {
             let mut info = vk::SwapchainCreateInfoKHR::default()
-                .surface(dvc_ctx.raw_surface_handle())
+                .surface(surface.raw())
                 .min_image_count(image_count)
                 .image_format(surface_format.format)
                 .image_color_space(surface_format.color_space)
@@ -130,7 +131,7 @@ impl Swapchain {
                         base_array_layer: 0,
                         layer_count: 1,
                     });
-                dvc_ctx.create_vk_image_view(&view_info)
+                device.create_vk_image_view(&view_info)
             })
             .collect::<Result<Vec<vk::ImageView>>>()?;
 

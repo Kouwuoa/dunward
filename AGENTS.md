@@ -73,7 +73,7 @@ Manages window display presentation, vsync modes, surface formats, and backbuffe
 * [`swapchain.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/display/swapchain.rs): Low-level swapchain
   handle, image views, and display surface recreation.
 * [`mod.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/display/mod.rs): [
-  `DisplayContext`](file:///C:/Users/koada/workspace/dunward/renderer/src/display/mod.rs#L39), [
+  `Display`](file:///C:/Users/koada/workspace/dunward/renderer/src/display/mod.rs#L39), [
   `PresentTextureBundle`](file:///C:/Users/koada/workspace/dunward/renderer/src/display/mod.rs#L23), [
   `DisplayPresentError`](file:///C:/Users/koada/workspace/dunward/renderer/src/display/mod.rs#L30).
 
@@ -175,7 +175,7 @@ Multi-buffered frame execution and rendering stages:
 * [`lighting_stage.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/frame/lighting_stage.rs): Compute lighting
   stage.
 * [`mod.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/frame/mod.rs): [
-  `FrameContext`](file:///C:/Users/koada/workspace/dunward/renderer/src/frame/mod.rs#L26).
+  `Frame`](file:///C:/Users/koada/workspace/dunward/renderer/src/frame/mod.rs#L26).
 
 ---
 

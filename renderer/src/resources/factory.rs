@@ -31,7 +31,6 @@ pub(crate) struct ResourceFactory {
 impl ResourceFactory {
     pub fn new(
         memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
-        transfer_command_recorder: Arc<TransferCommandRecorder>,
         device: Arc<ash::Device>,
     ) -> Result<Self> {
         let descriptor_allocator =

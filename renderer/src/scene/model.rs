@@ -8,7 +8,7 @@ use glam::Vec3;
 
 use super::mesh::Mesh;
 use super::vertex::Vertex;
-use crate::display::DisplayContext;
+use crate::display::Display;
 use crate::material::shader_data::PerVertexData;
 use crate::resources::r#mod::{AllocatedMegabufferRegion, Megabuffer, MegabufferExt};
 
@@ -23,7 +23,7 @@ impl FullscreenQuad {
     pub fn new(
         vertex_megabuffer: &Megabuffer,
         index_megabuffer: &Megabuffer,
-        display: &DisplayContext,
+        display: &Display,
     ) -> Result<Self> {
         let quad_mesh = Mesh::new_quad();
         let quad_model = Model::new(vec![quad_mesh], vertex_megabuffer, index_megabuffer)?;
@@ -39,7 +39,7 @@ impl FullscreenQuad {
 
     pub fn resize_to_display(
         &mut self,
-        display_ctx: &DisplayContext,
+        display_ctx: &Display,
         vertex_megabuffer: &Megabuffer,
     ) -> Result<()> {
         // Correct for image aspect ratio

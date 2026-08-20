@@ -5,26 +5,30 @@
 
 use std::ffi::{CStr, c_char};
 use std::str::Utf8Error;
-use std::sync::Arc;
-
-use ash::vk;
-use color_eyre::Result;
-use color_eyre::eyre::OptionExt;
+use std::sync::{Arc, Mutex};
 
 use super::instance::Instance;
 use super::queue::{Queue, QueueFamily};
 use super::semaphore::{SemaphoreValue, SignalSemaphore, WaitSemaphore};
+use crate::resources::texture::{ColorTexture, Texture};
+use ash::vk;
+use color_eyre::Result;
+use color_eyre::eyre::OptionExt;
 
 /// Main way to submit rendering commands to the GPU.
 pub(crate) struct Device {
-    pub logical: Arc<ash::Device>,
-    pub physical: vk::PhysicalDevice,
+    logical: Arc<ash::Device>,
+    physical: vk::PhysicalDevice,
 
     /// For now, require the graphics queue to support presentation
     graphics_queue: Arc<Queue>,
     compute_queue: Arc<Queue>,
     transfer_queue: Arc<Queue>,
+
+    mem_allocator: Arc<Mutex<vk_mem::Allocator>>,
 }
+
+impl Device {}
 
 impl Device {
     pub fn new(
@@ -58,6 +62,14 @@ impl Device {
         };
 
         Ok(dev)
+    }
+
+    pub fn raw_physical(&self) -> vk::PhysicalDevice {
+        self.physical
+    }
+
+    pub fn raw_logical(&self) -> Arc<ash::Device> {
+        self.logical.clone()
     }
 
     pub fn submit(
@@ -102,8 +114,8 @@ impl Device {
             .iter()
             .any(|s| matches!(s.value, SemaphoreValue::Timeline(_)))
             || signal_semaphores
-                .iter()
-                .any(|s| matches!(s.value, SemaphoreValue::Timeline(_)));
+            .iter()
+            .any(|s| matches!(s.value, SemaphoreValue::Timeline(_)));
 
         let mut submit = vk::SubmitInfo::default()
             .wait_semaphores(&wait_sems)
@@ -147,6 +159,114 @@ impl Device {
 
     pub fn get_transfer_queue(&self) -> Arc<Queue> {
         self.transfer_queue.clone()
+    }
+
+    pub fn create_binary_semaphore(&self) -> Result<BinarySemaphore> {
+        Ok(BinarySemaphore::new(unsafe {
+            self.device
+                .logical
+                .create_semaphore(&vk::SemaphoreCreateInfo::default(), None)?
+        }))
+    }
+
+    pub fn create_timeline_semaphore(&self) -> Result<TimelineSemaphore> {
+        Ok(TimelineSemaphore::new(unsafe {
+            self.device.logical.create_semaphore(
+                &vk::SemaphoreCreateInfo::default().push_next(&mut vk::SemaphoreTypeCreateInfo {
+                    semaphore_type: vk::SemaphoreType::TIMELINE,
+                    initial_value: 0,
+                    ..Default::default()
+                }),
+                None,
+            )?
+        }))
+    }
+
+    pub fn wait_timeline_semaphore(
+        &self,
+        semaphore: vk::Semaphore,
+        value: u64,
+        timeout: Duration,
+    ) -> Result<()> {
+        let wait_info = vk::SemaphoreWaitInfo::default()
+            .semaphores(std::slice::from_ref(&semaphore))
+            .values(std::slice::from_ref(&value));
+
+        unsafe {
+            self.device
+                .logical
+                .wait_semaphores(&wait_info, timeout.as_nanos() as u64)?;
+        }
+        Ok(())
+    }
+
+    pub fn wait_and_reset_fence(&self, fence: vk::Fence, timeout: Duration) -> Result<()> {
+        unsafe {
+            let fences = [fence];
+            self.device
+                .logical
+                .wait_for_fences(&fences, true, timeout.as_nanos() as u64)?;
+            self.device.logical.reset_fences(&fences)?;
+        }
+        Ok(())
+    }
+
+    pub fn wait_idle(&self) -> Result<()> {
+        Ok(unsafe { self.logical.device_wait_idle()? })
+    }
+
+    pub fn create_display_context(
+        &self,
+        window: &winit::window::Window,
+        memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
+    ) -> Result<Display> {
+        Display::new(window, self, memory_allocator)
+    }
+
+    pub fn submit(
+        &self,
+        cmd_recorder: CommandRecorder<Executable>,
+        wait_semaphores: &[WaitSemaphore],
+        signal_semaphores: &[SignalSemaphore],
+        fence: Option<vk::Fence>,
+    ) -> Result<CommandRecorder<Idle>> {
+        let cmd = cmd_recorder.get_command_buffer();
+        let queue = cmd_recorder.get_queue();
+
+        self.device
+            .submit(cmd, queue, wait_semaphores, signal_semaphores, fence)?;
+
+        Ok(CommandRecorder::<Idle>::new_from_old(cmd_recorder))
+    }
+
+    pub fn create_color_texture_from_vkimage(image: &vk::Image, view: &vk::ImageView, format: &vk::Format, extent: &vk::Extent2D, destroy_view: bool, queue: Arc<Queue>) -> ColorTexture {
+        Texture::new_color_texture_from_vkimage(
+            image,
+            view,
+            format,
+            extent,
+            destroy_view,
+            queue,
+            self.mem_
+            self.memory_allocator.clone(),
+            self.device.clone(),
+        );
+    }
+
+    pub fn create_vk_image_view(&self, info: &vk::ImageViewCreateInfo) -> Result<vk::ImageView> {
+        Ok(unsafe { self.device.logical.create_image_view(info, None)? })
+    }
+
+    pub fn create_vk_sampler(&self, info: &vk::SamplerCreateInfo) -> Result<vk::Sampler> {
+        Ok(unsafe { self.device.logical.create_sampler(info, None)? })
+    }
+
+    pub fn create_vk_fence(&self, info: &vk::FenceCreateInfo) -> Result<vk::Fence> {
+        Ok(unsafe { self.device.logical.create_fence(info, None)? })
+    }
+
+    pub fn create_vk_swapchain_loader(&self) -> ash::khr::swapchain::Device {
+        ash::khr::swapchain::Device::new(self.instance.inner(), &self.device.logical)
     }
 
     fn select_physical_device(
@@ -197,7 +317,7 @@ impl Device {
                                 let supports_present = {
                                     surface_loader
                                         .get_physical_device_surface_support(
-                                             device, i as u32, *surface,
+                                            device, i as u32, *surface,
                                         )
                                         .map_or(false, |b| b)
                                 };
@@ -254,11 +374,11 @@ impl Device {
                 })
                 .map(
                     |(
-                        device,
-                        graphics_queue_family_index,
-                        compute_queue_family_index,
-                        transfer_queue_family_index,
-                    )| {
+                         device,
+                         graphics_queue_family_index,
+                         compute_queue_family_index,
+                         transfer_queue_family_index,
+                     )| {
                         let queue_family_props =
                             instance.get_physical_device_queue_family_properties(device);
                         let graphics_props = queue_family_props

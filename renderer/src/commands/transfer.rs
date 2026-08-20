@@ -61,9 +61,12 @@ impl TransferCommandRecorder {
         })
     }
 
-    // Instantly execute some commands to the GPU without dealing with the render loop and other synchronization
-    // This is great for compute calculations and can be used from a background thread separated from the render loop
-    pub fn immediate_submit<F>(&self, func: F) -> Result<()>
+    /// Instantly execute some commands to the GPU without dealing with the render loop and other synchronization
+    /// This is great for compute calculations and can be used from a background thread separated from the render loop
+    /// # Important
+    /// This function is not thread-safe and should only be called from a single thread at a time.
+    /// It takes a mutable reference to `self` to ensure exclusive access.
+    pub fn immediate_submit<F>(&mut self, func: F) -> Result<()>
     where
         F: FnOnce(vk::CommandBuffer, &ash::Device) -> Result<()>,
     {

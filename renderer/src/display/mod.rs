@@ -1,25 +1,25 @@
 //! Window Display Presentation, Backbuffers, and Frame Presentation.
 //!
-//! Exposes [`DisplayContext`], which manages the acquisition of next presentation targets,
+//! Exposes [`Display`], which manages the acquisition of next presentation targets,
 //! queuing backbuffer images for presentation on the presentation queue, and handling window resizes.
 
 pub(crate) mod swapchain;
 
 pub(crate) use swapchain::Swapchain;
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
+use crate::core::device::Device;
+use crate::core::queue::Queue;
+use crate::core::semaphore::BinarySemaphore;
+use crate::core::surface::Surface;
+use crate::resources::texture::ColorTexture;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
 use thiserror::Error;
 use winit::window::Window;
-
-use crate::core::DeviceContext;
-use crate::core::queue::Queue;
-use crate::core::semaphore::BinarySemaphore;
-use crate::resources::texture::{ColorTexture, Texture};
 
 pub(crate) struct PresentTextureBundle {
     pub texture: ColorTexture,
@@ -37,28 +37,26 @@ pub(crate) enum DisplayPresentError {
 }
 
 /// Presentation target of the renderer, encapsulating the display surface and swapchain
-pub(crate) struct DisplayContext {
-    pub swapchain: Swapchain,
+pub(crate) struct Display {
+    surface: Surface,
+    swapchain: Swapchain,
     present_queue: Arc<Queue>,
-    memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
-    device: Arc<ash::Device>,
+    device: Arc<Device>,
 }
 
-impl DisplayContext {
+impl Display {
     pub fn new(
         window: &Window,
-        dvc_ctx: &DeviceContext,
-        memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
+        device: Arc<Device>,
+        surface: Surface,
     ) -> Result<Self> {
-        log::info!("Creating DisplayContext");
-
-        let swapchain = Swapchain::new(&window.inner_size(), dvc_ctx, None)?;
+        let swapchain = Swapchain::new(&window.inner_size(), &device, &surface, None)?;
 
         Ok(Self {
+            surface,
             swapchain,
-            present_queue: dvc_ctx.get_present_queue(),
-            memory_allocator,
-            device: dvc_ctx.logical_device_handle(),
+            present_queue: device.get_present_queue(),
+            device,
         })
     }
 
@@ -94,16 +92,14 @@ impl DisplayContext {
             ))?;
         let format = &self.swapchain.swapchain_image_format;
         let extent = &self.swapchain.swapchain_image_extent;
-        let texture = Texture::new_color_texture_from_vkimage(
+        self.device.create_color_texture_from_vkimage(
             image,
             view,
             format,
             extent,
             false,
             self.present_queue.clone(),
-            self.memory_allocator.clone(),
-            self.device.clone(),
-        );
+        )?;
 
         Ok(PresentTextureBundle {
             texture,
@@ -145,12 +141,9 @@ impl DisplayContext {
     pub fn resize(
         &mut self,
         size: &winit::dpi::PhysicalSize<u32>,
-        dvc_ctx: &DeviceContext,
     ) -> Result<()> {
-        dvc_ctx.wait_device_idle()?;
-
-        self.swapchain = Swapchain::new(size, dvc_ctx, Some(&self.swapchain))?;
-
+        self.device.wait_idle()?;
+        self.swapchain = Swapchain::new(size, &self.device, &self.surface, Some(&self.swapchain))?;
         Ok(())
     }
 

@@ -87,7 +87,7 @@ impl Buffer {
             .map_err(|e| eyre!(e.to_string()))?
             .get_allocation_info(allocation);
 
-        if std::mem::size_of_val(data) as u64 > allocation_info.size {
+        if size_of_val(data) as u64 > allocation_info.size {
             return Err(eyre!("Data too large to write into buffer"));
         }
 
@@ -100,10 +100,6 @@ impl Buffer {
         let copy_record = presser::copy_to_offset(&data, &mut slab, start_offset)?;
 
         Ok(copy_record)
-    }
-
-    pub fn alignment(&self) -> u64 {
-        self.alignment
     }
 }
 
