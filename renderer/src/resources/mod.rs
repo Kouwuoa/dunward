@@ -4,32 +4,14 @@
 //! for constructing GPU memory allocations and textures, and [`Megabuffer`] for pooled sub-allocations.
 
 pub(crate) mod buffer;
-pub(crate) mod descriptors;
+pub(crate) mod descriptor;
 pub(crate) mod factory;
 pub(crate) mod megabuffer;
 pub(crate) mod store;
 pub(crate) mod texture;
 pub(crate) mod updater;
 
-use std::sync::{Arc, Mutex};
-
 use ash::vk;
-use color_eyre::eyre::Result;
-
-use crate::core::DeviceContext;
-
-/// Helper function to instantiate the `vk_mem::Allocator` instance.
-pub(crate) fn create_memory_allocator(
-    dvc_ctx: &DeviceContext,
-) -> Result<Arc<Mutex<vk_mem::Allocator>>> {
-    Ok(Arc::new(Mutex::new(unsafe {
-        vk_mem::Allocator::new(vk_mem::AllocatorCreateInfo::new(
-            &dvc_ctx.instance_handle(),
-            &dvc_ctx.logical_device_handle(),
-            dvc_ctx.physical_device_handle(),
-        ))?
-    })))
-}
 
 #[derive(PartialEq)]
 pub(crate) enum ResourceType {

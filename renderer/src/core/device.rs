@@ -6,14 +6,17 @@
 use std::ffi::{CStr, c_char};
 use std::str::Utf8Error;
 use std::sync::{Arc, Mutex};
-
+use std::time::Duration;
 use super::instance::Instance;
 use super::queue::{Queue, QueueFamily};
-use super::semaphore::{SemaphoreValue, SignalSemaphore, WaitSemaphore};
+use super::semaphore::{BinarySemaphore, SemaphoreValue, SignalSemaphore, TimelineSemaphore, WaitSemaphore};
 use crate::resources::texture::{ColorTexture, Texture};
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::OptionExt;
+use crate::commands::{CommandRecorder, Executable, Idle};
+use crate::core::surface::Surface;
+use crate::display::Display;
 
 /// Main way to submit rendering commands to the GPU.
 pub(crate) struct Device {
@@ -33,14 +36,14 @@ impl Device {}
 impl Device {
     pub fn new(
         instance: &Instance,
-        surface: Option<(&vk::SurfaceKHR, &ash::khr::surface::Instance)>,
+        surface: &Surface,
     ) -> Result<Self> {
         let (physical_device, graphics_queue_family, compute_queue_family, transfer_queue_family) =
-            Self::select_physical_device(instance.inner(), surface)?;
+            Self::select_physical_device(instance.raw(), Some((&surface.raw(), surface.raw_loader())))?;
 
         let (logical_device, graphics_queue, compute_queue, transfer_queue) =
             Self::create_logical_device(
-                instance.inner(),
+                instance.raw(),
                 &physical_device,
                 graphics_queue_family,
                 compute_queue_family,
@@ -52,6 +55,14 @@ impl Device {
         let compute_queue = Arc::new(compute_queue);
         let transfer_queue = Arc::new(transfer_queue);
 
+        let mem_allocator = Arc::new(Mutex::new(unsafe {
+            vk_mem::Allocator::new(vk_mem::AllocatorCreateInfo::new(
+                &instance.raw(),
+                &logical_device,
+                physical_device,
+            ))?
+        }));
+
         let dev = Self {
             logical: logical_device,
             physical: physical_device,
@@ -59,6 +70,8 @@ impl Device {
             graphics_queue,
             compute_queue,
             transfer_queue,
+
+            mem_allocator,
         };
 
         Ok(dev)
@@ -74,13 +87,12 @@ impl Device {
 
     pub fn submit(
         &self,
-        cmd: vk::CommandBuffer,
-        queue: Arc<Queue>,
+        cmd_recorder: CommandRecorder<Executable>,
         wait_semaphores: &[WaitSemaphore],
         signal_semaphores: &[SignalSemaphore],
         fence: Option<vk::Fence>,
-    ) -> Result<()> {
-        let command_buffers = [cmd];
+    ) -> Result<CommandRecorder<Idle>> {
+        let command_buffers = [cmd_recorder.get_command_buffer()];
 
         let wait_sems = wait_semaphores
             .iter()
@@ -139,10 +151,10 @@ impl Device {
 
         let fence = fence.map_or(vk::Fence::null(), |fence| fence);
         unsafe {
-            self.logical.queue_submit(queue.handle, &[submit], fence)?;
+            self.logical.queue_submit(cmd_recorder.get_queue().handle, &[submit], fence)?;
         }
 
-        Ok(())
+        Ok(CommandRecorder::<Idle>::new_from_old(cmd_recorder))
     }
 
     pub fn get_present_queue(&self) -> Arc<Queue> {
@@ -163,15 +175,14 @@ impl Device {
 
     pub fn create_binary_semaphore(&self) -> Result<BinarySemaphore> {
         Ok(BinarySemaphore::new(unsafe {
-            self.device
-                .logical
+            self.logical
                 .create_semaphore(&vk::SemaphoreCreateInfo::default(), None)?
         }))
     }
 
     pub fn create_timeline_semaphore(&self) -> Result<TimelineSemaphore> {
         Ok(TimelineSemaphore::new(unsafe {
-            self.device.logical.create_semaphore(
+            self.logical.create_semaphore(
                 &vk::SemaphoreCreateInfo::default().push_next(&mut vk::SemaphoreTypeCreateInfo {
                     semaphore_type: vk::SemaphoreType::TIMELINE,
                     initial_value: 0,
@@ -193,7 +204,7 @@ impl Device {
             .values(std::slice::from_ref(&value));
 
         unsafe {
-            self.device
+            self
                 .logical
                 .wait_semaphores(&wait_info, timeout.as_nanos() as u64)?;
         }
@@ -203,40 +214,16 @@ impl Device {
     pub fn wait_and_reset_fence(&self, fence: vk::Fence, timeout: Duration) -> Result<()> {
         unsafe {
             let fences = [fence];
-            self.device
+            self
                 .logical
                 .wait_for_fences(&fences, true, timeout.as_nanos() as u64)?;
-            self.device.logical.reset_fences(&fences)?;
+            self.logical.reset_fences(&fences)?;
         }
         Ok(())
     }
 
     pub fn wait_idle(&self) -> Result<()> {
         Ok(unsafe { self.logical.device_wait_idle()? })
-    }
-
-    pub fn create_display_context(
-        &self,
-        window: &winit::window::Window,
-        memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
-    ) -> Result<Display> {
-        Display::new(window, self, memory_allocator)
-    }
-
-    pub fn submit(
-        &self,
-        cmd_recorder: CommandRecorder<Executable>,
-        wait_semaphores: &[WaitSemaphore],
-        signal_semaphores: &[SignalSemaphore],
-        fence: Option<vk::Fence>,
-    ) -> Result<CommandRecorder<Idle>> {
-        let cmd = cmd_recorder.get_command_buffer();
-        let queue = cmd_recorder.get_queue();
-
-        self.device
-            .submit(cmd, queue, wait_semaphores, signal_semaphores, fence)?;
-
-        Ok(CommandRecorder::<Idle>::new_from_old(cmd_recorder))
     }
 
     pub fn create_color_texture_from_vkimage(image: &vk::Image, view: &vk::ImageView, format: &vk::Format, extent: &vk::Extent2D, destroy_view: bool, queue: Arc<Queue>) -> ColorTexture {

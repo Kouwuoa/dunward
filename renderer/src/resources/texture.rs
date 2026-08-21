@@ -13,6 +13,7 @@ use vk_mem::Alloc;
 
 use super::buffer::Buffer;
 use crate::commands::transfer::TransferCommandRecorder;
+use crate::core::device::Device;
 use crate::core::queue::Queue;
 
 #[repr(transparent)]
@@ -81,6 +82,8 @@ pub(crate) struct Texture {
     destroy_view: bool,
 
     allocation: Option<vk_mem::Allocation>, // GPU-only memory block
+
+    device: Arc<Device>,
 }
 
 pub(crate) enum TextureQueueState {

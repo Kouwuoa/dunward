@@ -17,6 +17,15 @@ pub(crate) struct Surface {
 }
 
 impl Surface {
+    pub fn new(surface: vk::SurfaceKHR, surface_loader: ash::khr::surface::Instance) -> Self {
+        Self {
+            surface,
+            surface_loader,
+            surface_formats: Vec::new(),
+            surface_present_modes: Vec::new(),
+        }
+    }
+
     pub fn init_surface_present_modes(&mut self, device: &Device) -> Result<()> {
         if !self.surface_present_modes.is_empty() {
             return Err(eyre!("Surface present modes have already been generated"));
@@ -74,5 +83,9 @@ impl Surface {
 
     pub fn raw(&self) -> vk::SurfaceKHR {
         self.surface
+    }
+
+    pub fn raw_loader(&self) -> &ash::khr::surface::Instance {
+        &self.surface_loader
     }
 }

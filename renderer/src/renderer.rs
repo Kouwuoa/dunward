@@ -3,6 +3,7 @@
 //! Exposes [`Renderer`], orchestrating multi-buffered frames in flight, device initialization,
 //! display presentation, resizing, and teardown.
 
+use std::sync::Arc;
 use std::time::Instant;
 
 use ash::vk;
@@ -33,7 +34,7 @@ pub enum RendererError {
 
 pub struct Renderer {
     instance: instance::Instance,
-    device: device::Device,
+    device: Arc<device::Device>,
 
     // Hardware & Presentation
     display: Display,
@@ -57,10 +58,10 @@ impl Renderer {
 
         let instance = instance::Instance::new(Some(window))?;
         let mut surface = instance.create_surface(window)?;
-        let device = instance.create_device(&surface)?;
+        let device = Arc::new(instance.create_device(&surface)?);
         surface.init_surface_formats(&device)?;
         surface.init_surface_present_modes(&device)?;
-        let display = Display::new(window, device, surface)?;
+        let display = Display::new(window, device.clone(), surface)?;
 
         let mut cmd_allocator =
             CommandRecorderAllocator::new(dvc_ctx.logical_device_handle())?;

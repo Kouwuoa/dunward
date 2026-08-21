@@ -49,12 +49,12 @@ impl Instance {
         })
     }
 
-    pub fn inner(&self) -> &ash::Instance {
+    pub fn raw(&self) -> &ash::Instance {
         &self.instance
     }
 
     pub fn create_device(&self, surface: &Surface) -> Result<Device> {
-        Device::new(self, Some((&surface.surface, &surface.surface_loader)))
+        Device::new(self, surface)
     }
 
     pub fn create_surface(&self, window: &Window) -> Result<Surface> {
@@ -68,12 +68,7 @@ impl Instance {
             )?
         };
         let surface_loader = ash::khr::surface::Instance::new(&self.entry, &self.instance);
-        Ok(Surface {
-            surface,
-            surface_loader,
-            surface_formats: vec![],
-            surface_present_modes: vec![],
-        })
+        Ok(Surface::new(surface, surface_loader))
     }
 
     fn create_instance(entry: &ash::Entry, window: Option<&Window>) -> Result<ash::Instance> {

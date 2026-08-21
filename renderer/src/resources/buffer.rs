@@ -3,11 +3,12 @@
 //! Wraps [`ash::vk::Buffer`] and [`vk_mem::Allocation`], supporting host-visible
 //! memory-mapped writes via [`presser`].
 
-use std::sync::{Arc, Mutex};
-
 use ash::vk;
 use color_eyre::eyre::{Result, eyre};
+use std::sync::{Arc, Mutex};
 use vk_mem::Alloc;
+
+use crate::core::device::Device;
 
 pub(crate) struct Buffer {
     buffer: vk::Buffer,
@@ -16,8 +17,7 @@ pub(crate) struct Buffer {
     mapped: bool,
 
     allocation: Option<vk_mem::Allocation>,
-    mem_allocator: Arc<Mutex<vk_mem::Allocator>>,
-    device: Arc<ash::Device>,
+    device: Arc<Device>,
 }
 
 impl Buffer {
@@ -64,11 +64,7 @@ impl Buffer {
         })
     }
 
-    pub fn write<T>(
-        &mut self,
-        data: &[T],
-        start_offset: usize,
-    ) -> Result<presser::CopyRecord>
+    pub fn write<T>(&mut self, data: &[T], start_offset: usize) -> Result<presser::CopyRecord>
     where
         T: Copy,
     {
@@ -76,10 +72,7 @@ impl Buffer {
             return Err(eyre!("Cannot write to buffer that is not mapped"));
         }
 
-        let allocation = self
-            .allocation
-            .as_ref()
-            .expect("Allocation does not exist");
+        let allocation = self.allocation.as_ref().expect("Allocation does not exist");
 
         let allocation_info = self
             .mem_allocator
@@ -106,10 +99,7 @@ impl Buffer {
 impl Drop for Buffer {
     fn drop(&mut self) {
         unsafe {
-            let allocation = self
-                .allocation
-                .as_mut()
-                .expect("Allocation does not exist");
+            let allocation = self.allocation.as_mut().expect("Allocation does not exist");
             self.mem_allocator
                 .lock()
                 .expect("Failed to acquire lock for memory allocator")
