@@ -3,23 +3,34 @@
 //! Handles GPU feature querying (Vulkan 1.3, Dynamic Rendering, Synchronization2,
 //! Buffer Device Address, Bindless Descriptors), physical device rating, and command submission.
 
+pub(crate) mod queue;
+pub(crate) mod semaphore;
+pub(crate) mod surface;
+
+mod instance;
+mod memory;
+
+use crate::commands::{CommandRecorder, Executable, Idle};
+use crate::resources::texture::{ColorTexture, Texture};
+use instance::Instance;
+use queue::Queue;
+use semaphore::{
+    BinarySemaphore, SemaphoreValue, SignalSemaphore, TimelineSemaphore, WaitSemaphore,
+};
+use surface::Surface;
+
+use crate::gpu::queue::QueueFamily;
+use ash::vk;
+use color_eyre::Result;
+use color_eyre::eyre::{OptionExt, eyre};
 use std::ffi::{CStr, c_char};
 use std::str::Utf8Error;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use super::instance::Instance;
-use super::queue::{Queue, QueueFamily};
-use super::semaphore::{BinarySemaphore, SemaphoreValue, SignalSemaphore, TimelineSemaphore, WaitSemaphore};
-use crate::resources::texture::{ColorTexture, Texture};
-use ash::vk;
-use color_eyre::Result;
-use color_eyre::eyre::OptionExt;
-use crate::commands::{CommandRecorder, Executable, Idle};
-use crate::core::surface::Surface;
-use crate::display::Display;
+use vk_mem::Alloc;
 
 /// Main way to submit rendering commands to the GPU.
-pub(crate) struct Device {
+pub(crate) struct Gpu {
     logical: Arc<ash::Device>,
     physical: vk::PhysicalDevice,
 
@@ -29,17 +40,19 @@ pub(crate) struct Device {
     transfer_queue: Arc<Queue>,
 
     mem_allocator: Arc<Mutex<vk_mem::Allocator>>,
+    instance: Instance,
 }
 
-impl Device {}
+impl Gpu {
+    pub fn new(window: &winit::window::Window) -> Result<(Self, Surface)> {
+        let instance = Instance::new(Some(window))?;
+        let mut surface = instance.create_surface(window)?;
 
-impl Device {
-    pub fn new(
-        instance: &Instance,
-        surface: &Surface,
-    ) -> Result<Self> {
         let (physical_device, graphics_queue_family, compute_queue_family, transfer_queue_family) =
-            Self::select_physical_device(instance.raw(), Some((&surface.raw(), surface.raw_loader())))?;
+            Self::select_physical_device(
+                instance.raw(),
+                Some((&surface.raw(), surface.raw_loader())),
+            )?;
 
         let (logical_device, graphics_queue, compute_queue, transfer_queue) =
             Self::create_logical_device(
@@ -63,18 +76,20 @@ impl Device {
             ))?
         }));
 
-        let dev = Self {
-            logical: logical_device,
-            physical: physical_device,
+        Ok((
+            Self {
+                logical: logical_device,
+                physical: physical_device,
 
-            graphics_queue,
-            compute_queue,
-            transfer_queue,
+                graphics_queue,
+                compute_queue,
+                transfer_queue,
 
-            mem_allocator,
-        };
-
-        Ok(dev)
+                mem_allocator,
+                instance,
+            },
+            surface,
+        ))
     }
 
     pub fn raw_physical(&self) -> vk::PhysicalDevice {
@@ -151,7 +166,8 @@ impl Device {
 
         let fence = fence.map_or(vk::Fence::null(), |fence| fence);
         unsafe {
-            self.logical.queue_submit(cmd_recorder.get_queue().handle, &[submit], fence)?;
+            self.logical
+                .queue_submit(cmd_recorder.get_queue().handle, &[submit], fence)?;
         }
 
         Ok(CommandRecorder::<Idle>::new_from_old(cmd_recorder))
@@ -204,8 +220,7 @@ impl Device {
             .values(std::slice::from_ref(&value));
 
         unsafe {
-            self
-                .logical
+            self.logical
                 .wait_semaphores(&wait_info, timeout.as_nanos() as u64)?;
         }
         Ok(())
@@ -214,8 +229,7 @@ impl Device {
     pub fn wait_and_reset_fence(&self, fence: vk::Fence, timeout: Duration) -> Result<()> {
         unsafe {
             let fences = [fence];
-            self
-                .logical
+            self.logical
                 .wait_for_fences(&fences, true, timeout.as_nanos() as u64)?;
             self.logical.reset_fences(&fences)?;
         }
@@ -226,42 +240,31 @@ impl Device {
         Ok(unsafe { self.logical.device_wait_idle()? })
     }
 
-    pub fn create_color_texture_from_vkimage(image: &vk::Image, view: &vk::ImageView, format: &vk::Format, extent: &vk::Extent2D, destroy_view: bool, queue: Arc<Queue>) -> ColorTexture {
-        Texture::new_color_texture_from_vkimage(
-            image,
-            view,
-            format,
-            extent,
-            destroy_view,
-            queue,
-            self.mem_
-            self.memory_allocator.clone(),
-            self.device.clone(),
-        );
+    pub fn create_vk_image_view(&self, info: &vk::ImageViewCreateInfo) -> Result<vk::ImageView> {
+        Ok(unsafe { self.logical.create_image_view(info, None)? })
     }
 
-    pub fn create_vk_image_view(&self, info: &vk::ImageViewCreateInfo) -> Result<vk::ImageView> {
-        Ok(unsafe { self.device.logical.create_image_view(info, None)? })
+    pub fn destroy_vk_image_view(&self, image_view: vk::ImageView) {
+        unsafe { self.logical.destroy_image_view(image_view, None) }
     }
 
     pub fn create_vk_sampler(&self, info: &vk::SamplerCreateInfo) -> Result<vk::Sampler> {
-        Ok(unsafe { self.device.logical.create_sampler(info, None)? })
+        Ok(unsafe { self.logical.create_sampler(info, None)? })
     }
 
     pub fn create_vk_fence(&self, info: &vk::FenceCreateInfo) -> Result<vk::Fence> {
-        Ok(unsafe { self.device.logical.create_fence(info, None)? })
+        Ok(unsafe { self.logical.create_fence(info, None)? })
     }
 
     pub fn create_vk_swapchain_loader(&self) -> ash::khr::swapchain::Device {
-        ash::khr::swapchain::Device::new(self.instance.inner(), &self.device.logical)
+        ash::khr::swapchain::Device::new(self.instance.raw(), &self.logical)
     }
 
     fn select_physical_device(
         instance: &ash::Instance,
         surface: Option<(&vk::SurfaceKHR, &ash::khr::surface::Instance)>,
     ) -> Result<(vk::PhysicalDevice, QueueFamily, QueueFamily, QueueFamily)> {
-        let req_device_exts = Self::get_required_device_extensions();
-        let req_device_exts = req_device_exts
+        let req_device_exts = Self::get_required_device_extensions()
             .iter()
             .map(|ext| ext.to_str())
             .collect::<std::result::Result<Vec<&str>, Utf8Error>>()?;

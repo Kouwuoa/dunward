@@ -1,7 +1,7 @@
 mod freelist;
 mod region;
-mod writer;
 mod uploader;
+mod writer;
 
 use ash::vk;
 use color_eyre::Result;
@@ -11,6 +11,9 @@ use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex, MutexGuard, mpsc};
 
 use super::buffer::Buffer;
+use crate::commands::TransferCommandRecorder;
+use crate::gpu::Gpu;
+use crate::resources::megabuffer::uploader::MegabufferUploader;
 use freelist::MegabufferFreeList;
 use region::AllocatedMegabufferRegion;
 use writer::{MegabufferWriteRecord, MegabufferWriter};
@@ -28,12 +31,11 @@ impl MegabufferId {
 
 pub(crate) struct Megabuffer {
     id: MegabufferId,
-    buffer: Arc<Buffer>,
-    free_list: Arc<Mutex<MegabufferFreeList>>,
+    buffer: Buffer,
+    free_list: MegabufferFreeList,
     writer: Arc<MegabufferWriter>,
-    write_receiver: Receiver<MegabufferWriteRecord>,
-
-    device: Arc<ash::Device>,
+    uploader: MegabufferUploader,
+    gpu: Arc<Gpu>,
 }
 
 impl PartialEq for Megabuffer {
@@ -47,8 +49,8 @@ impl Megabuffer {
         size: u64,
         alignment: u64,
         buf_usage: vk::BufferUsageFlags,
-        mem_allocator: Arc<Mutex<vk_mem::Allocator>>,
-        device: Arc<ash::Device>,
+        gpu: Arc<Gpu>,
+        upload_recorder: Arc<Mutex<TransferCommandRecorder>>,
     ) -> Result<Megabuffer> {
         log::info!(
             "Creating Megabuffer with size: {}, alignment: {}, usage: {:?}",
@@ -64,8 +66,7 @@ impl Megabuffer {
             buf_usage,
             mem_usage,
             false,
-            mem_allocator.clone(),
-            device.clone(),
+            gpu.clone(),
         )?);
 
         let id = MegabufferId::generate();
@@ -75,17 +76,17 @@ impl Megabuffer {
             id,
             alignment,
             write_sender,
-            device.clone(),
-            mem_allocator.clone(),
+            gpu.clone(),
         ));
+        let uploader = MegabufferUploader::new(write_receiver, upload_recorder);
 
-        Ok(Megabuffer {
+        Ok(Self {
             id,
             buffer,
             free_list,
             writer,
-            write_receiver,
-            device,
+            uploader,
+            gpu,
         })
     }
 
@@ -98,11 +99,11 @@ impl Megabuffer {
             .carve_free_region(aligned_size)
             .ok_or_eyre("Megabuffer out of memory: no suitable free region found")?;
         // Convert free region to allocated region
-        Ok(AllocatedMegabufferRegion {
-            offset: free_region.offset,
-            size: free_region.size,
-            parent_megabuffer: *self.clone(),
-        })
+        Ok(AllocatedMegabufferRegion::new(
+            free_region.offset,
+            free_region.size,
+            self.writer.clone(),
+        ))
     }
 
     /// Deallocate an allocated region and merge it with adjacent free regions if possible.
@@ -118,62 +119,12 @@ impl Megabuffer {
     }
 
     pub fn defragment(&self) -> Result<()> {
-        let mut state = self.lock()?;
-        state.defragment_free_regions()
+        self.free_list
+        self.free_list.defragment_free_regions()
     }
-
-    /// Batches and transfers all queued pending uploads to the GPU
-    pub fn upload(&self) -> Result<()> {
-        // Lock briefly to drain the pending uploads
-        let uploads = {
-            let mut state = self.lock()?;
-
-            // Don't upload if there are no pending uploads
-            if !state.has_pending_uploads() {
-                return Err(eyre!("No pending uploads to upload"));
-            }
-
-            // Drain all queued pending uploads
-            state.drain_pending_uploads()
-        }; // Lock released here!
-
-        // Lock-free GPU transfer submission that
-        // records all copy operations into ONE single transfer command buffer
-        self.upload_recorder
-            .immediate_submit(|cmd: vk::CommandBuffer, device: &ash::Device| {
-                for upload in uploads {
-                    let copy_region = vk::BufferCopy {
-                        src_offset: 0,
-                        dst_offset: upload.dst_offset,
-                        size: upload.size,
-                    };
-                    unsafe {
-                        device.cmd_copy_buffer(
-                            cmd,
-                            upload.staging_buffer.buffer,
-                            self.buffer.buffer,
-                            &[copy_region],
-                        );
-                    }
-                }
-
-                Ok(())
-            })?;
-
-        Ok(())
-    }
-
-    /// Writes data into a temporary staging buffer and queues it for GPU upload
-    pub fn write<T>(&self, data: &[T], region: &AllocatedMegabufferRegion) -> Result<()>
-    where
-        T: Copy,
-    {}
 
     fn aligned_size(&self, size: u64) -> u64 {
-        (size + self.alignment - 1) & !(self.alignment - 1)
-    }
-
-    fn lock(&self) -> Result<MutexGuard<MegabufferState>> {
-        self.state.lock().map_err(|e| eyre!(e.to_string()))
+        let alignment = self.buffer.alignment();
+        (size + alignment - 1) & !(alignment - 1)
     }
 }

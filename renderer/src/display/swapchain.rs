@@ -3,8 +3,9 @@
 //! Wraps [`ash::vk::SwapchainKHR`], querying surface capabilities, selecting
 //! extent/formats, and constructing swapchain image views for window presentation.
 
-use crate::core::device::Device;
-use crate::core::surface::Surface;
+use crate::gpu::Gpu;
+use crate::gpu::surface::Surface;
+
 use ash::vk;
 use color_eyre::Result;
 use winit::dpi::PhysicalSize;
@@ -39,13 +40,13 @@ impl Drop for Swapchain {
 impl Swapchain {
     pub fn new(
         size: &PhysicalSize<u32>,
-        device: &Device,
+        gpu: &Gpu,
         surface: &Surface,
         old_swapchain: Option<&Self>,
     ) -> Result<Self> {
         let surface_format = surface.find_suitable_surface_format()?;
         let surface_present_mode = surface.find_suitable_surface_present_mode();
-        let surface_capabilities = surface.get_physical_device_surface_capabilities(device)?;
+        let surface_capabilities = surface.get_physical_device_surface_capabilities(gpu)?;
 
         let image_extent = {
             if surface_capabilities.current_extent.width != u32::MAX {
@@ -72,8 +73,8 @@ impl Swapchain {
         };
 
         let queue_family_indices = [
-            device.get_graphics_queue().family.index,
-            device.get_present_queue().family.index,
+            gpu.get_graphics_queue().family.index,
+            gpu.get_present_queue().family.index,
         ];
         let image_sharing_mode = if queue_family_indices[0] != queue_family_indices[1] {
             vk::SharingMode::CONCURRENT
@@ -86,7 +87,7 @@ impl Swapchain {
             None => vk::SwapchainKHR::null(),
         };
 
-        let swapchain_loader = device.create_vk_swapchain_loader();
+        let swapchain_loader = gpu.create_vk_swapchain_loader();
         let swapchain = unsafe {
             let mut info = vk::SwapchainCreateInfoKHR::default()
                 .surface(surface.raw())
@@ -131,7 +132,7 @@ impl Swapchain {
                         base_array_layer: 0,
                         layer_count: 1,
                     });
-                device.create_vk_image_view(&view_info)
+                gpu.create_vk_image_view(&view_info)
             })
             .collect::<Result<Vec<vk::ImageView>>>()?;
 

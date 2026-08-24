@@ -10,36 +10,35 @@ use color_eyre::Result;
 use shaderpack::ShaderId;
 
 use super::ResourceType;
-use super::descriptors::{DescriptorAllocator, DescriptorSetLayoutBuilder};
-use super::r#mod::{Megabuffer, MegabufferExt};
 use super::texture::{ColorTexture, DepthTexture, StorageTexture, Texture};
 use crate::commands::transfer::TransferCommandRecorder;
+use crate::gpu::Gpu;
 use crate::material::shader::ComputeShader;
 use crate::material::shader_data::PerDrawData;
 use crate::material::{ComputeMaterialFactoryBuilder, MaterialFactory};
+use crate::resources::descriptor::DescriptorAllocator;
+use crate::resources::megabuffer::Megabuffer;
 
 /// `ResourceFactory` is responsible only for construction (`create_*` APIs)
 /// such as buffers, textures, and materials as needed.
 /// It does not own long-lived storage, caching, or lookup tables.
 pub(crate) struct ResourceFactory {
-    memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
-    transfer_command_recorder: Arc<TransferCommandRecorder>,
+    transfer_command_recorder: Arc<Mutex<TransferCommandRecorder>>,
     descriptor_allocator: Arc<Mutex<DescriptorAllocator>>,
-    device: Arc<ash::Device>,
+    gpu: Arc<Gpu>,
 }
 
 impl ResourceFactory {
     pub fn new(
-        memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
-        device: Arc<ash::Device>,
+        gpu: Arc<Gpu>,
     ) -> Result<Self> {
+        let transfer_command_recorder = Arc::new(Mutex::new(TransferCommandRecorder::new(&gpu)?));
         let descriptor_allocator =
-            Arc::new(Mutex::new(DescriptorAllocator::new(device.clone(), 1000)?));
+            Arc::new(Mutex::new(DescriptorAllocator::new(gpu.raw_logical(), 1000)?));
         Ok(Self {
-            memory_allocator,
             transfer_command_recorder,
             descriptor_allocator,
-            device,
+            gpu,
         })
     }
 
@@ -67,8 +66,7 @@ impl ResourceFactory {
         Texture::new_depth_texture(
             width,
             height,
-            self.memory_allocator.clone(),
-            self.device.clone(),
+            self.gpu.clone(),
         )
     }
 
@@ -82,9 +80,7 @@ impl ResourceFactory {
             size,
             alignment,
             buf_usage,
-            self.memory_allocator.clone(),
-            self.device.clone(),
-            self.transfer_command_recorder.clone(),
+            self.gpu.clone(),
         )
     }
 

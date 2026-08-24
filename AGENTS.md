@@ -55,8 +55,8 @@ Manages Vulkan instances, physical/logical devices, queues, semaphores, and surf
 
 * [`instance.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/core/instance.rs): Vulkan instance creation,
   validation layers, debug messenger.
-* [`device.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/core/device.rs): Physical device ranking, logical
-  device instantiation, Vulkan 1.3 features (synchronization2, dynamic rendering).
+* [`mod`](file:///C:/Users/koada/workspace/dunward/renderer/src/core/device.rs): Physical device ranking, logical device
+  instantiation, Vulkan 1.3 features (synchronization2, dynamic rendering).
 * [`queue.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/core/queue.rs): Hardware queues and family
   capabilities (`Queue`, `QueueFamily`).
 * [`semaphore.rs`](file:///C:/Users/koada/workspace/dunward/renderer/src/core/semaphore.rs): `BinarySemaphore`,

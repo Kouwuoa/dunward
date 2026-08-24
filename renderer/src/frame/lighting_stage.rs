@@ -5,13 +5,14 @@
 
 use ash::vk;
 use color_eyre::Result;
+use std::sync::Arc;
 
 use super::packet::FrameRenderPacket;
 use crate::commands::allocator::{CommandRecorderAllocator, CommandRecorderAllocatorExt};
 use crate::commands::recorder::{CommandRecorder, Idle};
-use crate::core::DeviceContext;
-use crate::core::semaphore::TimelineSemaphore;
 use crate::display::Display;
+use crate::gpu::Gpu;
+use crate::gpu::semaphore::TimelineSemaphore;
 use crate::material::Material;
 use crate::material::shader_data::PerDrawData;
 use crate::resources::factory::ResourceFactory;
@@ -34,13 +35,13 @@ pub(crate) struct FrameLightingStage {
 
 impl FrameLightingStage {
     pub fn new(
-        dvc_ctx: &DeviceContext,
+        gpu: Arc<Gpu>,
         display_ctx: &Display,
         cmd_allocator: &mut CommandRecorderAllocator,
         resource_factory: &ResourceFactory,
         resource_store: &mut ResourceStore,
     ) -> Result<Self> {
-        let compute_queue = dvc_ctx.get_compute_queue();
+        let compute_queue = gpu.get_compute_queue();
         let recorder = Some(cmd_allocator.allocate(compute_queue)?);
 
         let display_size = display_ctx.get_size();
@@ -50,9 +51,7 @@ impl FrameLightingStage {
             true,
         )?;
 
-        let material = resource_store
-            .compute_material_factory
-            .create_material()?;
+        let material = resource_store.compute_material_factory.create_material()?;
 
         Ok(Self {
             recorder,
@@ -66,7 +65,7 @@ impl FrameLightingStage {
     pub fn render(
         &mut self,
         pkt: FrameRenderPacket,
-        dvc: &DeviceContext,
+        gpu: &Gpu,
         frame_completion_timeline: &TimelineSemaphore,
         timeline_wait_val: u64,
         timeline_signal_val: u64,
@@ -98,7 +97,8 @@ impl FrameLightingStage {
             );
 
             // Clear the storage texture to black
-            recorder.clear_storage_texture(&mut self.target_tex, &vk::ClearColorValue::default())?;
+            recorder
+                .clear_storage_texture(&mut self.target_tex, &vk::ClearColorValue::default())?;
 
             // Bind the material to the command buffer
             recorder.bind_material(&self.material);
@@ -134,19 +134,21 @@ impl FrameLightingStage {
             recorder.dispatch(group_count_x, group_count_y, 1);
 
             // Release the texture from compute onto the graphics queue to match the queue of the swapchain image
-            recorder.release_texture_to_queue(&mut self.target_tex, dvc.get_graphics_queue());
+            recorder.release_texture_to_queue(&mut self.target_tex, gpu.get_graphics_queue());
 
             Ok(())
         })?;
 
         // Submit the command buffer
-        self.recorder = Some(dvc.submit(
-            recorder,
-            &[frame_completion_timeline
-                .to_wait_semaphore(vk::PipelineStageFlags::COMPUTE_SHADER, timeline_wait_val)],
-            &[frame_completion_timeline.to_signal_semaphore(timeline_signal_val)],
-            None,
-        )?);
+        self.recorder = Some(
+            gpu.submit(
+                recorder,
+                &[frame_completion_timeline
+                    .to_wait_semaphore(vk::PipelineStageFlags::COMPUTE_SHADER, timeline_wait_val)],
+                &[frame_completion_timeline.to_signal_semaphore(timeline_signal_val)],
+                None,
+            )?,
+        );
 
         self.is_first_render = false;
 
@@ -155,7 +157,11 @@ impl FrameLightingStage {
         })
     }
 
-    pub fn resize(&mut self, size: &winit::dpi::PhysicalSize<u32>, resource_factory: &ResourceFactory) {
+    pub fn resize(
+        &mut self,
+        size: &winit::dpi::PhysicalSize<u32>,
+        resource_factory: &ResourceFactory,
+    ) {
         self.target_tex = resource_factory
             .create_storage_texture(size.width, size.height, true)
             .unwrap();

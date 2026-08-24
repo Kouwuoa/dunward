@@ -3,12 +3,11 @@
 //! Exposes [`TransferCommandRecorder`], providing immediate GPU submission
 //! for buffer and texture uploads outside the main render loop.
 
-use std::sync::Arc;
-
+use crate::gpu::Gpu;
+use crate::gpu::queue::Queue;
 use ash::vk;
 use color_eyre::eyre::Result;
-
-use crate::core::queue::Queue;
+use std::sync::Arc;
 
 /// This is a specialized command recorder designed for performing one-off GPU transfer operations.
 ///
@@ -28,13 +27,15 @@ pub(crate) struct TransferCommandRecorder {
     transfer_fence: vk::Fence,
     command_pool: vk::CommandPool,
     command_buffer: vk::CommandBuffer,
-
-    pub transfer_queue: Arc<Queue>,
+    transfer_queue: Arc<Queue>,
     device: Arc<ash::Device>,
 }
 
 impl TransferCommandRecorder {
-    pub fn new(transfer_queue: Arc<Queue>, device: Arc<ash::Device>) -> Result<Self> {
+    pub fn new(gpu: &Gpu) -> Result<Self> {
+        let transfer_queue = gpu.get_transfer_queue();
+        let device = gpu.raw_logical();
+
         assert!(transfer_queue.family.supports_transfer());
 
         let transfer_fence_info = vk::FenceCreateInfo::default();

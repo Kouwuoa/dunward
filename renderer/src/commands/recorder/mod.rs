@@ -16,7 +16,7 @@ use ash::vk;
 use color_eyre::Result;
 
 use crate::commands::allocator::CommandRecorderAllocator;
-use crate::core::queue::Queue;
+use crate::gpu::queue::Queue;
 
 /// Ready to record
 pub(crate) struct Idle;

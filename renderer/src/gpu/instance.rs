@@ -11,7 +11,6 @@ use color_eyre::eyre::eyre;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::Window;
 
-use super::device::Device;
 use super::surface::Surface;
 
 /// Initializes Vulkan and keeps the Vulkan instance alive
@@ -51,10 +50,6 @@ impl Instance {
 
     pub fn raw(&self) -> &ash::Instance {
         &self.instance
-    }
-
-    pub fn create_device(&self, surface: &Surface) -> Result<Device> {
-        Device::new(self, surface)
     }
 
     pub fn create_surface(&self, window: &Window) -> Result<Surface> {

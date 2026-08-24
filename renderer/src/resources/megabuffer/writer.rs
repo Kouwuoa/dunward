@@ -1,15 +1,17 @@
 use super::AllocatedMegabufferRegion;
 use super::Buffer;
 use super::MegabufferId;
+use crate::gpu::Gpu;
+
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::{Arc, mpsc};
 
 pub(crate) struct MegabufferWriteRecord {
-    staging_buffer: Buffer,
-    dst_offset: u64,
-    size: u64,
+    pub staging_buffer: Buffer,
+    pub dst_offset: u64,
+    pub size: u64,
 }
 
 pub(crate) struct MegabufferWriter {
@@ -21,8 +23,7 @@ pub(crate) struct MegabufferWriter {
     /// When `AllocatedMegabufferRegion::write` is called from any worker thread, it sends a new `MegabufferWriteRecord` into the channel.
     /// The records accumulate in host-visible memory until drained by the `Megabuffer`'s receiver during `Megabuffer::upload`.
     write_sender: mpsc::Sender<MegabufferWriteRecord>,
-    device: Arc<ash::Device>,
-    mem_allocator: Arc<Mutex<vk_mem::Allocator>>,
+    gpu: Arc<Gpu>,
 }
 
 impl MegabufferWriter {
@@ -30,15 +31,13 @@ impl MegabufferWriter {
         megabuffer_id: MegabufferId,
         alignment: u64,
         write_sender: mpsc::Sender<MegabufferWriteRecord>,
-        device: Arc<ash::Device>,
-        mem_allocator: Arc<Mutex<vk_mem::Allocator>>,
+        gpu: Arc<Gpu>,
     ) -> Self {
-        MegabufferWriter {
+        Self {
             megabuffer_id,
             alignment,
             write_sender,
-            device,
-            mem_allocator,
+            gpu,
         }
     }
 
@@ -69,8 +68,7 @@ impl MegabufferWriter {
             vk::BufferUsageFlags::TRANSFER_SRC,
             vk_mem::MemoryUsage::AutoPreferHost,
             true,
-            self.mem_allocator.clone(),
-            self.device.clone(),
+            self.gpu.clone(),
         )?;
 
         // Write CPU bytes into the staging buffer

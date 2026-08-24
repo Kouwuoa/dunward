@@ -73,6 +73,23 @@ impl MegabufferFreeList {
         Ok(())
     }
 
+    pub fn defragment_free_regions(&mut self) {
+        self.free_regions.sort_by_key(|r| r.offset);
+
+        // Merge adjacent free regions
+        let mut i = 0;
+        while i < self.free_regions.len() - 1 {
+            if self.free_regions[i].offset + self.free_regions[i].size
+                == self.free_regions[i + 1].offset
+            {
+                self.free_regions[i].size += self.free_regions[i + 1].size;
+                self.free_regions.remove(i + 1);
+            } else {
+                i += 1;
+            }
+        }
+    }
+
     fn reclaim(&mut self, offset: u64, size: u64) {
         if size == 0 {
             return;
@@ -109,23 +126,6 @@ impl MegabufferFreeList {
                 let region = FreeMegabufferRegion { offset, size };
                 self.free_regions.push(region);
                 self.free_regions.sort_by_key(|r| r.offset);
-            }
-        }
-    }
-
-    fn defragment_free_regions(&mut self) {
-        self.free_regions.sort_by_key(|r| r.offset);
-
-        // Merge adjacent free regions
-        let mut i = 0;
-        while i < self.free_regions.len() - 1 {
-            if self.free_regions[i].offset + self.free_regions[i].size
-                == self.free_regions[i + 1].offset
-            {
-                self.free_regions[i].size += self.free_regions[i + 1].size;
-                self.free_regions.remove(i + 1);
-            } else {
-                i += 1;
             }
         }
     }

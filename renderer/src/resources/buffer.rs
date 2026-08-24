@@ -3,12 +3,11 @@
 //! Wraps [`ash::vk::Buffer`] and [`vk_mem::Allocation`], supporting host-visible
 //! memory-mapped writes via [`presser`].
 
+use crate::gpu::Gpu;
+
 use ash::vk;
 use color_eyre::eyre::{Result, eyre};
-use std::sync::{Arc, Mutex};
-use vk_mem::Alloc;
-
-use crate::core::device::Device;
+use std::sync::Arc;
 
 pub(crate) struct Buffer {
     buffer: vk::Buffer,
@@ -17,7 +16,7 @@ pub(crate) struct Buffer {
     mapped: bool,
 
     allocation: Option<vk_mem::Allocation>,
-    device: Arc<Device>,
+    gpu: Arc<Gpu>,
 }
 
 impl Buffer {
@@ -27,8 +26,7 @@ impl Buffer {
         buf_usage: vk::BufferUsageFlags,
         mem_usage: vk_mem::MemoryUsage,
         mapped: bool,
-        mem_allocator: Arc<Mutex<vk_mem::Allocator>>,
-        device: Arc<ash::Device>,
+        gpu: Arc<Gpu>,
     ) -> Result<Self> {
         let (buffer, allocation) = unsafe {
             let buffer_info = vk::BufferCreateInfo {
@@ -47,10 +45,7 @@ impl Buffer {
                 },
                 ..Default::default()
             };
-            mem_allocator
-                .lock()
-                .map_err(|e| eyre!(e.to_string()))?
-                .create_buffer_with_alignment(&buffer_info, &allocation_info, alignment)?
+            gpu.allocate_vk_buffer(&buffer_info, &allocation_info, alignment)?
         };
 
         Ok(Self {
@@ -59,8 +54,7 @@ impl Buffer {
             alignment,
             mapped,
             allocation: Some(allocation),
-            mem_allocator,
-            device,
+            gpu,
         })
     }
 
@@ -73,12 +67,7 @@ impl Buffer {
         }
 
         let allocation = self.allocation.as_ref().expect("Allocation does not exist");
-
-        let allocation_info = self
-            .mem_allocator
-            .lock()
-            .map_err(|e| eyre!(e.to_string()))?
-            .get_allocation_info(allocation);
+        let allocation_info = self.gpu.get_allocation_info(allocation)?;
 
         if size_of_val(data) as u64 > allocation_info.size {
             return Err(eyre!("Data too large to write into buffer"));
@@ -94,16 +83,21 @@ impl Buffer {
 
         Ok(copy_record)
     }
+
+    pub fn raw(&self) -> vk::Buffer {
+        self.buffer
+    }
+
+    pub fn alignment(&self) -> u64 {
+        self.alignment
+    }
 }
 
 impl Drop for Buffer {
     fn drop(&mut self) {
         unsafe {
             let allocation = self.allocation.as_mut().expect("Allocation does not exist");
-            self.mem_allocator
-                .lock()
-                .expect("Failed to acquire lock for memory allocator")
-                .destroy_buffer(self.buffer, allocation);
+            self.gpu.destroy_vk_buffer(self.buffer, allocation);
         }
     }
 }

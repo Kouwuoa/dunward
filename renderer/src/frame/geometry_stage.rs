@@ -5,10 +5,12 @@
 
 use ash::vk;
 use color_eyre::Result;
+use std::sync::Arc;
 
 use crate::commands::allocator::{CommandRecorderAllocator, CommandRecorderAllocatorExt};
 use crate::commands::recorder::{CommandRecorder, Idle};
 use crate::core::DeviceContext;
+use crate::gpu::Gpu;
 use crate::resources::r#mod::{AllocatedMegabufferRegion, MegabufferExt};
 use crate::resources::store::ResourceStore;
 
@@ -35,7 +37,7 @@ impl FrameGeometryStage {
     const TIMELINE_SEM_SIGNAL_VALUE: u64 = 1; // TODO: ignored for now
 
     pub fn new(
-        dvc_ctx: &DeviceContext,
+        gpu: Arc<Gpu>,
         cmd_allocator: &mut CommandRecorderAllocator,
         resource_store: &ResourceStore,
     ) -> Result<Self> {

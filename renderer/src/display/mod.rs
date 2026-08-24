@@ -7,17 +7,19 @@ pub(crate) mod swapchain;
 
 pub(crate) use swapchain::Swapchain;
 
-use std::sync::Arc;
-use std::time::Duration;
+use crate::{
+    gpu::{Gpu, queue::Queue, surface::Surface},
+    resources::texture::ColorTexture,
+};
 
-use crate::core::device::Device;
-use crate::core::queue::Queue;
-use crate::core::semaphore::BinarySemaphore;
-use crate::core::surface::Surface;
-use crate::resources::texture::ColorTexture;
+use crate::gpu::semaphore::BinarySemaphore;
+use crate::resources::texture::Texture;
+
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
+use std::sync::Arc;
+use std::time::Duration;
 use thiserror::Error;
 use winit::window::Window;
 
@@ -41,22 +43,16 @@ pub(crate) struct Display {
     surface: Surface,
     swapchain: Swapchain,
     present_queue: Arc<Queue>,
-    device: Arc<Device>,
 }
 
 impl Display {
-    pub fn new(
-        window: &Window,
-        device: Arc<Device>,
-        surface: Surface,
-    ) -> Result<Self> {
-        let swapchain = Swapchain::new(&window.inner_size(), &device, &surface, None)?;
+    pub fn new(window: &Window, gpu: Arc<Gpu>, surface: Surface) -> Result<Self> {
+        let swapchain = Swapchain::new(&window.inner_size(), &gpu, &surface, None)?;
 
         Ok(Self {
             surface,
             swapchain,
-            present_queue: device.get_present_queue(),
-            device,
+            present_queue: gpu.get_present_queue(),
         })
     }
 
@@ -64,6 +60,7 @@ impl Display {
         &self,
         signal_image_acquired_sem: &BinarySemaphore,
         timeout: Duration,
+        gpu: Arc<Gpu>,
     ) -> Result<PresentTextureBundle> {
         let (image_index, suboptimal) = unsafe {
             self.swapchain.swapchain_loader.acquire_next_image(
@@ -92,14 +89,15 @@ impl Display {
             ))?;
         let format = &self.swapchain.swapchain_image_format;
         let extent = &self.swapchain.swapchain_image_extent;
-        self.device.create_color_texture_from_vkimage(
+        let texture = Texture::new_color_texture_from_vkimage(
             image,
             view,
             format,
             extent,
             false,
             self.present_queue.clone(),
-        )?;
+            gpu,
+        );
 
         Ok(PresentTextureBundle {
             texture,
@@ -138,12 +136,9 @@ impl Display {
         }
     }
 
-    pub fn resize(
-        &mut self,
-        size: &winit::dpi::PhysicalSize<u32>,
-    ) -> Result<()> {
-        self.device.wait_idle()?;
-        self.swapchain = Swapchain::new(size, &self.device, &self.surface, Some(&self.swapchain))?;
+    pub fn resize(&mut self, size: &winit::dpi::PhysicalSize<u32>, gpu: &Gpu) -> Result<()> {
+        gpu.wait_idle()?;
+        self.swapchain = Swapchain::new(size, &gpu, &self.surface, Some(&self.swapchain))?;
         Ok(())
     }
 

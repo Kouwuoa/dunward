@@ -12,7 +12,7 @@
 
 pub(crate) mod camera;
 pub(crate) mod commands;
-pub(crate) mod core;
+pub(crate) mod gpu;
 pub(crate) mod display;
 pub(crate) mod frame;
 pub(crate) mod material;

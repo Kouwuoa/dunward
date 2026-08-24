@@ -9,7 +9,7 @@ use std::sync::Arc;
 use ash::vk;
 
 use super::{CommandRecorder, Recording};
-use crate::core::queue::Queue;
+use crate::gpu::queue::Queue;
 use crate::resources::texture::{Texture, TextureAccess, TextureQueueState};
 
 impl CommandRecorder<Recording> {
@@ -107,9 +107,9 @@ impl CommandRecorder<Recording> {
         };
         let is_write = (dst_access_mask
             & (vk::AccessFlags2::SHADER_STORAGE_WRITE
-                | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE
-                | vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE
-                | vk::AccessFlags2::TRANSFER_WRITE))
+            | vk::AccessFlags2::COLOR_ATTACHMENT_WRITE
+            | vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE
+            | vk::AccessFlags2::TRANSFER_WRITE))
             != vk::AccessFlags2::NONE;
 
         let recorder_queue_family_index = self.queue.family.index;

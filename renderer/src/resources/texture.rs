@@ -4,17 +4,15 @@
 //! tracking image formats, layouts, stage/access masks ([`TextureAccess`]),
 //! and queue family ownership ([`TextureQueueState`]).
 
-use std::ops::{Deref, DerefMut};
-use std::sync::{Arc, Mutex};
-
-use ash::vk;
-use color_eyre::eyre::{Result, eyre};
-use vk_mem::Alloc;
-
 use super::buffer::Buffer;
 use crate::commands::transfer::TransferCommandRecorder;
-use crate::core::device::Device;
-use crate::core::queue::Queue;
+use crate::gpu::Gpu;
+use crate::gpu::queue::Queue;
+
+use ash::vk;
+use color_eyre::eyre::Result;
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
 
 #[repr(transparent)]
 pub(crate) struct ColorTexture(pub Texture);
@@ -82,8 +80,7 @@ pub(crate) struct Texture {
     destroy_view: bool,
 
     allocation: Option<vk_mem::Allocation>, // GPU-only memory block
-
-    device: Arc<Device>,
+    gpu: Arc<Gpu>,
 }
 
 pub(crate) enum TextureQueueState {
@@ -110,12 +107,8 @@ impl Texture {
     /// and is NOT yet populated with any data.
     /// This means that unless you are making a depth image or storage image, you will need to call
     /// `upload()`
-    fn new(
-        create_info: &TextureCreateInfo,
-        memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
-        device: Arc<ash::Device>,
-    ) -> Result<Texture> {
-        let (image, allocation) = unsafe {
+    fn new(create_info: &TextureCreateInfo, gpu: Arc<Gpu>) -> Result<Texture> {
+        let (image, allocation) = {
             let image_info = vk::ImageCreateInfo::default()
                 .format(create_info.format)
                 .usage(create_info.usage)
@@ -134,10 +127,7 @@ impl Texture {
                 },
                 ..Default::default()
             };
-            memory_allocator
-                .lock()
-                .map_err(|e| eyre!(e.to_string()))?
-                .create_image(&image_info, &allocation_info)?
+            gpu.allocate_vk_image(&image_info, &allocation_info)?
         };
 
         let view = {
@@ -152,7 +142,7 @@ impl Texture {
                     layer_count: 1,
                     aspect_mask: create_info.aspect,
                 });
-            unsafe { device.create_image_view(&info, None)? }
+            gpu.create_vk_image_view(&info)?
         };
 
         Ok(Self {
@@ -171,8 +161,7 @@ impl Texture {
             destroy_view: true, // Since we created the view in this ctor, we'll need to clean it up
 
             allocation: Some(allocation),
-            memory_allocator,
-            device,
+            gpu,
         })
     }
 
@@ -183,9 +172,8 @@ impl Texture {
         data: Option<&[u8]>,
         use_dedicated_memory: bool,
         usage: vk::ImageUsageFlags,
-        memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
-        device: Arc<ash::Device>,
-        transfer: &TransferCommandRecorder,
+        gpu: Arc<Gpu>,
+        transfer: &mut TransferCommandRecorder,
     ) -> Result<ColorTexture> {
         let image = {
             let create_info = TextureCreateInfo {
@@ -199,7 +187,7 @@ impl Texture {
                 aspect: vk::ImageAspectFlags::COLOR,
                 use_dedicated_memory,
             };
-            let mut image = Self::new(&create_info, memory_allocator, device)?;
+            let mut image = Self::new(&create_info, gpu)?;
 
             if let Some(data) = data {
                 image.upload(data, transfer)?;
@@ -215,9 +203,8 @@ impl Texture {
         image: &image::DynamicImage,
         use_dedicated_memory: bool,
         usage: vk::ImageUsageFlags,
-        memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
-        device: Arc<ash::Device>,
-        transfer: &TransferCommandRecorder,
+        gpu: Arc<Gpu>,
+        transfer: &mut TransferCommandRecorder,
     ) -> Result<ColorTexture> {
         let data = image.to_rgba8().into_raw();
         let width = image.width();
@@ -228,8 +215,7 @@ impl Texture {
             Some(&data),
             use_dedicated_memory,
             usage,
-            memory_allocator,
-            device,
+            gpu,
             transfer,
         )
     }
@@ -243,8 +229,7 @@ impl Texture {
         extent: &vk::Extent2D,
         destroy_view: bool,
         queue: Arc<Queue>,
-        memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
-        device: Arc<ash::Device>,
+        gpu: Arc<Gpu>,
     ) -> ColorTexture {
         ColorTexture(Texture {
             image: *image,
@@ -264,18 +249,12 @@ impl Texture {
             queue_state: TextureQueueState::Owned { queue },
             destroy_view,
             allocation: None,
-            memory_allocator,
-            device,
+            gpu,
         })
     }
 
     /// Create a special type of texture used for the depth buffer
-    pub fn new_depth_texture(
-        width: u32,
-        height: u32,
-        memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
-        device: Arc<ash::Device>,
-    ) -> Result<DepthTexture> {
+    pub fn new_depth_texture(width: u32, height: u32, gpu: Arc<Gpu>) -> Result<DepthTexture> {
         let create_info = TextureCreateInfo {
             format: vk::Format::D32_SFLOAT,
             extent: vk::Extent3D {
@@ -287,11 +266,7 @@ impl Texture {
             aspect: vk::ImageAspectFlags::DEPTH,
             use_dedicated_memory: true, // Assuming the depth image will be used as a fullscreen attachment
         };
-        Ok(DepthTexture(Self::new(
-            &create_info,
-            memory_allocator,
-            device,
-        )?))
+        Ok(DepthTexture(Self::new(&create_info, gpu)?))
     }
 
     /// Create a special type of texture likely used by compute shaders
@@ -299,8 +274,7 @@ impl Texture {
         width: u32,
         height: u32,
         use_dedicated_memory: bool,
-        memory_allocator: Arc<Mutex<vk_mem::Allocator>>,
-        device: Arc<ash::Device>,
+        gpu: Arc<Gpu>,
     ) -> Result<StorageTexture> {
         let image = {
             let extent = vk::Extent3D {
@@ -318,7 +292,7 @@ impl Texture {
                 aspect: vk::ImageAspectFlags::COLOR,
                 use_dedicated_memory,
             };
-            Texture::new(&create_info, memory_allocator, device)?
+            Texture::new(&create_info, gpu)?
         };
 
         Ok(StorageTexture(image))
@@ -347,7 +321,7 @@ impl Texture {
                 height: self.extent.height,
             },
             dst_image_extent,
-            self.device.as_ref(),
+            &self.gpu.raw_logical(),
         );
     }
 
@@ -369,18 +343,17 @@ impl Texture {
         };
     }
 
-    fn upload(&mut self, data: &[u8], transfer: &TransferCommandRecorder) -> Result<()> {
+    fn upload(&mut self, data: &[u8], transfer: &mut TransferCommandRecorder) -> Result<()> {
         let mut staging_buffer = Buffer::new(
             data.len() as u64,
             256,
             vk::BufferUsageFlags::TRANSFER_SRC,
             vk_mem::MemoryUsage::AutoPreferHost,
             true,
-            self.memory_allocator.clone(),
-            self.device.clone(),
+            self.gpu.clone(),
         )?;
         staging_buffer.write(data, 0)?;
-        transfer.immediate_submit(|cmd: vk::CommandBuffer, device: &ash::Device| {
+        transfer.immediate_submit(|cmd: vk::CommandBuffer| {
             let range = vk::ImageSubresourceRange {
                 aspect_mask: self.aspect,
                 base_mip_level: 0,
@@ -400,7 +373,7 @@ impl Texture {
             };
 
             unsafe {
-                device.cmd_pipeline_barrier(
+                self.gpu.raw_logical().cmd_pipeline_barrier(
                     cmd,
                     vk::PipelineStageFlags::TOP_OF_PIPE,
                     vk::PipelineStageFlags::TRANSFER,
@@ -426,9 +399,9 @@ impl Texture {
             };
 
             unsafe {
-                device.cmd_copy_buffer_to_image(
+                self.gpu.raw_logical().cmd_copy_buffer_to_image(
                     cmd,
-                    staging_buffer.buffer,
+                    staging_buffer.raw(),
                     self.image,
                     vk::ImageLayout::TRANSFER_DST_OPTIMAL,
                     &[copy_region],
@@ -442,7 +415,7 @@ impl Texture {
             img_barrier_to_readable.dst_access_mask = vk::AccessFlags::SHADER_READ;
 
             unsafe {
-                device.cmd_pipeline_barrier(
+                self.gpu.raw_logical().cmd_pipeline_barrier(
                     cmd,
                     vk::PipelineStageFlags::TRANSFER,
                     vk::PipelineStageFlags::COMPUTE_SHADER,
@@ -462,16 +435,11 @@ impl Texture {
 
 impl Drop for Texture {
     fn drop(&mut self) {
-        unsafe {
-            if self.destroy_view {
-                self.device.destroy_image_view(self.view, None);
-            }
-            if let Some(allocation) = self.allocation.as_mut() {
-                self.memory_allocator
-                    .lock()
-                    .expect("Failed to acquire lock for memory allocator")
-                    .destroy_image(self.image, allocation);
-            }
+        if self.destroy_view {
+            self.gpu.destroy_vk_image_view(self.view);
+        }
+        if let Some(allocation) = self.allocation.as_mut() {
+            self.gpu.destroy_vk_image(self.image, allocation);
         }
     }
 }

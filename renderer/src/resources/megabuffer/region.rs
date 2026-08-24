@@ -12,11 +12,18 @@ pub(crate) struct AllocatedMegabufferRegion {
     pub size: u64,
     /// Offset of the allocated region within the parent megabuffer. This is ignored when the region is deallocated.
     pub offset: u64,
-
     writer: Arc<MegabufferWriter>,
 }
 
 impl AllocatedMegabufferRegion {
+    pub fn new(size: u64, offset: u64, writer: Arc<MegabufferWriter>) -> Self {
+        Self {
+            size,
+            offset,
+            writer,
+        }
+    }
+
     pub fn write<T>(&mut self, data: &[T]) -> Result<()>
     where
         T: Copy,

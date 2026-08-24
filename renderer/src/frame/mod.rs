@@ -10,6 +10,7 @@ pub(crate) mod packet;
 pub(crate) use geometry_stage::FrameGeometryStage;
 pub(crate) use lighting_stage::FrameLightingStage;
 pub(crate) use packet::{FramePresentPacket, FrameRenderPacket};
+use std::sync::Arc;
 
 use std::time::Duration;
 
@@ -18,9 +19,9 @@ use color_eyre::eyre::Result;
 
 use crate::commands::allocator::{CommandRecorderAllocator, CommandRecorderAllocatorExt};
 use crate::commands::recorder::{CommandRecorder, Idle};
-use crate::core::DeviceContext;
-use crate::core::semaphore::{BinarySemaphore, TimelineSemaphore};
 use crate::display::{Display, DisplayPresentError};
+use crate::gpu::Gpu;
+use crate::gpu::semaphore::{BinarySemaphore, TimelineSemaphore};
 use crate::resources::factory::ResourceFactory;
 use crate::resources::store::ResourceStore;
 use crate::resources::texture::TextureAccess;
@@ -38,18 +39,18 @@ pub(crate) struct Frame {
 
 impl Frame {
     pub fn new(
-        dvc_ctx: &mut DeviceContext,
-        display_ctx: &Display,
+        gpu: Arc<Gpu>,
+        display: &Display,
         cmd_allocator: &mut CommandRecorderAllocator,
         resource_factory: &ResourceFactory,
         resource_store: &mut ResourceStore,
     ) -> Result<Self> {
         log::info!("Creating FrameContext");
 
-        let geometry_stage = FrameGeometryStage::new(dvc_ctx, cmd_allocator, resource_store)?;
+        let geometry_stage = FrameGeometryStage::new(gpu.clone(), cmd_allocator, resource_store)?;
         let lighting_stage = FrameLightingStage::new(
-            dvc_ctx,
-            display_ctx,
+            gpu.clone(),
+            display,
             cmd_allocator,
             resource_factory,
             resource_store,
@@ -80,13 +81,13 @@ impl Frame {
     pub fn render(
         &mut self,
         pkt: FrameRenderPacket,
-        dvc: &DeviceContext,
+        gpu: Arc<Gpu>,
         display: &Display,
     ) -> Result<FramePresentPacket> {
         let timeout = Duration::from_secs(1);
 
         // Wait until the commands have finished from the last time this frame was rendered
-        dvc.wait_and_reset_fence(self.previous_frame_render_finished_fence, timeout)?;
+        gpu.wait_and_reset_fence(self.previous_frame_render_finished_fence, timeout)?;
 
         // Calculate timeline semaphore values
         let lighting_timeline_wait = self.frame_completion_timeline_base;
@@ -101,7 +102,7 @@ impl Frame {
         // Render the lighting stage
         let lighting_stage_output = self.lighting_stage.render(
             pkt,
-            dvc,
+            &gpu,
             &self.frame_completion_timeline,
             lighting_timeline_wait,
             lighting_timeline_signal,
@@ -109,7 +110,7 @@ impl Frame {
 
         // Acquire the next image from the display swapchain
         let mut present_tex =
-            display.acquire_next_present_texture(&self.present_texture_acquired_semaphore, timeout)?;
+            display.acquire_next_present_texture(&self.present_texture_acquired_semaphore, timeout, gpu.clone())?;
 
         // Perform post-render operations on the compute queue
         let postrender_recorder = self.postrender_recorder.take().unwrap();
@@ -146,13 +147,13 @@ impl Frame {
             // Release the lighting output texture back to the compute queue
             recorder.release_texture_to_queue(
                 lighting_stage_output.target_tex,
-                dvc.get_compute_queue(),
+                gpu.get_compute_queue(),
             );
 
             Ok(())
         })?;
 
-        self.postrender_recorder = Some(dvc.submit(
+        self.postrender_recorder = Some(gpu.submit(
             postrender_recorder,
             &[
                 // Wait for the lighting stage to finish rendering

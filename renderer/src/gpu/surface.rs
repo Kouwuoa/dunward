@@ -3,11 +3,11 @@
 //! Manages [`ash::vk::SurfaceKHR`], surface capabilities, supported color formats,
 //! and presentation modes (FIFO, Mailbox) for the window.
 
+use crate::gpu::Gpu;
+
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
-
-use crate::core::device::Device;
 
 pub(crate) struct Surface {
     surface: vk::SurfaceKHR,
@@ -26,27 +26,27 @@ impl Surface {
         }
     }
 
-    pub fn init_surface_present_modes(&mut self, device: &Device) -> Result<()> {
+    pub fn init_surface_present_modes(&mut self, gpu: &Gpu) -> Result<()> {
         if !self.surface_present_modes.is_empty() {
             return Err(eyre!("Surface present modes have already been generated"));
         }
 
         self.surface_present_modes = unsafe {
             self.surface_loader
-                .get_physical_device_surface_present_modes(device.raw_physical(), self.surface)?
+                .get_physical_device_surface_present_modes(gpu.raw_physical(), self.surface)?
         };
 
         Ok(())
     }
 
-    pub fn init_surface_formats(&mut self, device: &Device) -> Result<()> {
+    pub fn init_surface_formats(&mut self, gpu: &Gpu) -> Result<()> {
         if !self.surface_formats.is_empty() {
             return Err(eyre!("Surface formats have already been generated"));
         }
 
         self.surface_formats = unsafe {
             self.surface_loader
-                .get_physical_device_surface_formats(device.raw_physical(), self.surface)?
+                .get_physical_device_surface_formats(gpu.raw_physical(), self.surface)?
         };
 
         Ok(())
@@ -54,11 +54,11 @@ impl Surface {
 
     pub fn get_physical_device_surface_capabilities(
         &self,
-        device: &Device,
+        gpu: &Gpu,
     ) -> Result<vk::SurfaceCapabilitiesKHR> {
         Ok(unsafe {
             self.surface_loader
-                .get_physical_device_surface_capabilities(device.raw_physical(), self.surface)?
+                .get_physical_device_surface_capabilities(gpu.raw_physical(), self.surface)?
         })
     }
 
