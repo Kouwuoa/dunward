@@ -353,7 +353,7 @@ impl Texture {
             self.gpu.clone(),
         )?;
         staging_buffer.write(data, 0)?;
-        transfer.immediate_submit(|cmd: vk::CommandBuffer| {
+        transfer.immediate_submit(|cmd: vk::CommandBuffer, _device: &ash::Device| {
             let range = vk::ImageSubresourceRange {
                 aspect_mask: self.aspect,
                 base_mip_level: 0,

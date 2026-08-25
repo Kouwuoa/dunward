@@ -3,16 +3,15 @@
 //! Configures dynamic rendering state, depth-stencil, blending, multisampling,
 //! rasterization, vertex input layouts, and pipeline layouts for rasterization passes.
 
-use std::ffi::CString;
-use std::sync::{Arc, Mutex};
+use super::MaterialFactory;
+use super::shader::GraphicsShader;
+use crate::resources::descriptor::DescriptorAllocator;
+use crate::scene::vertex::VertexInputDescription;
 
 use ash::vk;
 use color_eyre::eyre::{OptionExt, Result, eyre};
-
-use super::MaterialFactory;
-use super::shader::GraphicsShader;
-use crate::resources::descriptors::DescriptorAllocator;
-use crate::scene::vertex::VertexInputDescription;
+use std::ffi::CString;
+use std::sync::{Arc, Mutex};
 
 pub(crate) struct GraphicsMaterialFactoryBuilder<'a> {
     vertex_input_description: VertexInputDescription,

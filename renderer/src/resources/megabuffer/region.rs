@@ -1,4 +1,6 @@
-use super::{MegabufferId, MegabufferWriter};
+use super::{Megabuffer, MegabufferId, MegabufferWriter, aligned_size};
+use color_eyre::eyre::Result;
+use color_eyre::eyre::eyre;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -12,14 +14,18 @@ pub(crate) struct AllocatedMegabufferRegion {
     pub size: u64,
     /// Offset of the allocated region within the parent megabuffer. This is ignored when the region is deallocated.
     pub offset: u64,
+    alignment: u64,
+    megabuffer_id: MegabufferId,
     writer: Arc<MegabufferWriter>,
 }
 
 impl AllocatedMegabufferRegion {
-    pub fn new(size: u64, offset: u64, writer: Arc<MegabufferWriter>) -> Self {
+    pub fn new(size: u64, offset: u64, alignment: u64, megabuffer_id: MegabufferId, writer: Arc<MegabufferWriter>) -> Self {
         Self {
             size,
             offset,
+            alignment,
+            megabuffer_id,
             writer,
         }
     }
@@ -28,34 +34,11 @@ impl AllocatedMegabufferRegion {
     where
         T: Copy,
     {
-        let data_size = size_of_val(data) as u64;
-        if data_size > region.size {
-            return Err(eyre!("Data too large for region"));
-        }
-
-        // Allocate a temporary staging buffer ONLY for this data
-        let mut staging_buffer = Buffer::new(
-            data_size,
-            self.alignment,
-            vk::BufferUsageFlags::TRANSFER_SRC,
-            vk_mem::MemoryUsage::AutoPreferHost,
-            true,
-            self.mem_allocator.clone(),
-            self.device.clone(),
-        )?;
-
-        let _ = staging_buffer.write(data, 0)?;
-
-        let mut state = self.lock()?;
-        state.queue_upload(staging_buffer, region.offset, data_size);
+        self.writer.write(data, self)
     }
 
     pub fn suballocate_region(&mut self, size: u64) -> Result<AllocatedMegabufferRegion> {
-        let size = self
-            .parent_megabuffer_state
-            .as_ref()
-            .unwrap()
-            .aligned_size(size)?;
+        let size = aligned_size(size, self.alignment);
 
         if size > self.size {
             return Err(eyre!("Subregion size too large"));
@@ -68,9 +51,11 @@ impl AllocatedMegabufferRegion {
         }
 
         let subregion = AllocatedMegabufferRegion {
-            offset: self.offset + (self.size - size),
             size,
-            parent_megabuffer: self.parent_megabuffer.clone(),
+            offset: self.offset + (self.size - size),
+            alignment: self.alignment,
+            megabuffer_id: self.megabuffer_id,
+            writer: self.writer.clone(),
         };
         self.size -= size;
 
@@ -78,15 +63,15 @@ impl AllocatedMegabufferRegion {
     }
 
     pub fn belongs_to_same_megabuffer(&self, other: &Self) -> bool {
-        self.parent_megabuffer == other.parent_megabuffer
+        self.megabuffer_id == other.megabuffer_id
     }
 
     pub fn belongs_to_megabuffer(&self, megabuffer: &Megabuffer) -> bool {
-        self.parent_megabuffer.as_ref().unwrap() == megabuffer
+        self.megabuffer_id == megabuffer.id
     }
 
     pub fn belongs_to_megabuffer_id(&self, megabuffer_id: MegabufferId) -> bool {
-        self.parent_megabuffer.as_ref().unwrap().id == megabuffer_id
+        self.megabuffer_id == megabuffer_id
     }
 
     pub fn is_adjacent_to(&self, other: &Self) -> bool {
@@ -130,21 +115,5 @@ impl AllocatedMegabufferRegion {
         self.size = new_size;
 
         Ok(())
-    }
-
-    fn lock(&self) -> Result<MutexGuard<MegabufferState>> {
-        self.parent_megabuffer_state
-            .lock()
-            .map_err(|e| eyre!(e.to_string()))
-    }
-}
-
-impl Drop for AllocatedMegabufferRegion {
-    fn drop(&mut self) {
-        if self.size > 0 {
-            if let Ok(mut state) = self.parent_megabuffer_state.lock() {
-                state.deallocate_region(self)
-            }
-        }
     }
 }

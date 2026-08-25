@@ -4,11 +4,11 @@
 //! to queue descriptor set updates (e.g. updating render target storage textures)
 //! and commit them prior to shader dispatches.
 
-use ash::vk;
-
-use super::descriptors::DescriptorWriter;
 use super::texture::StorageTexture;
 use crate::material::Material;
+use crate::resources::descriptor::DescriptorWriter;
+
+use ash::vk;
 
 pub(crate) struct ResourceUpdater<'a> {
     device: &'a ash::Device,

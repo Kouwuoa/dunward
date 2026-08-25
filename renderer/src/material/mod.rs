@@ -9,17 +9,13 @@ pub(crate) mod shader;
 pub(crate) mod shader_data;
 
 pub(crate) use compute::ComputeMaterialFactoryBuilder;
-pub(crate) use graphics::GraphicsMaterialFactoryBuilder;
-pub(crate) use shader::{ComputeShader, GraphicsShader};
-pub(crate) use shader_data::{PerDrawData, PerFrameData, PerMaterialData, PerObjectData, PerVertexData};
 
 use std::sync::{Arc, Mutex};
 
+use crate::resources::descriptor::DescriptorAllocator;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
-
-use crate::resources::descriptors::DescriptorAllocator;
 
 /// You can think of a Material as a shader instance that you can bind resources and data to.
 /// You only need to create a Material once, and then you can use it to render multiple objects.

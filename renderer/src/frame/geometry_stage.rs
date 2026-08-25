@@ -3,16 +3,15 @@
 //! Owns per-frame megabuffer regions (vertex, index, per-frame uniform, per-material, per-object)
 //! and records rasterization commands for 3D meshes.
 
+use crate::commands::allocator::{CommandRecorderAllocator, CommandRecorderAllocatorExt};
+use crate::commands::recorder::{CommandRecorder, Idle};
+use crate::gpu::Gpu;
+use crate::resources::megabuffer::region::AllocatedMegabufferRegion;
+use crate::resources::store::ResourceStore;
+
 use ash::vk;
 use color_eyre::Result;
 use std::sync::Arc;
-
-use crate::commands::allocator::{CommandRecorderAllocator, CommandRecorderAllocatorExt};
-use crate::commands::recorder::{CommandRecorder, Idle};
-use crate::core::DeviceContext;
-use crate::gpu::Gpu;
-use crate::resources::r#mod::{AllocatedMegabufferRegion, MegabufferExt};
-use crate::resources::store::ResourceStore;
 
 const FRAME_VERTEX_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
 const FRAME_INDEX_BUFFER_SIZE: u64 = 1024 * 1024; // 1 MB
@@ -39,9 +38,9 @@ impl FrameGeometryStage {
     pub fn new(
         gpu: Arc<Gpu>,
         cmd_allocator: &mut CommandRecorderAllocator,
-        resource_store: &ResourceStore,
+        resource_store: &mut ResourceStore,
     ) -> Result<Self> {
-        let graphics_queue = dvc_ctx.get_graphics_queue();
+        let graphics_queue = gpu.get_graphics_queue();
         let recorder = Some(cmd_allocator.allocate(graphics_queue)?);
 
         let vertex_region = resource_store
@@ -60,7 +59,7 @@ impl FrameGeometryStage {
             .per_object_megabuffer
             .allocate_region(FRAME_PER_OBJECT_BUFFER_SIZE)?;
 
-        let finished_fence = dvc_ctx.create_vk_fence(
+        let finished_fence = gpu.create_vk_fence(
             &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
         )?;
 

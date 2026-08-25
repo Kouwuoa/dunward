@@ -16,7 +16,7 @@ use crate::gpu::Gpu;
 use crate::material::shader::ComputeShader;
 use crate::material::shader_data::PerDrawData;
 use crate::material::{ComputeMaterialFactoryBuilder, MaterialFactory};
-use crate::resources::descriptor::DescriptorAllocator;
+use crate::resources::descriptor::{DescriptorAllocator, DescriptorSetLayoutBuilder};
 use crate::resources::megabuffer::Megabuffer;
 
 /// `ResourceFactory` is responsible only for construction (`create_*` APIs)
@@ -29,12 +29,12 @@ pub(crate) struct ResourceFactory {
 }
 
 impl ResourceFactory {
-    pub fn new(
-        gpu: Arc<Gpu>,
-    ) -> Result<Self> {
+    pub fn new(gpu: Arc<Gpu>) -> Result<Self> {
         let transfer_command_recorder = Arc::new(Mutex::new(TransferCommandRecorder::new(&gpu)?));
-        let descriptor_allocator =
-            Arc::new(Mutex::new(DescriptorAllocator::new(gpu.raw_logical(), 1000)?));
+        let descriptor_allocator = Arc::new(Mutex::new(DescriptorAllocator::new(
+            gpu.raw_logical(),
+            1000,
+        )?));
         Ok(Self {
             transfer_command_recorder,
             descriptor_allocator,
@@ -43,7 +43,7 @@ impl ResourceFactory {
     }
 
     pub fn create_color_texture(
-        &self,
+        &mut self,
         width: u32,
         height: u32,
         data: Option<&[u8]>,
@@ -56,18 +56,13 @@ impl ResourceFactory {
             data,
             use_dedicated_memory,
             usage,
-            self.memory_allocator.clone(),
-            self.device.clone(),
-            &self.transfer_command_recorder,
+            self.gpu.clone(),
+            &mut *self.transfer_command_recorder.lock().unwrap(),
         )
     }
 
     pub fn create_depth_texture(&self, width: u32, height: u32) -> Result<DepthTexture> {
-        Texture::new_depth_texture(
-            width,
-            height,
-            self.gpu.clone(),
-        )
+        Texture::new_depth_texture(width, height, self.gpu.clone())
     }
 
     pub fn create_megabuffer(
@@ -81,6 +76,7 @@ impl ResourceFactory {
             alignment,
             buf_usage,
             self.gpu.clone(),
+            self.transfer_command_recorder.clone(),
         )
     }
 
@@ -90,20 +86,17 @@ impl ResourceFactory {
         height: u32,
         use_dedicated_memory: bool,
     ) -> Result<StorageTexture> {
-        Texture::new_storage_texture(
-            width,
-            height,
-            use_dedicated_memory,
-            self.memory_allocator.clone(),
-            self.device.clone(),
-        )
+        Texture::new_storage_texture(width, height, use_dedicated_memory, self.gpu.clone())
     }
 
     pub fn create_compute_material_factory(&self) -> Result<MaterialFactory> {
         let descriptor_set_layout = self.create_compute_descriptor_set_layout()?;
         let pipeline_layout = self.create_compute_pipeline_layout(descriptor_set_layout)?;
-        let compute_shader = ComputeShader::new(ShaderId::TestPattern, self.device.clone())?;
-        ComputeMaterialFactoryBuilder::new(self.device.clone(), self.descriptor_allocator.clone())
+        let compute_shader = ComputeShader::new(ShaderId::TestPattern, self.gpu.raw_logical())?;
+        ComputeMaterialFactoryBuilder::new(
+            self.gpu.raw_logical(),
+            self.descriptor_allocator.clone(),
+        )
             .with_shader(compute_shader)
             .with_pipeline_layout(pipeline_layout)
             .with_descriptor_set_layout(descriptor_set_layout)
@@ -168,7 +161,7 @@ impl ResourceFactory {
             )
             .build(
                 vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
-                &self.device,
+                &self.gpu.raw_logical(),
             )
     }
 
@@ -189,7 +182,8 @@ impl ResourceFactory {
             .push_constant_ranges(&push_constant_ranges);
 
         let pipeline_layout = unsafe {
-            self.device
+            self.gpu
+                .raw_logical()
                 .create_pipeline_layout(&pipeline_layout_create_info, None)?
         };
 

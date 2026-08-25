@@ -1,5 +1,5 @@
+pub(crate) mod region;
 mod freelist;
-mod region;
 mod uploader;
 mod writer;
 
@@ -7,8 +7,7 @@ use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
 use std::sync::atomic::AtomicU32;
-use std::sync::mpsc::Receiver;
-use std::sync::{Arc, Mutex, MutexGuard, mpsc};
+use std::sync::{Arc, Mutex, mpsc};
 
 use super::buffer::Buffer;
 use crate::commands::TransferCommandRecorder;
@@ -17,6 +16,10 @@ use crate::resources::megabuffer::uploader::MegabufferUploader;
 use freelist::MegabufferFreeList;
 use region::AllocatedMegabufferRegion;
 use writer::{MegabufferWriteRecord, MegabufferWriter};
+
+pub(crate) fn aligned_size(size: u64, alignment: u64) -> u64 {
+    (size + alignment - 1) & !(alignment - 1)
+}
 
 static MEGABUFFER_ID_COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -45,7 +48,7 @@ impl PartialEq for Megabuffer {
 }
 
 impl Megabuffer {
-    fn new(
+    pub fn new(
         size: u64,
         alignment: u64,
         buf_usage: vk::BufferUsageFlags,
@@ -60,17 +63,10 @@ impl Megabuffer {
         );
 
         let mem_usage = vk_mem::MemoryUsage::AutoPreferDevice;
-        let buffer = Arc::new(Buffer::new(
-            size,
-            alignment,
-            buf_usage,
-            mem_usage,
-            false,
-            gpu.clone(),
-        )?);
+        let buffer = Buffer::new(size, alignment, buf_usage, mem_usage, false, gpu.clone())?;
 
         let id = MegabufferId::generate();
-        let free_list = Arc::new(Mutex::new(MegabufferFreeList::new(id, size)));
+        let free_list = MegabufferFreeList::new(id, size);
         let (write_sender, write_receiver) = mpsc::channel();
         let writer = Arc::new(MegabufferWriter::new(
             id,
@@ -91,40 +87,39 @@ impl Megabuffer {
     }
 
     /// Find a fitting free region, split it, and return the allocated region (locks the free-list)
-    pub fn allocate_region(&self, size: u64) -> Result<AllocatedMegabufferRegion> {
+    pub fn allocate_region(&mut self, size: u64) -> Result<AllocatedMegabufferRegion> {
         let aligned_size = self.aligned_size(size);
-        let mut state = self.lock()?;
         // Find fitting free region
-        let free_region = state
+        let free_region = self
+            .free_list
             .carve_free_region(aligned_size)
             .ok_or_eyre("Megabuffer out of memory: no suitable free region found")?;
         // Convert free region to allocated region
         Ok(AllocatedMegabufferRegion::new(
             free_region.offset,
             free_region.size,
+            self.buffer.alignment(),
+            self.id,
             self.writer.clone(),
         ))
     }
 
     /// Deallocate an allocated region and merge it with adjacent free regions if possible.
-    pub fn deallocate_region(&self, region: &mut AllocatedMegabufferRegion) -> Result<()> {
+    pub fn deallocate_region(&mut self, region: &mut AllocatedMegabufferRegion) -> Result<()> {
         if region.size == 0 {
             return Err(eyre!(
                 "Cannot deallocate region with size 0. This region was likely already deallocated."
             ));
         }
 
-        let mut state = self.lock()?;
-        state.reclaim_region(region)
+        self.free_list.reclaim_region(region)
     }
 
-    pub fn defragment(&self) -> Result<()> {
-        self.free_list
+    pub fn defragment(&mut self) {
         self.free_list.defragment_free_regions()
     }
 
     fn aligned_size(&self, size: u64) -> u64 {
-        let alignment = self.buffer.alignment();
-        (size + alignment - 1) & !(alignment - 1)
+        aligned_size(size, self.buffer.alignment())
     }
 }

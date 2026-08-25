@@ -7,9 +7,9 @@ use ash::vk;
 use color_eyre::Result;
 
 use super::factory::ResourceFactory;
-use super::r#mod::Megabuffer;
 use super::texture::{ColorTexture, StorageTexture};
 use crate::material::MaterialFactory;
+use crate::resources::megabuffer::Megabuffer;
 
 const VERTEX_BUFFER_SIZE: u64 = 1024 * 1024 * 256; // 256 MB
 const INDEX_BUFFER_SIZE: u64 = 1024 * 1024 * 64; // 64 MB
@@ -38,8 +38,8 @@ pub(crate) struct ResourceStore {
 
     /// Compute pipeline factory that creates material instances for compute passes
     pub compute_material_factory: MaterialFactory,
-    /// Rasterization pipeline factory that creates material instances for rasterizing 3D geometry
-    pub graphics_material_factory: MaterialFactory,
+    ///// Rasterization pipeline factory that creates material instances for rasterizing 3D geometry
+    //pub graphics_material_factory: MaterialFactory,
 }
 
 impl ResourceStore {
@@ -77,6 +77,7 @@ impl ResourceStore {
         )?;
 
         let compute_material_factory = factory.create_compute_material_factory()?;
+        //let graphics_material_factory = factory.create_graphics_material_factory()?;
 
         Ok(Self {
             storage_textures: Vec::new(),
@@ -90,6 +91,7 @@ impl ResourceStore {
             per_object_megabuffer,
 
             compute_material_factory,
+            //graphics_material_factory,
         })
     }
 

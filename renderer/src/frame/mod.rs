@@ -56,14 +56,14 @@ impl Frame {
             resource_store,
         )?;
 
-        let present_image_acquired_semaphore = dvc_ctx.create_binary_semaphore()?;
-        let render_finished_semaphore = dvc_ctx.create_binary_semaphore()?;
-        let previous_frame_render_finished_fence = dvc_ctx.create_vk_fence(
+        let present_image_acquired_semaphore = gpu.create_binary_semaphore()?;
+        let render_finished_semaphore = gpu.create_binary_semaphore()?;
+        let previous_frame_render_finished_fence = gpu.create_vk_fence(
             &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
         )?;
-        let frame_completion_timeline = dvc_ctx.create_timeline_semaphore()?;
+        let frame_completion_timeline = gpu.create_timeline_semaphore()?;
 
-        let graphics_queue = dvc_ctx.get_graphics_queue();
+        let graphics_queue = gpu.get_graphics_queue();
         let postrender_recorder = Some(cmd_allocator.allocate(graphics_queue)?);
 
         Ok(Self {
@@ -109,8 +109,11 @@ impl Frame {
         )?;
 
         // Acquire the next image from the display swapchain
-        let mut present_tex =
-            display.acquire_next_present_texture(&self.present_texture_acquired_semaphore, timeout, gpu.clone())?;
+        let mut present_tex = display.acquire_next_present_texture(
+            &self.present_texture_acquired_semaphore,
+            timeout,
+            gpu.clone(),
+        )?;
 
         // Perform post-render operations on the compute queue
         let postrender_recorder = self.postrender_recorder.take().unwrap();
@@ -153,26 +156,28 @@ impl Frame {
             Ok(())
         })?;
 
-        self.postrender_recorder = Some(gpu.submit(
-            postrender_recorder,
-            &[
-                // Wait for the lighting stage to finish rendering
-                self.frame_completion_timeline.to_wait_semaphore(
-                    vk::PipelineStageFlags::TRANSFER,
-                    lighting_timeline_signal,
-                ),
-                // Wait for the present texture to be acquired
-                self.present_texture_acquired_semaphore
-                    .to_wait_semaphore(vk::PipelineStageFlags::TRANSFER),
-            ],
-            // Signal that all render operations have finished, meaning the display image is ready to be presented
-            &[
-                self.frame_completion_timeline
-                    .to_signal_semaphore(postrender_timeline_signal),
-                self.render_finished_semaphore.to_signal_semaphore(),
-            ],
-            Some(self.previous_frame_render_finished_fence),
-        )?);
+        self.postrender_recorder = Some(
+            gpu.submit(
+                postrender_recorder,
+                &[
+                    // Wait for the lighting stage to finish rendering
+                    self.frame_completion_timeline.to_wait_semaphore(
+                        vk::PipelineStageFlags::TRANSFER,
+                        lighting_timeline_signal,
+                    ),
+                    // Wait for the present texture to be acquired
+                    self.present_texture_acquired_semaphore
+                        .to_wait_semaphore(vk::PipelineStageFlags::TRANSFER),
+                ],
+                // Signal that all render operations have finished, meaning the display image is ready to be presented
+                &[
+                    self.frame_completion_timeline
+                        .to_signal_semaphore(postrender_timeline_signal),
+                    self.render_finished_semaphore.to_signal_semaphore(),
+                ],
+                Some(self.previous_frame_render_finished_fence),
+            )?,
+        );
 
         Ok(FramePresentPacket {
             texture: present_tex,
@@ -187,7 +192,11 @@ impl Frame {
         display.present(pkt.texture, &self.render_finished_semaphore)
     }
 
-    pub fn resize(&mut self, size: &winit::dpi::PhysicalSize<u32>, resource_factory: &ResourceFactory) {
+    pub fn resize(
+        &mut self,
+        size: &winit::dpi::PhysicalSize<u32>,
+        resource_factory: &ResourceFactory,
+    ) {
         // TODO: Resize the geometry stage as well
         self.lighting_stage.resize(size, resource_factory);
     }

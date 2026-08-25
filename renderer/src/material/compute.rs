@@ -3,16 +3,15 @@
 //! Configures compute shaders, pipeline layouts, and descriptor set layouts
 //! for compute dispatch workloads.
 
-use std::ffi::CString;
-use std::sync::{Arc, Mutex};
+use super::MaterialFactory;
+use super::shader::ComputeShader;
+use crate::resources::descriptor::DescriptorAllocator;
 
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
-
-use super::MaterialFactory;
-use super::shader::ComputeShader;
-use crate::resources::descriptors::DescriptorAllocator;
+use std::ffi::CString;
+use std::sync::{Arc, Mutex};
 
 pub(crate) struct ComputeMaterialFactoryBuilder {
     shader: Option<ComputeShader>,

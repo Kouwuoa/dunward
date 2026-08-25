@@ -10,6 +10,8 @@ use super::mesh::Mesh;
 use super::vertex::Vertex;
 use crate::display::Display;
 use crate::material::shader_data::PerVertexData;
+use crate::resources::megabuffer::Megabuffer;
+use crate::resources::megabuffer::region::AllocatedMegabufferRegion;
 
 pub(crate) struct FullscreenQuad {
     quad_model: Model,
@@ -20,8 +22,8 @@ pub(crate) struct FullscreenQuad {
 
 impl FullscreenQuad {
     pub fn new(
-        vertex_megabuffer: &Megabuffer,
-        index_megabuffer: &Megabuffer,
+        vertex_megabuffer: &mut Megabuffer,
+        index_megabuffer: &mut Megabuffer,
         display: &Display,
     ) -> Result<Self> {
         let quad_mesh = Mesh::new_quad();
@@ -38,8 +40,8 @@ impl FullscreenQuad {
 
     pub fn resize_to_display(
         &mut self,
-        display_ctx: &Display,
-        vertex_megabuffer: &Megabuffer,
+        display: &Display,
+        vertex_megabuffer: &mut Megabuffer,
     ) -> Result<()> {
         // Correct for image aspect ratio
         let mut x = if self.image_width >= self.image_height {
@@ -54,7 +56,7 @@ impl FullscreenQuad {
         };
 
         // Correct for viewport aspect ratio
-        let size = display_ctx.swapchain.swapchain_image_extent;
+        let size = display.get_size();
         if size.width >= size.height {
             y *= size.width as f32 / size.height as f32;
         } else {
@@ -88,8 +90,8 @@ pub(crate) struct Model {
 impl Model {
     pub fn new(
         meshes: Vec<Mesh>,
-        vertex_megabuffer: &Megabuffer,
-        index_megabuffer: &Megabuffer,
+        vertex_megabuffer: &mut Megabuffer,
+        index_megabuffer: &mut Megabuffer,
     ) -> Result<Self> {
         log::info!("Creating model with {} meshes", meshes.len());
 
@@ -119,8 +121,9 @@ impl Model {
 
         // Upload all vertices to the vertex buffer
         let vertex_buffer_region_size = (vertices.len() * size_of::<PerVertexData>()) as u64;
-        let vertex_buffer_region = vertex_megabuffer.allocate_region(vertex_buffer_region_size)?;
-        vertex_megabuffer.write(&vertices, &vertex_buffer_region)?;
+        let mut vertex_buffer_region =
+            vertex_megabuffer.allocate_region(vertex_buffer_region_size)?;
+        vertex_buffer_region.write(&vertices)?;
 
         // Upload all indices to the index buffer if the model has indices
         let index_buffer_region = if has_indices {
@@ -131,8 +134,9 @@ impl Model {
                 .collect::<Vec<u32>>();
 
             let index_buffer_region_size = (indices.len() * size_of::<u32>()) as u64;
-            let index_buffer_region = index_megabuffer.allocate_region(index_buffer_region_size)?;
-            index_megabuffer.write(&indices, &index_buffer_region)?;
+            let mut index_buffer_region =
+                index_megabuffer.allocate_region(index_buffer_region_size)?;
+            index_buffer_region.write(&indices)?;
 
             Some(index_buffer_region)
         } else {
@@ -149,7 +153,7 @@ impl Model {
     pub fn write_vertex_buffer(
         &mut self,
         vertices: &[PerVertexData],
-        vertex_megabuffer: &Megabuffer,
+        vertex_megabuffer: &mut Megabuffer,
     ) -> Result<()> {
         if self.vertex_megabuffer_region.is_none() {
             return Err(eyre!("Model does not have a vertex buffer region"));
