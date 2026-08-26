@@ -28,7 +28,7 @@ impl Buffer {
         mapped: bool,
         gpu: Arc<Gpu>,
     ) -> Result<Self> {
-        let (buffer, allocation) = unsafe {
+        let (buffer, allocation) = {
             let buffer_info = vk::BufferCreateInfo {
                 size,
                 usage: buf_usage,
@@ -95,9 +95,7 @@ impl Buffer {
 
 impl Drop for Buffer {
     fn drop(&mut self) {
-        unsafe {
-            let allocation = self.allocation.as_mut().expect("Allocation does not exist");
-            self.gpu.destroy_vk_buffer(self.buffer, allocation);
-        }
+        let allocation = self.allocation.as_mut().expect("Allocation does not exist");
+        self.gpu.destroy_vk_buffer(self.buffer, allocation);
     }
 }

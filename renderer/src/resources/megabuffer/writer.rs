@@ -57,7 +57,7 @@ impl MegabufferWriter {
         }
 
         let data_size = size_of_val(data) as u64;
-        if data_size > region.size {
+        if data_size > region.size() {
             return Err(eyre!("Data too large for region"));
         }
 
@@ -77,7 +77,7 @@ impl MegabufferWriter {
         // Send write record down the lock-free MPSC channel
         self.write_sender.send(MegabufferWriteRecord {
             staging_buffer,
-            dst_offset: region.offset,
+            dst_offset: region.offset(),
             size: data_size,
         })?;
 

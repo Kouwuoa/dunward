@@ -25,7 +25,7 @@ static MEGABUFFER_ID_COUNTER: AtomicU32 = AtomicU32::new(0);
 
 /// Strongly typed Megabuffer identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct MegabufferId(u32);
+pub(crate) struct MegabufferId(u32);
 impl MegabufferId {
     pub fn generate() -> Self {
         Self(MEGABUFFER_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
@@ -74,7 +74,7 @@ impl Megabuffer {
             write_sender,
             gpu.clone(),
         ));
-        let uploader = MegabufferUploader::new(write_receiver, upload_recorder);
+        let uploader = MegabufferUploader::new(buffer.raw(), write_receiver, upload_recorder);
 
         Ok(Self {
             id,
@@ -84,6 +84,10 @@ impl Megabuffer {
             uploader,
             gpu,
         })
+    }
+
+    pub fn upload(&mut self) -> Result<()> {
+        self.uploader.upload()
     }
 
     /// Find a fitting free region, split it, and return the allocated region (locks the free-list)
@@ -105,13 +109,7 @@ impl Megabuffer {
     }
 
     /// Deallocate an allocated region and merge it with adjacent free regions if possible.
-    pub fn deallocate_region(&mut self, region: &mut AllocatedMegabufferRegion) -> Result<()> {
-        if region.size == 0 {
-            return Err(eyre!(
-                "Cannot deallocate region with size 0. This region was likely already deallocated."
-            ));
-        }
-
+    pub fn deallocate_region(&mut self, region: AllocatedMegabufferRegion) -> Result<()> {
         self.free_list.reclaim_region(region)
     }
 

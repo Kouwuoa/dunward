@@ -159,13 +159,13 @@ impl Model {
             return Err(eyre!("Model does not have a vertex buffer region"));
         }
 
-        vertex_megabuffer.deallocate_region(&mut self.vertex_megabuffer_region.take().unwrap())?;
+        vertex_megabuffer.deallocate_region(self.vertex_megabuffer_region.take().unwrap())?;
 
         let mut vertex_megabuffer_region =
             vertex_megabuffer.allocate_region(std::mem::size_of_val(vertices) as u64)?;
         vertex_megabuffer_region.write(vertices)?;
-
         self.vertex_megabuffer_region = Some(vertex_megabuffer_region);
+
         Ok(())
     }
 

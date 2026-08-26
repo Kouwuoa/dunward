@@ -6,6 +6,7 @@ use color_eyre::eyre::{Result, eyre};
 pub(crate) struct MegabufferFreeList {
     megabuffer_id: MegabufferId,
     free_regions: Vec<FreeMegabufferRegion>,
+    total_capacity: u64,
 }
 
 impl MegabufferFreeList {
@@ -17,6 +18,7 @@ impl MegabufferFreeList {
                 offset: 0,
                 size: total_capacity,
             }],
+            total_capacity,
         }
     }
 
@@ -50,25 +52,22 @@ impl MegabufferFreeList {
                 )
             })?;
 
-        // Insert the new free region into the free regions vector
+        // Clean up the free region that was split if its size is 0
         if self.free_regions[region_index].size == 0 {
-            self.free_regions[region_index] = new_region.clone();
-        } else {
-            self.free_regions.insert(region_index, new_region.clone());
+            self.free_regions.remove(region_index);
         }
 
         Some(new_region)
     }
 
-    pub fn reclaim_region(&mut self, region: &mut AllocatedMegabufferRegion) -> Result<()> {
+    pub fn reclaim_region(&mut self, region: AllocatedMegabufferRegion) -> Result<()> {
         if !region.belongs_to_megabuffer_id(self.megabuffer_id) {
             return Err(eyre!(
                 "Attempted to reclaim a region that does not belong to this megabuffer"
             ));
         }
 
-        self.reclaim(region.offset, region.size);
-        region.size = 0; // Mark the region as invalid by setting size to 0
+        self.reclaim(region.offset(), region.size())?;
 
         Ok(())
     }
@@ -90,9 +89,41 @@ impl MegabufferFreeList {
         }
     }
 
-    fn reclaim(&mut self, offset: u64, size: u64) {
+    pub fn available_bytes(&self) -> u64 {
+        self.free_regions.iter().map(|r| r.size).sum()
+    }
+
+    pub fn allocated_bytes(&self) -> u64 {
+        self.total_capacity - self.available_bytes()
+    }
+
+    pub fn total_capacity(&self) -> u64 {
+        self.total_capacity
+    }
+
+    fn reclaim(&mut self, offset: u64, size: u64) -> Result<()> {
         if size == 0 {
-            return;
+            return Err(eyre!("Size must be greater than zero"));
+        }
+
+        if size > self.allocated_bytes() {
+            return Err(eyre!("Size must be less than or equal to allocated bytes"));
+        }
+
+        if offset + size > self.total_capacity {
+            return Err(eyre!(
+                "Region extends beyond total capacity of the megabuffer"
+            ));
+        }
+
+        for free_region in &self.free_regions {
+            let free_end = free_region.offset + free_region.size;
+            let reclaim_end = offset + size;
+            if offset < free_end && reclaim_end > free_region.offset {
+                return Err(eyre!(
+                    "Attempted to reclaim a region that overlaps with an already free region"
+                ));
+            }
         }
 
         let mut left_index = None; // Some if there is a free region to the left of the deallocated region
@@ -128,6 +159,8 @@ impl MegabufferFreeList {
                 self.free_regions.sort_by_key(|r| r.offset);
             }
         }
+
+        Ok(())
     }
 }
 
@@ -143,6 +176,9 @@ mod tests {
         assert_eq!(freelist.free_regions.len(), 1);
         assert_eq!(freelist.free_regions[0].offset, 0);
         assert_eq!(freelist.free_regions[0].size, 1024);
+        assert_eq!(freelist.available_bytes(), 1024);
+        assert_eq!(freelist.allocated_bytes(), 0);
+        assert_eq!(freelist.total_capacity(), 1024);
     }
 
     #[test]
@@ -153,6 +189,52 @@ mod tests {
         let carved = carved.unwrap();
         assert_eq!(carved.offset, 0);
         assert_eq!(carved.size, 256);
+        assert_eq!(freelist.available_bytes(), 768);
+        assert_eq!(freelist.allocated_bytes(), 256);
+        assert_eq!(freelist.total_capacity(), 1024);
+        assert_eq!(freelist.free_regions.len(), 1);
+        assert_eq!(freelist.free_regions[0].offset, 256);
+        assert_eq!(freelist.free_regions[0].size, 768);
+    }
+
+    #[test]
+    fn test_carve_multiple_consecutive() {
+        let mut freelist = MegabufferFreeList::new(MEGABUFFER_ID, 1024);
+
+        let r1 = freelist.carve_free_region(256).expect("First carve should succeed");
+        assert_eq!(r1.offset, 0);
+        assert_eq!(r1.size, 256);
+        assert_eq!(freelist.available_bytes(), 768);
+        assert_eq!(freelist.allocated_bytes(), 256);
+
+        let r2 = freelist.carve_free_region(256).expect("Second carve should succeed");
+        assert_eq!(r2.offset, 256);
+        assert_eq!(r2.size, 256);
+        assert_eq!(freelist.available_bytes(), 512);
+        assert_eq!(freelist.allocated_bytes(), 512);
+
+        let r3 = freelist.carve_free_region(512).expect("Third carve should succeed");
+        assert_eq!(r3.offset, 512);
+        assert_eq!(r3.size, 512);
+        assert_eq!(freelist.available_bytes(), 0);
+        assert_eq!(freelist.allocated_bytes(), 1024);
+        assert!(freelist.free_regions.is_empty());
+
+        // Further allocations must fail when exhausted
+        assert!(freelist.carve_free_region(1).is_none());
+    }
+
+    #[test]
+    fn test_carve_exact_capacity() {
+        let mut freelist = MegabufferFreeList::new(MEGABUFFER_ID, 1024);
+        let carved = freelist.carve_free_region(1024);
+        assert!(carved.is_some());
+        let carved = carved.unwrap();
+        assert_eq!(carved.offset, 0);
+        assert_eq!(carved.size, 1024);
+        assert_eq!(freelist.available_bytes(), 0);
+        assert_eq!(freelist.allocated_bytes(), 1024);
+        assert!(freelist.free_regions.is_empty());
     }
 
     #[test]
@@ -160,6 +242,39 @@ mod tests {
         let mut freelist = MegabufferFreeList::new(MEGABUFFER_ID, 512);
         let carved = freelist.carve_free_region(1024);
         assert!(carved.is_none());
+        assert_eq!(freelist.available_bytes(), 512);
+        assert_eq!(freelist.allocated_bytes(), 0);
+        assert_eq!(freelist.total_capacity(), 512);
+    }
+
+    #[test]
+    fn test_carve_skips_small_regions_to_find_fit() {
+        let mut freelist = MegabufferFreeList {
+            megabuffer_id: MEGABUFFER_ID,
+            free_regions: vec![
+                FreeMegabufferRegion {
+                    offset: 0,
+                    size: 100,
+                },
+                FreeMegabufferRegion {
+                    offset: 200,
+                    size: 300,
+                },
+            ],
+            total_capacity: 500,
+        };
+
+        // Request 200: first region (size 100) is too small, second region (size 300) fits
+        let carved = freelist.carve_free_region(200).expect("Should find fitting region");
+        assert_eq!(carved.offset, 200);
+        assert_eq!(carved.size, 200);
+        assert_eq!(freelist.free_regions.len(), 2);
+        assert_eq!(freelist.free_regions[0].offset, 0);
+        assert_eq!(freelist.free_regions[0].size, 100);
+        assert_eq!(freelist.free_regions[1].offset, 400);
+        assert_eq!(freelist.free_regions[1].size, 100);
+        assert_eq!(freelist.available_bytes(), 200);
+        assert_eq!(freelist.allocated_bytes(), 300);
     }
 
     #[test]
@@ -176,16 +291,21 @@ mod tests {
                     size: 100,
                 },
             ],
+            total_capacity: 600,
         };
 
         // Reclaim in the middle without touching neighbors
-        freelist.reclaim(250, 50);
+        freelist.reclaim(250, 50).unwrap();
 
         assert_eq!(freelist.free_regions.len(), 3);
         assert_eq!(freelist.free_regions[0].offset, 0);
+        assert_eq!(freelist.free_regions[0].size, 100);
         assert_eq!(freelist.free_regions[1].offset, 250);
         assert_eq!(freelist.free_regions[1].size, 50);
         assert_eq!(freelist.free_regions[2].offset, 500);
+        assert_eq!(freelist.free_regions[2].size, 100);
+        assert_eq!(freelist.available_bytes(), 250);
+        assert_eq!(freelist.allocated_bytes(), 350);
     }
 
     #[test]
@@ -202,15 +322,17 @@ mod tests {
                     size: 100,
                 },
             ],
+            total_capacity: 1024,
         };
 
         // Reclaim immediately adjacent to the right of the first block [0..100]
-        freelist.reclaim(100, 50);
+        freelist.reclaim(100, 50).unwrap();
 
         assert_eq!(freelist.free_regions.len(), 2);
         assert_eq!(freelist.free_regions[0].offset, 0);
         assert_eq!(freelist.free_regions[0].size, 150);
         assert_eq!(freelist.free_regions[1].offset, 500);
+        assert_eq!(freelist.free_regions[1].size, 100);
     }
 
     #[test]
@@ -227,10 +349,11 @@ mod tests {
                     size: 100,
                 },
             ],
+            total_capacity: 1024,
         };
 
         // Reclaim immediately adjacent to the left of the second block [500..600]
-        freelist.reclaim(450, 50);
+        freelist.reclaim(450, 50).unwrap();
 
         assert_eq!(freelist.free_regions.len(), 2);
         assert_eq!(freelist.free_regions[0].offset, 0);
@@ -253,14 +376,33 @@ mod tests {
                     size: 100,
                 },
             ],
+            total_capacity: 1024,
         };
 
         // Reclaim bridging the gap [100..200]
-        freelist.reclaim(100, 100);
+        freelist.reclaim(100, 100).unwrap();
 
         assert_eq!(freelist.free_regions.len(), 1);
         assert_eq!(freelist.free_regions[0].offset, 0);
         assert_eq!(freelist.free_regions[0].size, 300);
+    }
+
+    #[test]
+    fn test_reclaim_invalid_inputs() {
+        let mut freelist = MegabufferFreeList::new(MEGABUFFER_ID, 1024);
+        freelist.carve_free_region(256).unwrap();
+
+        // Reclaim size 0 -> error
+        assert!(freelist.reclaim(0, 0).is_err());
+
+        // Reclaim size larger than allocated bytes -> error
+        assert!(freelist.reclaim(0, 500).is_err());
+
+        // Reclaim beyond total capacity -> error
+        assert!(freelist.reclaim(1000, 100).is_err());
+
+        // Reclaim overlapping with already free region [256..1024] -> error
+        assert!(freelist.reclaim(200, 100).is_err());
     }
 
     #[test]
@@ -281,6 +423,7 @@ mod tests {
                     size: 100,
                 },
             ],
+            total_capacity: 300,
         };
 
         freelist.defragment_free_regions();
@@ -288,5 +431,90 @@ mod tests {
         assert_eq!(freelist.free_regions.len(), 1);
         assert_eq!(freelist.free_regions[0].offset, 0);
         assert_eq!(freelist.free_regions[0].size, 300);
+    }
+
+    #[test]
+    fn test_defragment_multiple_disjoint_clusters() {
+        let mut freelist = MegabufferFreeList {
+            megabuffer_id: MEGABUFFER_ID,
+            free_regions: vec![
+                FreeMegabufferRegion {
+                    offset: 500,
+                    size: 100,
+                },
+                FreeMegabufferRegion {
+                    offset: 0,
+                    size: 100,
+                },
+                FreeMegabufferRegion {
+                    offset: 100,
+                    size: 100,
+                },
+                FreeMegabufferRegion {
+                    offset: 400,
+                    size: 100,
+                },
+            ],
+            total_capacity: 1000,
+        };
+
+        freelist.defragment_free_regions();
+
+        assert_eq!(freelist.free_regions.len(), 2);
+        assert_eq!(freelist.free_regions[0].offset, 0);
+        assert_eq!(freelist.free_regions[0].size, 200);
+        assert_eq!(freelist.free_regions[1].offset, 400);
+        assert_eq!(freelist.free_regions[1].size, 200);
+    }
+
+    #[test]
+    fn test_full_alloc_dealloc_lifecycle() {
+        let mut freelist = MegabufferFreeList::new(MEGABUFFER_ID, 1000);
+
+        let r1 = freelist.carve_free_region(200).unwrap();
+        let r2 = freelist.carve_free_region(300).unwrap();
+        let r3 = freelist.carve_free_region(500).unwrap();
+
+        assert_eq!(freelist.available_bytes(), 0);
+        assert_eq!(freelist.allocated_bytes(), 1000);
+        assert!(freelist.free_regions.is_empty());
+
+        // Reclaim middle region r2 (200..500)
+        freelist.reclaim(r2.offset, r2.size).unwrap();
+        assert_eq!(freelist.available_bytes(), 300);
+        assert_eq!(freelist.allocated_bytes(), 700);
+        assert_eq!(freelist.free_regions.len(), 1);
+        assert_eq!(freelist.free_regions[0].offset, 200);
+        assert_eq!(freelist.free_regions[0].size, 300);
+
+        // Carve smaller chunk from r2's gap
+        let r4 = freelist.carve_free_region(100).unwrap();
+        assert_eq!(r4.offset, 200);
+        assert_eq!(r4.size, 100);
+        assert_eq!(freelist.available_bytes(), 200);
+        assert_eq!(freelist.free_regions[0].offset, 300);
+        assert_eq!(freelist.free_regions[0].size, 200);
+
+        // Reclaim r1 (0..200) -> now free regions are [0..200] and [300..500]
+        freelist.reclaim(r1.offset, r1.size).unwrap();
+        assert_eq!(freelist.free_regions.len(), 2);
+        assert_eq!(freelist.free_regions[0].offset, 0);
+        assert_eq!(freelist.free_regions[0].size, 200);
+        assert_eq!(freelist.free_regions[1].offset, 300);
+        assert_eq!(freelist.free_regions[1].size, 200);
+
+        // Reclaim r4 (200..300) -> bridges left (0..200) and right (300..500)
+        freelist.reclaim(r4.offset, r4.size).unwrap();
+        assert_eq!(freelist.free_regions.len(), 1);
+        assert_eq!(freelist.free_regions[0].offset, 0);
+        assert_eq!(freelist.free_regions[0].size, 500);
+
+        // Reclaim r3 (500..1000) -> merges with [0..500] to restore full capacity [0..1000]
+        freelist.reclaim(r3.offset, r3.size).unwrap();
+        assert_eq!(freelist.free_regions.len(), 1);
+        assert_eq!(freelist.free_regions[0].offset, 0);
+        assert_eq!(freelist.free_regions[0].size, 1000);
+        assert_eq!(freelist.available_bytes(), 1000);
+        assert_eq!(freelist.allocated_bytes(), 0);
     }
 }

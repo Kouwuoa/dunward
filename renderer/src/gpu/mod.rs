@@ -11,7 +11,6 @@ mod instance;
 mod memory;
 
 use crate::commands::{CommandRecorder, Executable, Idle};
-use crate::resources::texture::{ColorTexture, Texture};
 use instance::Instance;
 use queue::Queue;
 use semaphore::{
@@ -22,12 +21,11 @@ use surface::Surface;
 use crate::gpu::queue::QueueFamily;
 use ash::vk;
 use color_eyre::Result;
-use color_eyre::eyre::{OptionExt, eyre};
+use color_eyre::eyre::OptionExt;
 use std::ffi::{CStr, c_char};
 use std::str::Utf8Error;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use vk_mem::Alloc;
 
 /// Main way to submit rendering commands to the GPU.
 pub(crate) struct Gpu {
@@ -46,7 +44,7 @@ pub(crate) struct Gpu {
 impl Gpu {
     pub fn new(window: &winit::window::Window) -> Result<(Self, Surface)> {
         let instance = Instance::new(Some(window))?;
-        let mut surface = instance.create_surface(window)?;
+        let surface = instance.create_surface(window)?;
 
         let (physical_device, graphics_queue_family, compute_queue_family, transfer_queue_family) =
             Self::select_physical_device(

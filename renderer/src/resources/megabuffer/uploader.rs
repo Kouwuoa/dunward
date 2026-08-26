@@ -1,4 +1,4 @@
-use super::{Megabuffer, MegabufferWriteRecord};
+use super::MegabufferWriteRecord;
 use crate::commands::TransferCommandRecorder;
 
 use ash::vk;
@@ -7,23 +7,26 @@ use color_eyre::eyre::eyre;
 use std::sync::{Arc, Mutex, mpsc};
 
 pub(crate) struct MegabufferUploader {
+    megabuffer_raw_buffer: vk::Buffer,
     write_receiver: mpsc::Receiver<MegabufferWriteRecord>,
     upload_recorder: Arc<Mutex<TransferCommandRecorder>>,
 }
 
 impl MegabufferUploader {
     pub fn new(
+        megabuffer_raw_buffer: vk::Buffer,
         write_receiver: mpsc::Receiver<MegabufferWriteRecord>,
         upload_recorder: Arc<Mutex<TransferCommandRecorder>>,
     ) -> Self {
         Self {
+            megabuffer_raw_buffer,
             write_receiver,
             upload_recorder,
         }
     }
 
     /// Batches and transfers all queued pending uploads to the GPU
-    pub fn upload(&mut self, megabuffer: &Megabuffer) -> Result<()> {
+    pub fn upload(&mut self) -> Result<()> {
         let upload_records: Vec<MegabufferWriteRecord> = self.write_receiver.try_iter().collect();
 
         // Lock-free GPU transfer submission that
@@ -42,7 +45,7 @@ impl MegabufferUploader {
                         device.cmd_copy_buffer(
                             cmd,
                             upload.staging_buffer.raw(),
-                            megabuffer.buffer.raw(),
+                            self.megabuffer_raw_buffer,
                             &[copy_region],
                         );
                     }

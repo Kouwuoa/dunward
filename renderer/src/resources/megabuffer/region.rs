@@ -3,7 +3,7 @@ use color_eyre::eyre::Result;
 use color_eyre::eyre::eyre;
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct FreeMegabufferRegion {
     pub size: u64,
     pub offset: u64,
@@ -11,23 +11,37 @@ pub(crate) struct FreeMegabufferRegion {
 
 pub(crate) struct AllocatedMegabufferRegion {
     /// Size of the allocated region. This is 0 when the region is deallocated.
-    pub size: u64,
+    size: u64,
     /// Offset of the allocated region within the parent megabuffer. This is ignored when the region is deallocated.
-    pub offset: u64,
+    offset: u64,
     alignment: u64,
     megabuffer_id: MegabufferId,
     writer: Arc<MegabufferWriter>,
 }
 
 impl AllocatedMegabufferRegion {
-    pub fn new(size: u64, offset: u64, alignment: u64, megabuffer_id: MegabufferId, writer: Arc<MegabufferWriter>) -> Self {
+    pub fn new(
+        offset: u64,
+        size: u64,
+        alignment: u64,
+        megabuffer_id: MegabufferId,
+        writer: Arc<MegabufferWriter>,
+    ) -> Self {
         Self {
-            size,
             offset,
+            size,
             alignment,
             megabuffer_id,
             writer,
         }
+    }
+
+    pub fn size(&self) -> u64 {
+        self.size
+    }
+
+    pub fn offset(&self) -> u64 {
+        self.offset
     }
 
     pub fn write<T>(&mut self, data: &[T]) -> Result<()>
