@@ -22,12 +22,12 @@ impl Gpu {
         }
     }
 
-    pub fn destroy_vk_image(&self, image: vk::Image, allocation: &mut vk_mem::Allocation) {
+    pub fn destroy_vk_image(&self, image: vk::Image, mut allocation: vk_mem::Allocation) {
         unsafe {
             self.mem_allocator
                 .lock()
                 .expect("Failed to acquire lock for memory allocator")
-                .destroy_image(image, allocation);
+                .destroy_image(image, &mut allocation);
         }
     }
 
@@ -46,12 +46,12 @@ impl Gpu {
         }
     }
 
-    pub fn destroy_vk_buffer(&self, buffer: vk::Buffer, allocation: &mut vk_mem::Allocation) {
+    pub fn destroy_vk_buffer(&self, buffer: vk::Buffer, mut allocation: vk_mem::Allocation) {
         unsafe {
             self.mem_allocator
                 .lock()
                 .expect("Failed to acquire lock for memory allocator")
-                .destroy_buffer(buffer, allocation);
+                .destroy_buffer(buffer, &mut allocation);
         }
     }
 

@@ -63,8 +63,9 @@ impl Renderer {
         let display = Display::new(window, gpu.clone(), surface)?;
 
         let mut cmd_allocator = CommandRecorderAllocator::new(gpu.raw_logical())?;
+        let deletion_queue = DeletionQueue::new(gpu.clone())?;
         let resource_factory = ResourceFactory::new(gpu.clone())?;
-        let mut resource_store = ResourceStore::new(&resource_factory)?;
+        let mut resource_store = ResourceStore::new(&resource_factory, deletion_queue.get_sender())?;
         let nearest_sampler = gpu.create_vk_sampler(
             &vk::SamplerCreateInfo::default()
                 .mag_filter(vk::Filter::NEAREST)

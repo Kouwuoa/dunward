@@ -10,6 +10,7 @@ pub(crate) mod megabuffer;
 pub(crate) mod store;
 pub(crate) mod texture;
 pub(crate) mod updater;
+mod deletion;
 
 use ash::vk;
 

@@ -9,6 +9,7 @@ use color_eyre::Result;
 use super::factory::ResourceFactory;
 use super::texture::{ColorTexture, StorageTexture};
 use crate::material::MaterialFactory;
+use crate::resources::deletion::queue::DeletionQueue;
 use crate::resources::megabuffer::Megabuffer;
 
 const VERTEX_BUFFER_SIZE: u64 = 1024 * 1024 * 256; // 256 MB
@@ -40,6 +41,8 @@ pub(crate) struct ResourceStore {
     pub compute_material_factory: MaterialFactory,
     ///// Rasterization pipeline factory that creates material instances for rasterizing 3D geometry
     //pub graphics_material_factory: MaterialFactory,
+
+    deletion_queue: DeletionQueue,
 }
 
 impl ResourceStore {

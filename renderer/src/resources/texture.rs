@@ -77,7 +77,7 @@ pub(crate) struct Texture {
 
     /// Determines if the dtor should destroy the vk::ImageView associated with this texture.
     /// If false, this `Texture` will NOT responsible for the lifetime of the `vk::ImageView`.
-    destroy_view: bool,
+    should_destroy_view: bool,
 
     allocation: Option<vk_mem::Allocation>, // GPU-only memory block
     gpu: Arc<Gpu>,
@@ -158,7 +158,7 @@ impl Texture {
             },
             queue_state: TextureQueueState::Uninitialized,
 
-            destroy_view: true, // Since we created the view in this ctor, we'll need to clean it up
+            should_destroy_view: true, // Since we created the view in this ctor, we'll need to clean it up
 
             allocation: Some(allocation),
             gpu,
@@ -247,7 +247,7 @@ impl Texture {
                 access_mask: vk::AccessFlags2::NONE,
             },
             queue_state: TextureQueueState::Owned { queue },
-            destroy_view,
+            should_destroy_view: destroy_view,
             allocation: None,
             gpu,
         })
@@ -435,7 +435,7 @@ impl Texture {
 
 impl Drop for Texture {
     fn drop(&mut self) {
-        if self.destroy_view {
+        if self.should_destroy_view {
             self.gpu.destroy_vk_image_view(self.view);
         }
         if let Some(allocation) = self.allocation.as_mut() {
