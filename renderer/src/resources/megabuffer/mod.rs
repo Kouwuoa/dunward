@@ -12,6 +12,8 @@ use std::sync::{Arc, Mutex, mpsc};
 use super::buffer::Buffer;
 use crate::commands::TransferCommandRecorder;
 use crate::gpu::Gpu;
+use crate::resources::deletion::payload::BufferDeletionPayload;
+use crate::resources::deletion::sender::DeletionSender;
 use crate::resources::megabuffer::uploader::MegabufferUploader;
 use freelist::MegabufferFreeList;
 use region::AllocatedMegabufferRegion;
@@ -54,6 +56,7 @@ impl Megabuffer {
         buf_usage: vk::BufferUsageFlags,
         gpu: Arc<Gpu>,
         upload_recorder: Arc<Mutex<TransferCommandRecorder>>,
+        deletion_sender: DeletionSender<BufferDeletionPayload>,
     ) -> Result<Megabuffer> {
         log::info!(
             "Creating Megabuffer with size: {}, alignment: {}, usage: {:?}",
@@ -63,7 +66,7 @@ impl Megabuffer {
         );
 
         let mem_usage = vk_mem::MemoryUsage::AutoPreferDevice;
-        let buffer = Buffer::new(size, alignment, buf_usage, mem_usage, false, gpu.clone())?;
+        let buffer = Buffer::new(size, alignment, buf_usage, mem_usage, false, gpu.clone(), deletion_sender.clone())?;
 
         let id = MegabufferId::generate();
         let free_list = MegabufferFreeList::new(id, size);
@@ -73,6 +76,7 @@ impl Megabuffer {
             alignment,
             write_sender,
             gpu.clone(),
+            deletion_sender.clone(),
         ));
         let uploader = MegabufferUploader::new(buffer.raw(), write_receiver, upload_recorder);
 

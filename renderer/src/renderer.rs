@@ -11,6 +11,7 @@ use color_eyre::Result;
 use thiserror::Error;
 
 use crate::gpu::Gpu;
+use crate::resources::deletion::queue::DeletionQueue;
 use crate::{
     Camera,
     commands::allocator::{CommandRecorderAllocator, CommandRecorderAllocatorExt},
@@ -35,15 +36,14 @@ pub enum RendererError {
 
 pub struct Renderer {
     gpu: Arc<Gpu>,
-
-    // Hardware & Presentation
     display: Display,
     frames: Vec<Frame>,
-
-    // Commands & Resources
     cmd_allocator: CommandRecorderAllocator,
-    resource_factory: ResourceFactory,
-    resource_store: ResourceStore,
+
+    // Wrap long-lived resource owners in Option for clean teardown in Drop
+    resource_factory: Option<ResourceFactory>,
+    resource_store: Option<ResourceStore>,
+    deletion_queue: DeletionQueue,
 
     frame_number: u64,
     time_start: Instant,
@@ -63,9 +63,9 @@ impl Renderer {
         let display = Display::new(window, gpu.clone(), surface)?;
 
         let mut cmd_allocator = CommandRecorderAllocator::new(gpu.raw_logical())?;
-        let deletion_queue = DeletionQueue::new(gpu.clone())?;
-        let resource_factory = ResourceFactory::new(gpu.clone())?;
-        let mut resource_store = ResourceStore::new(&resource_factory, deletion_queue.get_sender())?;
+        let deletion_queue = DeletionQueue::new(Self::FRAMES_IN_FLIGHT as usize);
+        let resource_factory = ResourceFactory::new(gpu.clone(), deletion_queue.get_sender())?;
+        let mut resource_store = ResourceStore::new(&resource_factory)?;
         let nearest_sampler = gpu.create_vk_sampler(
             &vk::SamplerCreateInfo::default()
                 .mag_filter(vk::Filter::NEAREST)
@@ -94,8 +94,9 @@ impl Renderer {
             display,
             frames,
             cmd_allocator,
-            resource_factory,
-            resource_store,
+            resource_factory: Some(resource_factory),
+            resource_store: Some(resource_store),
+            deletion_queue,
             frame_number: 0,
             time_start: Instant::now(),
         })
@@ -113,6 +114,13 @@ impl Renderer {
         let present_pkt = current_frame
             .render(render_pkt, self.gpu.clone(), &self.display)
             .unwrap();
+
+        // Destroy resources collected in the previous frame
+        self.deletion_queue
+            .destroy_pending(current_frame_index, &self.gpu);
+
+        // Ingest new resources scheduled for deletion into the frame bucket for the current frame
+        self.deletion_queue.collect_pending(current_frame_index);
 
         // Present the frame
         let display_suboptimal = present_pkt.texture.suboptimal;
@@ -140,7 +148,7 @@ impl Renderer {
 
         // Resize the frame contexts
         for frame in &mut self.frames {
-            frame.resize(&size, &self.resource_factory);
+            frame.resize(&size, self.resource_factory.as_ref().unwrap());
         }
 
         Ok(())
@@ -170,5 +178,13 @@ impl Drop for Renderer {
         for frame in self.frames.drain(..) {
             frame.destroy(&mut self.cmd_allocator).unwrap();
         }
+
+        // Drop resource store and factory to trigger Drop impls of all resources,
+        // sending their deletion payloads to the deletion queue
+        drop(self.resource_factory.take());
+        drop(self.resource_store.take());
+
+        // Flush the deletion queue to ensure all resources are deleted
+        self.deletion_queue.flush_all(&self.gpu);
     }
 }

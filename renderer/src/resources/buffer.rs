@@ -3,6 +3,8 @@
 //! Wraps [`ash::vk::Buffer`] and [`vk_mem::Allocation`], supporting host-visible
 //! memory-mapped writes via [`presser`].
 
+use super::deletion::payload::BufferDeletionPayload;
+use super::deletion::sender::DeletionSender;
 use crate::gpu::Gpu;
 
 use ash::vk;
@@ -17,6 +19,7 @@ pub(crate) struct Buffer {
 
     allocation: Option<vk_mem::Allocation>,
     gpu: Arc<Gpu>,
+    deletion_sender: DeletionSender<BufferDeletionPayload>,
 }
 
 impl Buffer {
@@ -27,6 +30,7 @@ impl Buffer {
         mem_usage: vk_mem::MemoryUsage,
         mapped: bool,
         gpu: Arc<Gpu>,
+        deletion_sender: DeletionSender<BufferDeletionPayload>,
     ) -> Result<Self> {
         let (buffer, allocation) = {
             let buffer_info = vk::BufferCreateInfo {
@@ -55,6 +59,7 @@ impl Buffer {
             mapped,
             allocation: Some(allocation),
             gpu,
+            deletion_sender,
         })
     }
 
@@ -95,7 +100,9 @@ impl Buffer {
 
 impl Drop for Buffer {
     fn drop(&mut self) {
-        let allocation = self.allocation.as_mut().expect("Allocation does not exist");
-        self.gpu.destroy_vk_buffer(self.buffer, allocation);
+        self.deletion_sender.send(BufferDeletionPayload {
+            handle: self.buffer,
+            allocation: self.allocation.take().unwrap(),
+        });
     }
 }

@@ -3,6 +3,8 @@ use super::Buffer;
 use super::MegabufferId;
 use crate::gpu::Gpu;
 
+use crate::resources::deletion::payload::BufferDeletionPayload;
+use crate::resources::deletion::sender::DeletionSender;
 use ash::vk;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
@@ -24,6 +26,7 @@ pub(crate) struct MegabufferWriter {
     /// The records accumulate in host-visible memory until drained by the `Megabuffer`'s receiver during `Megabuffer::upload`.
     write_sender: mpsc::Sender<MegabufferWriteRecord>,
     gpu: Arc<Gpu>,
+    staging_buffer_deletion_sender: DeletionSender<BufferDeletionPayload>,
 }
 
 impl MegabufferWriter {
@@ -32,12 +35,14 @@ impl MegabufferWriter {
         alignment: u64,
         write_sender: mpsc::Sender<MegabufferWriteRecord>,
         gpu: Arc<Gpu>,
+        staging_buffer_deletion_sender: DeletionSender<BufferDeletionPayload>,
     ) -> Self {
         Self {
             megabuffer_id,
             alignment,
             write_sender,
             gpu,
+            staging_buffer_deletion_sender,
         }
     }
 
@@ -69,6 +74,7 @@ impl MegabufferWriter {
             vk_mem::MemoryUsage::AutoPreferHost,
             true,
             self.gpu.clone(),
+            self.staging_buffer_deletion_sender.clone(),
         )?;
 
         // Write CPU bytes into the staging buffer

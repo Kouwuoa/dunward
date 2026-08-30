@@ -94,9 +94,9 @@ impl Display {
             view,
             format,
             extent,
-            false,
             self.present_queue.clone(),
             gpu,
+            None,
         );
 
         Ok(PresentTextureBundle {

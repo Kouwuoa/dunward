@@ -9,6 +9,8 @@ use crate::commands::transfer::TransferCommandRecorder;
 use crate::gpu::Gpu;
 use crate::gpu::queue::Queue;
 
+use crate::resources::deletion::payload::{BufferDeletionPayload, TextureDeletionPayload};
+use crate::resources::deletion::sender::DeletionSender;
 use ash::vk;
 use color_eyre::eyre::Result;
 use std::ops::{Deref, DerefMut};
@@ -75,12 +77,10 @@ pub(crate) struct Texture {
     pub access_state: TextureAccess,
     pub queue_state: TextureQueueState,
 
-    /// Determines if the dtor should destroy the vk::ImageView associated with this texture.
-    /// If false, this `Texture` will NOT responsible for the lifetime of the `vk::ImageView`.
-    should_destroy_view: bool,
-
     allocation: Option<vk_mem::Allocation>, // GPU-only memory block
     gpu: Arc<Gpu>,
+    /// If `None`, this `Texture` will NOT responsible for the lifetime of the `vk::ImageView`, `vk::Image`, or `vk_mem::Allocation`.
+    deletion_sender: Option<DeletionSender<TextureDeletionPayload>>,
 }
 
 pub(crate) enum TextureQueueState {
@@ -107,7 +107,11 @@ impl Texture {
     /// and is NOT yet populated with any data.
     /// This means that unless you are making a depth image or storage image, you will need to call
     /// `upload()`
-    fn new(create_info: &TextureCreateInfo, gpu: Arc<Gpu>) -> Result<Texture> {
+    fn new(
+        create_info: &TextureCreateInfo,
+        gpu: Arc<Gpu>,
+        deletion_sender: DeletionSender<TextureDeletionPayload>,
+    ) -> Result<Texture> {
         let (image, allocation) = {
             let image_info = vk::ImageCreateInfo::default()
                 .format(create_info.format)
@@ -157,11 +161,9 @@ impl Texture {
                 access_mask: vk::AccessFlags2::NONE,
             },
             queue_state: TextureQueueState::Uninitialized,
-
-            should_destroy_view: true, // Since we created the view in this ctor, we'll need to clean it up
-
             allocation: Some(allocation),
             gpu,
+            deletion_sender: Some(deletion_sender),
         })
     }
 
@@ -174,6 +176,7 @@ impl Texture {
         usage: vk::ImageUsageFlags,
         gpu: Arc<Gpu>,
         transfer: &mut TransferCommandRecorder,
+        deletion_sender: DeletionSender<TextureDeletionPayload>,
     ) -> Result<ColorTexture> {
         let image = {
             let create_info = TextureCreateInfo {
@@ -187,10 +190,14 @@ impl Texture {
                 aspect: vk::ImageAspectFlags::COLOR,
                 use_dedicated_memory,
             };
-            let mut image = Self::new(&create_info, gpu)?;
+            let mut image = Self::new(&create_info, gpu, deletion_sender.clone())?;
 
             if let Some(data) = data {
-                image.upload(data, transfer)?;
+                image.upload(
+                    data,
+                    transfer,
+                    deletion_sender.clone::<BufferDeletionPayload>(),
+                )?;
             }
 
             image
@@ -205,6 +212,7 @@ impl Texture {
         usage: vk::ImageUsageFlags,
         gpu: Arc<Gpu>,
         transfer: &mut TransferCommandRecorder,
+        deletion_sender: DeletionSender<TextureDeletionPayload>,
     ) -> Result<ColorTexture> {
         let data = image.to_rgba8().into_raw();
         let width = image.width();
@@ -217,19 +225,20 @@ impl Texture {
             usage,
             gpu,
             transfer,
+            deletion_sender,
         )
     }
 
     /// # Arguments
-    /// * `destroy_view` - If false, this function creates a `ColorTexture` that is NOT responsible for the lifetime of the `vk::ImageView`
+    /// * `deletion_sender` - If None, this function creates a `ColorTexture` that is NOT responsible for the lifetime of the `vk::ImageView`. The `ColorTexture` will also not be responsible for cleaning up the `vk::Image` allocation
     pub fn new_color_texture_from_vkimage(
         image: &vk::Image,
         view: &vk::ImageView,
         format: &vk::Format,
         extent: &vk::Extent2D,
-        destroy_view: bool,
         queue: Arc<Queue>,
         gpu: Arc<Gpu>,
+        deletion_sender: Option<DeletionSender<TextureDeletionPayload>>,
     ) -> ColorTexture {
         ColorTexture(Texture {
             image: *image,
@@ -247,14 +256,19 @@ impl Texture {
                 access_mask: vk::AccessFlags2::NONE,
             },
             queue_state: TextureQueueState::Owned { queue },
-            should_destroy_view: destroy_view,
             allocation: None,
             gpu,
+            deletion_sender,
         })
     }
 
     /// Create a special type of texture used for the depth buffer
-    pub fn new_depth_texture(width: u32, height: u32, gpu: Arc<Gpu>) -> Result<DepthTexture> {
+    pub fn new_depth_texture(
+        width: u32,
+        height: u32,
+        gpu: Arc<Gpu>,
+        deletion_sender: DeletionSender<TextureDeletionPayload>,
+    ) -> Result<DepthTexture> {
         let create_info = TextureCreateInfo {
             format: vk::Format::D32_SFLOAT,
             extent: vk::Extent3D {
@@ -266,7 +280,7 @@ impl Texture {
             aspect: vk::ImageAspectFlags::DEPTH,
             use_dedicated_memory: true, // Assuming the depth image will be used as a fullscreen attachment
         };
-        Ok(DepthTexture(Self::new(&create_info, gpu)?))
+        Ok(DepthTexture(Self::new(&create_info, gpu, deletion_sender)?))
     }
 
     /// Create a special type of texture likely used by compute shaders
@@ -275,6 +289,7 @@ impl Texture {
         height: u32,
         use_dedicated_memory: bool,
         gpu: Arc<Gpu>,
+        deletion_sender: DeletionSender<TextureDeletionPayload>,
     ) -> Result<StorageTexture> {
         let image = {
             let extent = vk::Extent3D {
@@ -292,7 +307,7 @@ impl Texture {
                 aspect: vk::ImageAspectFlags::COLOR,
                 use_dedicated_memory,
             };
-            Texture::new(&create_info, gpu)?
+            Texture::new(&create_info, gpu, deletion_sender)?
         };
 
         Ok(StorageTexture(image))
@@ -343,7 +358,12 @@ impl Texture {
         };
     }
 
-    fn upload(&mut self, data: &[u8], transfer: &mut TransferCommandRecorder) -> Result<()> {
+    fn upload(
+        &mut self,
+        data: &[u8],
+        transfer: &mut TransferCommandRecorder,
+        staging_buffer_deletion_sender: DeletionSender<BufferDeletionPayload>,
+    ) -> Result<()> {
         let mut staging_buffer = Buffer::new(
             data.len() as u64,
             256,
@@ -351,6 +371,7 @@ impl Texture {
             vk_mem::MemoryUsage::AutoPreferHost,
             true,
             self.gpu.clone(),
+            staging_buffer_deletion_sender,
         )?;
         staging_buffer.write(data, 0)?;
         transfer.immediate_submit(|cmd: vk::CommandBuffer, _device: &ash::Device| {
@@ -435,11 +456,12 @@ impl Texture {
 
 impl Drop for Texture {
     fn drop(&mut self) {
-        if self.should_destroy_view {
-            self.gpu.destroy_vk_image_view(self.view);
-        }
-        if let Some(allocation) = self.allocation.as_mut() {
-            self.gpu.destroy_vk_image(self.image, allocation);
+        if let Some(deletion_sender) = &self.deletion_sender {
+            deletion_sender.send(TextureDeletionPayload {
+                handle: self.image,
+                view: Some(self.view),
+                allocation: self.allocation,
+            });
         }
     }
 }
