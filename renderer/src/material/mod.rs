@@ -9,6 +9,7 @@ pub(crate) mod shader;
 pub(crate) mod shader_data;
 
 pub(crate) use compute::ComputeMaterialFactoryBuilder;
+pub(crate) use graphics::GraphicsMaterialFactoryBuilder;
 
 use std::sync::{Arc, Mutex};
 
@@ -43,11 +44,8 @@ impl Material {
 
     pub fn bind(&self, command_buffer: vk::CommandBuffer) {
         unsafe {
-            self.device.cmd_bind_pipeline(
-                command_buffer,
-                self.pipeline_bind_point,
-                self.pipeline,
-            );
+            self.device
+                .cmd_bind_pipeline(command_buffer, self.pipeline_bind_point, self.pipeline);
             let descriptor_sets = [self.descriptor_set];
             self.device.cmd_bind_descriptor_sets(
                 command_buffer,

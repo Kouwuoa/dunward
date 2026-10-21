@@ -96,6 +96,7 @@ impl Frame {
         self.frame_completion_timeline_base = postrender_timeline_signal;
 
         // TODO: Render the geometry stage
+        let geometry_stage_output = self.geometry_stage.render();
 
         // TODO: Transfer the geometry stage output texture from graphics queue to compute queue
 
@@ -197,7 +198,7 @@ impl Frame {
         size: &winit::dpi::PhysicalSize<u32>,
         resource_factory: &ResourceFactory,
     ) {
-        // TODO: Resize the geometry stage as well
+        self.geometry_stage.resize(size, resource_factory);
         self.lighting_stage.resize(size, resource_factory);
     }
 
