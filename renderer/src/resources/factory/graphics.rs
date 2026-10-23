@@ -1,7 +1,11 @@
-use crate::material::{GraphicsMaterialFactoryBuilder, MaterialFactory, shader::GraphicsShader};
+use crate::{
+    material::{GraphicsMaterialFactoryBuilder, MaterialFactory, shader::GraphicsShader},
+    resources::{ResourceType, descriptor::DescriptorSetLayoutBuilder},
+};
 
 use super::ResourceFactory;
 
+use ash::vk;
 use color_eyre::Result;
 use shaderpack::ShaderId;
 
@@ -10,8 +14,8 @@ impl ResourceFactory {
         let descriptor_set_layout = self.create_graphics_descriptor_set_layout()?;
         let pipeline_layout = self.create_graphics_pipeline_layout(descriptor_set_layout)?;
         let graphics_shader = GraphicsShader::new(
-            ShaderId::TriangleVert,
-            ShaderId::TriangleFrag,
+            ShaderId::DefaultVert,
+            ShaderId::DefaultFrag,
             self.gpu.raw_logical(),
         )?;
         GraphicsMaterialFactoryBuilder::new(
@@ -26,7 +30,38 @@ impl ResourceFactory {
         todo!()
     }
 
-    fn create_graphics_descriptor_set_layout(&self) -> _ {
-        todo!()
+    fn create_graphics_descriptor_set_layout(&self) -> Result<vk::DescriptorSetLayout> {
+        DescriptorSetLayoutBuilder::new()
+            .add_binding(
+                // Per-frame
+                0,
+                ResourceType::UniformBuffer.descriptor_type(),
+                1,
+                vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                ResourceType::UniformBuffer.descriptor_binding_flags(),
+                None,
+            )
+            .add_binding(
+                // Per-material
+                1,
+                ResourceType::StorageBuffer.descriptor_type(),
+                1,
+                vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                ResourceType::StorageBuffer.descriptor_binding_flags(),
+                None,
+            )
+            .add_binding(
+                // Per-object
+                2,
+                ResourceType::StorageBuffer.descriptor_type(),
+                1,
+                vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+                ResourceType::StorageBuffer.descriptor_binding_flags(),
+                None,
+            )
+            .build(
+                vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
+                &self.gpu.raw_logical(),
+            )
     }
 }

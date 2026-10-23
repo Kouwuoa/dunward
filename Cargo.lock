@@ -4160,7 +4160,6 @@ dependencies = [
  "color-eyre",
  "log",
  "naga 28.0.0",
- "rust-embed",
  "shaderc",
 ]
 

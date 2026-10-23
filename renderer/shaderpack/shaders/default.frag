@@ -1,11 +1,16 @@
 #version 450
+#extension GL_EXT_buffer_reference : require
+#extension GL_EXT_scalar_block_layout : require
 #extension GL_EXT_nonuniform_qualifier : require
 
+
+// These data structures must match exactly with Rust #[repr(C)]
 struct PerFrameData {
     mat4 viewproj;
     float near;
     float far;
-    float _padding[2];
+    float time_sec;
+    float _padding;
 };
 struct PerMaterialData {
     uint texture_index;
@@ -15,22 +20,24 @@ struct PerObjectData {
     mat4 model;
 };
 
-layout(set = 0, binding = 0) uniform PerFrameBuffer {
-    PerFrameData data;
-} per_frame;
-layout(set = 0, binding = 1) buffer PerMaterialBuffer {
-    PerMaterialData data[];
-} per_material;
-layout(set = 0, binding = 2) buffer PerObjectBuffer {
-    PerObjectData data[];
-} per_object;
-layout(set = 0, binding = 3) uniform sampler samplers[];
-layout(set = 0, binding = 4) uniform texture2D textures[];
+// Declare buffer references (these are 64-bit pointers)
+layout(buffer_reference, scalar) readonly buffer FrameBufferRef {
+    PerFrameData frame;
+};
+layout(buffer_reference, scalar) readonly buffer MaterialBufferRef {
+    PerMaterialData materials[];
+};
+layout(buffer_reference, scalar) readonly buffer ObjectBufferRef {
+    PerObjectData objects[];
+};
 
 layout(push_constant) uniform PerDrawData {
     uint object_index;
     uint material_index;
 } per_draw;
+
+layout(set = 1, binding = 0) uniform sampler global_samplers[];
+layout(set = 1, binding = 1) uniform texture2D global_textures[];
 
 layout(location = 0) in vec2 in_texcoord;
 layout(location = 0) out vec4 out_color;
